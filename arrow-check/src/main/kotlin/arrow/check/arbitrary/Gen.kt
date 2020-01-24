@@ -2,6 +2,18 @@ package arrow.check.arbitrary
 
 import arrow.Kind
 import arrow.Kind2
+import arrow.check.arbitrary.gent.alternative.alternative
+import arrow.check.arbitrary.gent.applicative.applicative
+import arrow.check.arbitrary.gent.functor.functor
+import arrow.check.arbitrary.gent.monad.monad
+import arrow.check.property.*
+import arrow.check.property.rose.alternative.alternative
+import arrow.check.property.rose.alternative.orElse
+import arrow.check.property.rose.applicative.applicative
+import arrow.check.property.rose.birecursive.birecursive
+import arrow.check.property.rose.monad.monad
+import arrow.check.property.rose.monadFilter.filterMap
+import arrow.check.property.rose.monadTrans.monadTrans
 import arrow.core.*
 import arrow.core.extensions.eval.monad.monad
 import arrow.core.extensions.id.functor.functor
@@ -9,7 +21,6 @@ import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.traverse.sequence
 import arrow.core.extensions.list.traverse.traverse
 import arrow.core.extensions.listk.functorFilter.filterMap
-import arrow.core.extensions.option.monad.monad
 import arrow.extension
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
@@ -24,19 +35,6 @@ import arrow.mtl.typeclasses.unnest
 import arrow.mtl.value
 import arrow.syntax.collections.tail
 import arrow.typeclasses.*
-import arrow.check.arbitrary.gent.alternative.alternative
-import arrow.check.arbitrary.gent.applicative.applicative
-import arrow.check.arbitrary.gent.functor.functor
-import arrow.check.arbitrary.gent.monad.map
-import arrow.check.arbitrary.gent.monad.monad
-import arrow.check.property.*
-import arrow.check.property.rose.alternative.alternative
-import arrow.check.property.rose.alternative.orElse
-import arrow.check.property.rose.applicative.applicative
-import arrow.check.property.rose.birecursive.birecursive
-import arrow.check.property.rose.monad.monad
-import arrow.check.property.rose.monadFilter.filterMap
-import arrow.check.property.rose.monadTrans.monadTrans
 import kotlin.random.Random
 
 // @higherkind boilerplate
@@ -87,6 +85,7 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
         fun <M, A> just(MA: Monad<M>, a: A): GenT<M, A> = GenT {
             Rose.just(OptionT.applicative(MA), a)
         }
+
         fun <A> just(a: A): Gen<A> = just(Id.monad(), a)
     }
 }
@@ -175,7 +174,9 @@ interface GenTMonoid<M, A> : Monoid<GenT<M, A>>, GenTSemigroup<M, A> {
 @extension
 interface GenTAlternative<M> : Alternative<GenTPartialOf<M>>, GenTApplicative<M> {
     override fun MM(): Monad<M>
-    override fun <A> empty(): Kind<GenTPartialOf<M>, A> = GenT { Rose.alternative(OptionT.alternative(MM()), OptionT.monad(MM())).empty<A>().fix() }
+    override fun <A> empty(): Kind<GenTPartialOf<M>, A> =
+        GenT { Rose.alternative(OptionT.alternative(MM()), OptionT.monad(MM())).empty<A>().fix() }
+
     override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
         GenT { t -> (fix().runGen(t).orElse(OptionT.alternative(MM()), OptionT.monad(MM()), b.fix().runGen(t))) }
 }
@@ -196,54 +197,71 @@ fun <M> GenT.Companion.monadGen(MM: Monad<M>): MonadGen<GenTPartialOf<M>, M> = o
     override fun <A> Kind<GenTPartialOf<M>, A>.toGenT(): GenT<M, A> = fix()
     override fun <A, B> Kind<GenTPartialOf<M>, A>.map(f: (A) -> B): Kind<GenTPartialOf<M>, B> =
         fix().genMap(BM(), f)
+
     override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
         fix().genAp(BM(), ff.fix())
+
     override fun <A, B> Kind<GenTPartialOf<M>, A>.lazyAp(ff: () -> Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
         fix().genAp(BM(), ff().fix())
+
     override fun <A, B> Kind<GenTPartialOf<M>, A>.flatMap(f: (A) -> Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, B> =
         MM().run { flatMap(f) }
+
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = MM().just(a)
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<M>, Either<A, B>>): Kind<GenTPartialOf<M>, B> =
         MM().tailRecM(a, f)
+
     override fun <A> empty(): Kind<GenTPartialOf<M>, A> = GenT.alternative(BM()).empty()
-    override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> = GenT.alternative(BM()).run {
-        orElse(b.fix())
-    }
+    override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
+        GenT.alternative(BM()).run {
+            orElse(b.fix())
+        }
 }
 
 // for convenience and to not throw on non-arrow users
-fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object: MonadGen<GenTPartialOf<ForId>, ForId> {
+fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object : MonadGen<GenTPartialOf<ForId>, ForId> {
     override fun BM(): Monad<ForId> = Id.monad()
     override fun MM(): Monad<GenTPartialOf<ForId>> = GenT.monad(Id.monad())
     override fun <A> GenT<ForId, A>.fromGenT(): Kind<GenTPartialOf<ForId>, A> = this
     override fun <A> Kind<GenTPartialOf<ForId>, A>.toGenT(): GenT<ForId, A> = fix()
     override fun <A, B> Kind<GenTPartialOf<ForId>, A>.map(f: (A) -> B): Kind<GenTPartialOf<ForId>, B> =
         fix().genMap(BM(), f)
+
     override fun <A, B> Kind<GenTPartialOf<ForId>, A>.ap(ff: Kind<GenTPartialOf<ForId>, (A) -> B>): Kind<GenTPartialOf<ForId>, B> =
         fix().genAp(BM(), ff.fix())
+
     override fun <A, B> Kind<GenTPartialOf<ForId>, A>.flatMap(f: (A) -> Kind<GenTPartialOf<ForId>, B>): Kind<GenTPartialOf<ForId>, B> =
         MM().run { flatMap(f) }
-    override fun <A> just(a: A): Kind<GenTPartialOf<ForId>, A> = MM().just(a)
-    override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<ForId>, Either<A, B>>): Kind<GenTPartialOf<ForId>, B> =
-        MM().tailRecM(a, f)
-    override fun <A> empty(): Kind<GenTPartialOf<ForId>, A> = GenT.alternative(BM()).empty()
-    override fun <A> Kind<GenTPartialOf<ForId>, A>.orElse(b: Kind<GenTPartialOf<ForId>, A>): Kind<GenTPartialOf<ForId>, A> = GenT.alternative(BM()).run {
-        orElse(b.fix())
-    }
 
-    override fun <A> Kind<GenTPartialOf<ForId>, A>.list(range: Range<Int>): Kind<GenTPartialOf<ForId>, List<A>> = GenT.monadGen(Eval.monad()).run {
-        GenT(AndThen(this@list.toGenT().generalize(Eval.monad()).list(range).toGenT().runGen).andThen {
-            it.hoist(object: FunctionK<OptionTPartialOf<ForEval>, OptionTPartialOf<ForId>> {
-                override fun <A> invoke(fa: Kind<OptionTPartialOf<ForEval>, A>): Kind<OptionTPartialOf<ForId>, A> =
-                    OptionT(Id(fa.value().value()))
-            }, OptionT.monad(Eval.monad()))
-        }).fromGenT()
-    }
+    override fun <A> just(a: A): Kind<GenTPartialOf<ForId>, A> = MM().just(a)
+    override fun <A, B> tailRecM(
+        a: A,
+        f: (A) -> Kind<GenTPartialOf<ForId>, Either<A, B>>
+    ): Kind<GenTPartialOf<ForId>, B> =
+        MM().tailRecM(a, f)
+
+    override fun <A> empty(): Kind<GenTPartialOf<ForId>, A> = GenT.alternative(BM()).empty()
+    override fun <A> Kind<GenTPartialOf<ForId>, A>.orElse(b: Kind<GenTPartialOf<ForId>, A>): Kind<GenTPartialOf<ForId>, A> =
+        GenT.alternative(BM()).run {
+            orElse(b.fix())
+        }
+
+    override fun <A> Kind<GenTPartialOf<ForId>, A>.list(range: Range<Int>): Kind<GenTPartialOf<ForId>, List<A>> =
+        GenT.monadGen(Eval.monad()).run {
+            GenT(AndThen(this@list.toGenT().generalize(Eval.monad()).list(range).toGenT().runGen).andThen {
+                it.hoist(object : FunctionK<OptionTPartialOf<ForEval>, OptionTPartialOf<ForId>> {
+                    override fun <A> invoke(fa: Kind<OptionTPartialOf<ForEval>, A>): Kind<OptionTPartialOf<ForId>, A> =
+                        OptionT(Id(fa.value().value()))
+                }, OptionT.monad(Eval.monad()))
+            }).fromGenT()
+        }
 }
 
-fun <M, A> GenT.Companion.monadGen(MM: Monad<M>, f: MonadGen<GenTPartialOf<M>, M>.() -> GenTOf<M, A>): GenT<M, A> = monadGen(MM).f().fix()
+fun <M, A> GenT.Companion.monadGen(MM: Monad<M>, f: MonadGen<GenTPartialOf<M>, M>.() -> GenTOf<M, A>): GenT<M, A> =
+    monadGen(MM).f().fix()
 
-fun <A> GenT.Companion.monadGen(f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, A>): Gen<A> = monadGen().f().fix()
+fun <A> GenT.Companion.monadGen(f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, A>): Gen<A> =
+    monadGen().f().fix()
 
 fun <M, A> Gen<A>.generalize(MM: Monad<M>): GenT<M, A> = GenT { (r, s) ->
     runGen(r toT s).hoist(object : FunctionK<OptionTPartialOf<ForId>, OptionTPartialOf<M>> {
@@ -489,7 +507,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 val (x, gen) = this@filterMap.scale { Size(2 * k + it.unSize) }.freeze().bind()
                 f(x).fold({ t(k + 1).bind() }, {
                     gen.toGenT()
-                        .mapTree { it.filterMap(OptionT.alternative(BM()), OptionT.monad(BM()), f)  }
+                        .mapTree { it.filterMap(OptionT.alternative(BM()), OptionT.monad(BM()), f) }
                         .fromGenT().bind()
                 })
             }
@@ -529,11 +547,6 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         }
     }
 
-    // TODO arrow pr
-    private fun <A> Kind<M, A>.replicateLazy(n: Int): Kind<M, List<A>> =
-        if (n <= 0) just(emptyList())
-        else lazyAp { this@replicateLazy.replicate(n - 1).map { xs -> { x: A -> listOf(x) + xs } } }
-
     fun <A> Kind<M, A>.list(range: IntRange): Kind<M, List<A>> = list(Range.constant(range.first, range.last))
 
     fun <A> Kind<M, A>.set(range: Range<Int>): Kind<M, Set<A>> = MM().run {
@@ -562,6 +575,32 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
             }
         return go(0, emptyMap())
     }
+
+    // arrow combinators
+    fun <L, R> either(l: Kind<M, L>, r: Kind<M, R>): Kind<M, Either<L, R>> = sized { sz ->
+        frequency(
+            2 toT l.map(::Left),
+            1 + sz.unSize toT r.map(::Right)
+        )
+    }
+
+    fun <E, A> validated(l: Kind<M, E>, r: Kind<M, A>): Kind<M, Validated<E, A>> =
+        either(l, r).map { Validated.fromEither(it) }
+
+    fun <L, R> ior(l: Kind<M, L>, r: Kind<M, R>): Kind<M, Ior<L, R>> = sized { sz ->
+        frequency(
+            2 toT l.map { Ior.Left(it) },
+            1 + (sz.unSize / 2) toT mapN(l, r) { (l, r) -> Ior.Both(l, r) },
+            1 + sz.unSize toT r.map { Ior.Right(it) }
+        )
+    }
+
+    fun <A> Kind<M, A>.id(): Kind<M, Id<A>> = map(::Id)
+
+    fun <A, T> Kind<M, A>.const(): Kind<M, Const<A, T>> = map(::Const)
+
+    fun <A> Kind<M, A>.nonEmptyList(range: Range<Int>): Kind<M, NonEmptyList<A>> =
+        list(range).filterMap { NonEmptyList.fromList(it) }
 
     // subterms
     fun <A> Kind<M, A>.freeze(): Kind<M, Tuple2<A, Kind<M, A>>> =
