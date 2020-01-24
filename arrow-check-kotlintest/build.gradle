@@ -1,0 +1,23 @@
+// TODO can I avoid having to declare this somehow?
+repositories {
+    maven { url 'https://dl.bintray.com/jannis/kotlin-pretty' }
+    maven { url 'https://dl.bintray.com/jannis/kparsec' }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    implementation "io.arrow-kt:arrow-fx:$arrow_version" // IO and arrow fx
+    api project(":arrow-check")
+
+    api("io.kotlintest:kotlintest-runner-junit5:3.4.2") {
+        exclude group: "io.arrow-kt"
+    }
+    api("io.arrow-kt:arrow-test:$arrow_version") { // test helpers and laws
+        exclude group: "io.kotlintest"
+    }
+}
+
+test {
+    useJUnitPlatform()
+}

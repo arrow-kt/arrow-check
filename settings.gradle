@@ -1,0 +1,3 @@
+rootProject.name = 'arrow-check'
+
+include 'arrow-check', 'arrow-check-kotlintest'
