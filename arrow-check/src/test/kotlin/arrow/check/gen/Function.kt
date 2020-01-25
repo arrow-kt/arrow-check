@@ -1,4 +1,4 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.core.Tuple2
 import arrow.core.extensions.eq

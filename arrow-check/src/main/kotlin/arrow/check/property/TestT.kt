@@ -1,31 +1,27 @@
 package arrow.check.property
 
 import arrow.Kind
-import arrow.Kind2
-import arrow.core.*
-import arrow.core.extensions.id.applicative.applicative
-import arrow.core.extensions.id.eq.eq
-import arrow.core.extensions.list.foldable.combineAll
-import arrow.extension
-import arrow.mtl.EitherT
-import arrow.mtl.WriterT
-import arrow.mtl.WriterTPartialOf
-import arrow.mtl.extensions.writert.applicative.applicative
-import arrow.mtl.extensions.writert.functor.functor
-import arrow.mtl.extensions.writert.monad.monad
-import arrow.mtl.typeclasses.MonadTrans
-import arrow.mtl.value
-import arrow.typeclasses.*
-import pretty.*
-import arrow.check.arbitrary.GenT
-import arrow.check.arbitrary.GenTPartialOf
-import arrow.check.arbitrary.gent.applicative.applicative
-import arrow.check.arbitrary.gent.functor.functor
 import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
 import arrow.check.property.log.monoid.monoid
+import arrow.core.*
+import arrow.core.extensions.id.applicative.applicative
+import arrow.core.extensions.id.eq.eq
+import arrow.core.extensions.list.foldable.combineAll
+import arrow.mtl.EitherT
+import arrow.mtl.WriterT
+import arrow.mtl.WriterTPartialOf
+import arrow.mtl.extensions.writert.applicative.applicative
+import arrow.mtl.extensions.writert.monad.monad
+import arrow.mtl.value
+import arrow.syntax.function.andThen
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.Eq
+import arrow.typeclasses.Monad
+import arrow.typeclasses.Show
+import pretty.*
 
 // ---------------------------- TestT
 typealias Test<A> = TestT<ForId, A>
@@ -52,61 +48,6 @@ data class TestT<M, A>(val runTestT: EitherT<WriterTPartialOf<M, Log>, Failure, 
         fun <M, A> just(MM: Monad<M>, a: A): TestT<M, A> =
             TestT(EitherT.just(WriterT.applicative(MM, Log.monoid()), a))
     }
-}
-
-@extension
-interface TestTFunctor<M> : Functor<TestTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A, B> Kind<TestTPartialOf<M>, A>.map(f: (A) -> B): Kind<TestTPartialOf<M>, B> =
-        fix().map(MM(), f)
-}
-
-@extension
-interface TestTApplicative<M> : Applicative<TestTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A, B> Kind<TestTPartialOf<M>, A>.ap(ff: Kind<TestTPartialOf<M>, (A) -> B>): Kind<TestTPartialOf<M>, B> =
-        fix().ap(MM(), ff.fix())
-
-    override fun <A> just(a: A): Kind<TestTPartialOf<M>, A> = TestT.just(MM(), a)
-}
-
-@extension
-interface TestTMonad<M> : Monad<TestTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A> just(a: A): Kind<TestTPartialOf<M>, A> =
-        TestT(EitherT.just(WriterT.applicative(MM(), Log.monoid()), a))
-
-    override fun <A, B> Kind<TestTPartialOf<M>, A>.flatMap(f: (A) -> Kind<TestTPartialOf<M>, B>): Kind<TestTPartialOf<M>, B> =
-        TestT(fix().runTestT.flatMap(WriterT.monad(MM(), Log.monoid()), f andThen { it.fix().runTestT }))
-
-    override fun <A, B> tailRecM(a: A, f: (A) -> Kind<TestTPartialOf<M>, Either<A, B>>): Kind<TestTPartialOf<M>, B> =
-        f(a).flatMap {
-            it.fold({
-                tailRecM(it, f)
-            }, {
-                just(it)
-            })
-        }
-}
-
-@extension
-interface TestTMonadTest<M> : MonadTest<TestTPartialOf<M>>, TestTMonad<M> {
-    override fun MM(): Monad<M>
-
-    override fun <A> Test<A>.liftTest(): Kind<TestTPartialOf<M>, A> = hoist(MM())
-}
-
-@extension
-interface TestTMonadTrans : MonadTrans<ForTestT> {
-    override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForTestT, G, A> =TestT(
-        EitherT.liftF<WriterTPartialOf<G, Log>, Failure, A>(
-            WriterT.functor(MF),
-            WriterT.liftF(this, Log.monoid(), MF)
-        )
-    )
 }
 
 // TODO refractor when https://github.com/arrow-kt/arrow/pull/1767 is merged
@@ -170,9 +111,9 @@ interface MonadTest<M> : Monad<M> {
     fun tabulate(table: String, name: String): Kind<M, Unit> =
         coverTable(table, 0.0, name, true)
 
-    fun failException(e: Exception): Kind<M, Unit> =
+    fun failException(e: Throwable): Kind<M, Unit> =
         failWith(
-            "Exception:".text() softLine (e.message?.doc() ?: nil())
+            ("Exception:".text() softLine e.toString().doc()).nest(4)
         )
 
     fun failure(): Kind<M, Unit> = failWith(nil())

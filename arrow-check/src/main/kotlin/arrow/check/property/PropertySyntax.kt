@@ -7,23 +7,26 @@ import arrow.core.Id
 import arrow.core.extensions.id.monad.monad
 import arrow.fx.ForIO
 import arrow.fx.IO
-import arrow.fx.IOOf
 import arrow.fx.extensions.io.monad.monad
 import arrow.typeclasses.Monad
 import arrow.typeclasses.MonadContinuation
 import arrow.typeclasses.MonadSyntax
 import arrow.typeclasses.Show
 import pretty.Doc
-import arrow.check.arbitrary.*
-import arrow.check.arbitrary.`fun`.show.show
-import arrow.check.property.propertyt.monad.monad
-import arrow.check.property.propertyt.monadTrans.monadTrans
+import arrow.check.gen.*
+import arrow.check.property.instances.PropertyTMonadTest
+import arrow.check.property.instances.propertyt.monad.monad
+import arrow.check.property.instances.propertyt.monadTrans.monadTrans
 import kotlin.coroutines.startCoroutine
 
 // TODO monadIO once https://github.com/arrow-kt/arrow/pull/1943 is merged
 fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): Property {
     val continuation = PropertyTestContinuation<Unit>()
-    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = { just(c()).fix() }
+    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = {
+        // Until https://github.com/arrow-kt/arrow/issues/1976 has a good fix
+        unit().bind()
+        just(c()).fix()
+    }
     wrapReturn.startCoroutine(continuation, continuation)
     return Property(
         config = propertyConfig,

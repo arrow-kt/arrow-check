@@ -2,30 +2,35 @@ package arrow.check
 
 import arrow.Kind
 import arrow.core.*
-import arrow.core.extensions.either.applicative.applicative
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
 import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.fx.IO
 import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.functor.unit
-import arrow.fx.extensions.io.monad.monad
 import arrow.fx.fix
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.value
 import arrow.recursion.elgotM
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
-import kparsec.renderPretty
-import kparsec.runParser
-import kparsec.stream
 import pretty.*
-import arrow.check.arbitrary.*
-import arrow.check.pretty.KValue
-import arrow.check.pretty.listParser
+import arrow.check.gen.*
 import arrow.check.property.*
 import arrow.check.property.Failure
+import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
+import arrow.check.property.instances.propertyt.monadTest.monadTest
+import arrow.check.property.instances.testt.monadTest.failException
+import arrow.fx.extensions.io.monadDefer.monadDefer
+import arrow.fx.typeclasses.MonadDefer
 import kotlin.random.Random
+
+fun main() {
+    check {
+        val i = forAll { int(0..1000) }.bind()
+        throw IllegalStateException("WOO?!")
+    }.unsafeRunSync()
+}
 
 /**
  * TODO Unsigned type instances for coarbitrary and function. Also generators for unsigned types
@@ -144,7 +149,7 @@ internal fun checkReport(
     prop: Property
 ): IO<Report<Result>> =
     IO.fx {
-        val report = !runProperty(IO.monad(), size, seed, prop.config, prop.prop) {
+        val report = !runProperty(IO.monadDefer(), size, seed, prop.config, prop.prop) {
             // TODO Live update will come back once I finish concurrent output
             IO.unit
         }
@@ -163,13 +168,18 @@ data class State(
 
 // TODO also clean this up... split it apart etc
 fun <M> runProperty(
-    MM: Monad<M>,
+    MM: MonadDefer<M>,
     initialSize: Size,
     initialSeed: RandSeed,
     config: PropertyConfig,
     prop: PropertyT<M, Unit>,
     hook: (Report<Progress>) -> Kind<M, Unit>
 ): Kind<M, Report<Result>> {
+    // Catch all errors M throws and report them using failException. This also catches all errors in all shrink branches the same way
+    val wrappedProp = prop.handleErrorWith(MM) {
+        PropertyT.monadTest(MM).failException(it)
+    }
+
     val (confidence, minTests) = when (config.terminationCriteria) {
         is EarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
         is NoEarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
@@ -239,7 +249,7 @@ fun <M> runProperty(
                     else -> seed.split().let { (s1, s2) ->
                         // TODO catch errors
                         MM.fx.monad {
-                            val res = !prop.unPropertyT.runTestT
+                            val res = !wrappedProp.unPropertyT.runTestT
                                 .value() // EitherT
                                 .value().fix() // WriterT
                                 .runGen(s1 toT size)
@@ -258,6 +268,8 @@ fun <M> runProperty(
                                     )
                                 ).right()
                             }, { node ->
+                                // I do not understand what makes this necessary
+                                (node as RoseF<Tuple2<Log, Either<Failure, Unit>>, Rose<OptionTPartialOf<M>, Tuple2<Log, Either<Failure, Unit>>>>)
                                 node.res.let { (log, result) ->
                                     result.fold({
                                         // shrink failure
@@ -377,7 +389,11 @@ fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(
 fun <M, A> Option<RoseF<A, Rose<OptionTPartialOf<M>, A>>>.unwrap(FF: Functor<M>): RoseF<Option<A>, Rose<M, Option<A>>> =
     fold({
         RoseF(None, emptySequence())
-    }, { RoseF(it.res.some(), it.shrunk.map { FF.run { Rose(it.runRose.value().map { it.unwrap(FF) }) } }) })
+    }, {
+        RoseF(
+            it.res.some(),
+            it.shrunk.map { FF.run { Rose(it.runRose.value().map { it.unwrap(FF) }) } })
+    })
 
 fun <M, A, L, W> RoseF<Option<Tuple2<W, Either<L, A>>>, M>.isFailure(): Boolean =
     res.fold({ false }, { it.b.isLeft() })

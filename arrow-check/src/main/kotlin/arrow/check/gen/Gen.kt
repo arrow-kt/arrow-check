@@ -1,19 +1,15 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.Kind
-import arrow.Kind2
-import arrow.check.arbitrary.gent.alternative.alternative
-import arrow.check.arbitrary.gent.applicative.applicative
-import arrow.check.arbitrary.gent.functor.functor
-import arrow.check.arbitrary.gent.monad.monad
+import arrow.check.gen.instances.gent.alternative.alternative
+import arrow.check.gen.instances.gent.monad.monad
+import arrow.check.gen.instances.rose.alternative.alternative
+import arrow.check.gen.instances.rose.applicative.applicative
+import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.rose.monad.monad
+import arrow.check.gen.instances.rose.monadFilter.filterMap
+import arrow.check.gen.instances.rose.monadTrans.monadTrans
 import arrow.check.property.*
-import arrow.check.property.rose.alternative.alternative
-import arrow.check.property.rose.alternative.orElse
-import arrow.check.property.rose.applicative.applicative
-import arrow.check.property.rose.birecursive.birecursive
-import arrow.check.property.rose.monad.monad
-import arrow.check.property.rose.monadFilter.filterMap
-import arrow.check.property.rose.monadTrans.monadTrans
 import arrow.core.*
 import arrow.core.extensions.eval.monad.monad
 import arrow.core.extensions.id.functor.functor
@@ -21,7 +17,6 @@ import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.traverse.sequence
 import arrow.core.extensions.list.traverse.traverse
 import arrow.core.extensions.listk.functorFilter.filterMap
-import arrow.extension
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.extensions.optiont.alternative.alternative
@@ -30,7 +25,6 @@ import arrow.mtl.extensions.optiont.functor.functor
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
 import arrow.mtl.fix
-import arrow.mtl.typeclasses.MonadTrans
 import arrow.mtl.typeclasses.unnest
 import arrow.mtl.value
 import arrow.syntax.collections.tail
@@ -65,7 +59,7 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
      */
     fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> = GenT { (seed, size) ->
         val (l, r) = seed.split()
-        Rose.applicative(OptionT.applicative(MA)).map(
+        Rose.applicative(OptionT.applicative(MA)).mapN(
             this@GenT.runGen(l toT size),
             ff.runGen(r toT size)
         ) { (a, b) -> b(a) }.fix()
@@ -87,106 +81,6 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
         }
 
         fun <A> just(a: A): Gen<A> = just(Id.monad(), a)
-    }
-}
-
-@extension
-interface GenTFunctor<M> : Functor<GenTPartialOf<M>> {
-    fun FM(): Functor<M>
-
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.map(f: (A) -> B): Kind<GenTPartialOf<M>, B> =
-        fix().genMap(FM(), f)
-}
-
-@extension
-interface GenTApplicative<M> : Applicative<GenTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(MM(), ff.fix())
-
-    override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(MM(), a)
-}
-
-/**
- * This violates monad laws because every flatMap splits the rng. In practice that is not a problem
- *  because the distribution of A's a Gen produces stays the same.
- * This can however be problematic when using the unsafe methods [promote], [delay].
- */
-@extension
-interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.map(f: (A) -> B): Kind<GenTPartialOf<M>, B> =
-        GenT.functor(MM()).run { map(f) }
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.followedBy(fb: Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, B> =
-        GenT.applicative(MM()).run { followedBy(fb) }
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.apTap(fb: Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, A> =
-        GenT.applicative(MM()).run { apTap(fb) }
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.lazyAp(ff: () -> Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(MM(), ff().fix())
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(MM(), ff.fix())
-
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.flatMap(f: (A) -> Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, B> =
-        fix().genFlatMap(MM(), f andThen { it.fix() })
-
-    override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(MM(), a)
-
-    override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<M>, Either<A, B>>): Kind<GenTPartialOf<M>, B> =
-        f(a).flatMap {
-            it.fold({
-                tailRecM(it, f)
-            }, {
-                just(it)
-            })
-        }
-}
-
-@extension
-interface GenTSemigroup<M, A> : Semigroup<GenT<M, A>> {
-    fun MM(): Monad<M>
-    fun AS(): Semigroup<A>
-
-    override fun GenT<M, A>.combine(b: GenT<M, A>): GenT<M, A> = GenT.applicative(MM()).run {
-        map(this@combine, b) { (a, b) -> AS().run { a + b } }.fix()
-    }
-}
-
-@extension
-interface GenTMonoid<M, A> : Monoid<GenT<M, A>>, GenTSemigroup<M, A> {
-    override fun MM(): Monad<M>
-    override fun AS(): Semigroup<A> = AM()
-    fun AM(): Monoid<A>
-
-    override fun empty(): GenT<M, A> = GenT.just(MM(), AM().empty())
-}
-
-@extension
-interface GenTAlternative<M> : Alternative<GenTPartialOf<M>>, GenTApplicative<M> {
-    override fun MM(): Monad<M>
-    override fun <A> empty(): Kind<GenTPartialOf<M>, A> =
-        GenT { Rose.alternative(OptionT.alternative(MM()), OptionT.monad(MM())).empty<A>().fix() }
-
-    override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
-        GenT { t -> (fix().runGen(t).orElse(OptionT.alternative(MM()), OptionT.monad(MM()), b.fix().runGen(t))) }
-}
-
-@extension
-interface GenTMonadTrans : MonadTrans<ForGenT> {
-    override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForGenT, G, A> = GenT {
-        OptionT.monadTrans().run {
-            liftT(MF)
-        }.let { Rose.monadTrans().run { it.liftT(OptionT.monad(MF)).fix() } }
     }
 }
 

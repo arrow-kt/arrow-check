@@ -1,6 +1,13 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.Kind
+import arrow.check.gen.either.func.func
+import arrow.check.gen.fn.functor.functor
+import arrow.check.gen.fn.functor.map
+import arrow.check.gen.instances.gent.applicative.applicative
+import arrow.check.gen.listk.func.func
+import arrow.check.gen.option.func.func
+import arrow.check.gen.tuple2.func.func
 import arrow.core.*
 import arrow.core.extensions.eval.monad.flatten
 import arrow.core.extensions.id.monad.monad
@@ -14,21 +21,7 @@ import arrow.mtl.value
 import arrow.recursion.pattern.ListF
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Functor
-import arrow.typeclasses.Monad
 import arrow.typeclasses.Show
-import arrow.check.arbitrary.`fun`.show.show
-import arrow.check.arbitrary.either.func.func
-import arrow.check.arbitrary.fn.functor.functor
-import arrow.check.arbitrary.fn.functor.map
-import arrow.check.arbitrary.gent.applicative.applicative
-import arrow.check.arbitrary.listk.func.func
-import arrow.check.arbitrary.option.func.func
-import arrow.check.arbitrary.tuple2.func.func
-import arrow.check.property.PropertyT
-import arrow.check.property.Rose
-import arrow.check.property.fix
-import arrow.check.property.forAll
-import arrow.check.property.propertyt.monad.monad
 
 // @higherkind boilerplate
 class ForFun private constructor() {
@@ -129,7 +122,7 @@ interface FnFunctor<C> : Functor<FnPartialOf<C>> {
 
 // fn gen
 fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun<A, B>> =
-    Gen.applicative(Id.monad()).map(
+    Gen.applicative(Id.monad()).mapN(
         this@toFunction,
         Gen { (s, sz) ->
             Rose.unfold(
