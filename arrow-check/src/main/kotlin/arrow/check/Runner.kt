@@ -28,7 +28,6 @@ import kotlin.random.Random
 fun main() {
     check {
         val i = forAll { int(0..1000) }.bind()
-        throw IllegalStateException("WOO?!")
     }.unsafeRunSync()
 }
 
@@ -247,7 +246,6 @@ fun <M> runProperty(
                     ) ->
                         MM.just(Report(numTests, numDiscards, currCoverage, Result.GivenUp).left())
                     else -> seed.split().let { (s1, s2) ->
-                        // TODO catch errors
                         MM.fx.monad {
                             val res = !wrappedProp.unPropertyT.runTestT
                                 .value() // EitherT

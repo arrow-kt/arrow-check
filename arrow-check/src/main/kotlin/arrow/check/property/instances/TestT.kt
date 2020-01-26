@@ -8,6 +8,7 @@ import arrow.check.property.instances.testt.monad.monad
 import arrow.check.property.instances.testt.monadTrans.liftT
 import arrow.check.property.log.monoid.monoid
 import arrow.core.Either
+import arrow.core.Tuple2
 import arrow.extension
 import arrow.fx.IO
 import arrow.fx.RacePair
@@ -26,6 +27,7 @@ import arrow.mtl.extensions.writert.monad.monad
 import arrow.mtl.extensions.writert.monadError.monadError
 import arrow.mtl.typeclasses.MonadReader
 import arrow.mtl.typeclasses.MonadTrans
+import arrow.mtl.typeclasses.MonadWriter
 import arrow.syntax.function.andThen
 import arrow.typeclasses.*
 import kotlin.coroutines.CoroutineContext
@@ -66,6 +68,15 @@ interface TestTMonad<M> : Monad<TestTPartialOf<M>> {
                 just(it)
             })
         }
+}
+
+@extension
+interface TestTAlternative<M> : Alternative<TestTPartialOf<M>>, TestTApplicative<M> {
+    override fun MM(): Monad<M>
+    fun AF(): Alternative<M>
+    override fun <A> empty(): Kind<TestTPartialOf<M>, A> = AF().empty<A>().liftT(MM())
+    override fun <A> Kind<TestTPartialOf<M>, A>.orElse(b: Kind<TestTPartialOf<M>, A>): Kind<TestTPartialOf<M>, A> =
+        TestT(EitherT(WriterT(AF().run { fix().runTestT.value().value().orElse(b.fix().runTestT.value().value()) })))
 }
 
 @extension
@@ -124,15 +135,6 @@ interface TestTMonadError<M, E> : MonadError<TestTPartialOf<M>, E>, TestTApplica
 interface TestTMonadThrow<M> : MonadThrow<TestTPartialOf<M>>, TestTMonadError<M, Throwable> {
     override fun ME(): MonadError<M, Throwable>
 }
-
-/*
-TODO Why is WriterT.bracket fixed to Throwable?
-@extension
-interface TestTBracket<M, E> : Bracket<TestTPartialOf<M>, E>, TestTMonadError<M, E> {
-    override fun ME(): MonadError<M, E> = MB()
-    fun MB(): Bracket<M, E>
-}
- */
 
 @extension
 interface TestTMonadDefer<M> : MonadDefer<TestTPartialOf<M>>, TestTMonadThrow<M> {
@@ -218,12 +220,4 @@ interface TestTConcurrent<M> : Concurrent<TestTPartialOf<M>>, TestTAsync<M> {
 }
  */
 
-/* TODO arrow pr
-@extension
-interface TestTMonadReader<M, D> : MonadReader<TestTPartialOf<M>, D>, TestTMonad<M> {
-    override fun MM(): Monad<M> = MR()
-    fun MR(): MonadReader<M, D>
-
-    private fun eReader() = EitherT.monadRader()
-}
- */
+// TODO when https://github.com/arrow-kt/arrow/pull/1981 is merged add MonadState etc

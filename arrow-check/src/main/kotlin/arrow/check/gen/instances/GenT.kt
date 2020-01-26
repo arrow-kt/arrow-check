@@ -10,6 +10,8 @@ import arrow.check.gen.instances.rose.alternative.alternative
 import arrow.check.gen.instances.rose.alternative.orElse
 import arrow.check.gen.instances.rose.applicativeError.handleErrorWith
 import arrow.check.gen.instances.rose.monadError.monadError
+import arrow.check.gen.instances.rose.monadReader.local
+import arrow.check.gen.instances.rose.monadReader.monadReader
 import arrow.check.gen.instances.rose.monadTrans.monadTrans
 import arrow.core.AndThen
 import arrow.core.Either
@@ -22,6 +24,7 @@ import arrow.mtl.extensions.optiont.alternative.alternative
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadError.monadError
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
+import arrow.mtl.typeclasses.MonadReader
 import arrow.mtl.typeclasses.MonadTrans
 import arrow.typeclasses.*
 
@@ -140,3 +143,4 @@ interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativ
 }
 
 // TODO Bracket when Rose has an instance
+
