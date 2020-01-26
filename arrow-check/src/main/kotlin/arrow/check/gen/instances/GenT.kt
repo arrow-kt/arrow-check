@@ -6,6 +6,7 @@ import arrow.check.gen.*
 import arrow.check.gen.instances.gent.applicative.applicative
 import arrow.check.gen.instances.gent.functor.functor
 import arrow.check.gen.instances.gent.monadTrans.liftT
+import arrow.check.gen.instances.gent.monadTrans.monadTrans
 import arrow.check.gen.instances.rose.alternative.alternative
 import arrow.check.gen.instances.rose.alternative.orElse
 import arrow.check.gen.instances.rose.applicativeError.handleErrorWith
@@ -142,5 +143,17 @@ interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativ
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(ME(), a)
 }
 
-// TODO Bracket when Rose has an instance
+@extension
+interface GenTSemigroup<M, A> : Semigroup<GenT<M, A>> {
+    fun MM(): Monad<M>
+    fun SA(): Semigroup<A>
+    override fun GenT<M, A>.combine(b: GenT<M, A>): GenT<M, A> = GenT.applicative(MM()).mapN(this, b) { (a, b) -> SA().run { a + b } }.fix()
+}
 
+@extension
+interface GenTMonoid<M, A> : Monoid<GenT<M, A>>, GenTSemigroup<M, A> {
+    override fun MM(): Monad<M>
+    override fun SA(): Semigroup<A> = MA()
+    fun MA(): Monoid<A>
+    override fun empty(): GenT<M, A> = GenT.monadTrans().run { MM().just(MA().empty()).liftT(MM()).fix() }
+}

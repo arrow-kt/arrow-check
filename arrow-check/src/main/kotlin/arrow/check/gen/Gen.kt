@@ -6,6 +6,7 @@ import arrow.check.gen.instances.gent.monad.monad
 import arrow.check.gen.instances.rose.alternative.alternative
 import arrow.check.gen.instances.rose.applicative.applicative
 import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.rose.mFunctor.mFunctor
 import arrow.check.gen.instances.rose.monad.monad
 import arrow.check.gen.instances.rose.monadFilter.filterMap
 import arrow.check.gen.instances.rose.monadTrans.monadTrans
@@ -143,10 +144,12 @@ fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object : 
     override fun <A> Kind<GenTPartialOf<ForId>, A>.list(range: Range<Int>): Kind<GenTPartialOf<ForId>, List<A>> =
         GenT.monadGen(Eval.monad()).run {
             GenT(AndThen(this@list.toGenT().generalize(Eval.monad()).list(range).toGenT().runGen).andThen {
-                it.hoist(object : FunctionK<OptionTPartialOf<ForEval>, OptionTPartialOf<ForId>> {
-                    override fun <A> invoke(fa: Kind<OptionTPartialOf<ForEval>, A>): Kind<OptionTPartialOf<ForId>, A> =
-                        OptionT(Id(fa.value().value()))
-                }, OptionT.monad(Eval.monad()))
+                Rose.mFunctor().run {
+                    it.hoist(OptionT.monad(Eval.monad()), object : FunctionK<OptionTPartialOf<ForEval>, OptionTPartialOf<ForId>> {
+                        override fun <A> invoke(fa: Kind<OptionTPartialOf<ForEval>, A>): Kind<OptionTPartialOf<ForId>, A> =
+                            OptionT(Id(fa.value().value()))
+                    }).fix()
+                }
             }).fromGenT()
         }
 }
@@ -158,12 +161,14 @@ fun <A> GenT.Companion.monadGen(f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> G
     monadGen().f().fix()
 
 fun <M, A> Gen<A>.generalize(MM: Monad<M>): GenT<M, A> = GenT { (r, s) ->
-    runGen(r toT s).hoist(object : FunctionK<OptionTPartialOf<ForId>, OptionTPartialOf<M>> {
-        override fun <A> invoke(fa: Kind<OptionTPartialOf<ForId>, A>): Kind<OptionTPartialOf<M>, A> =
-            OptionT(
-                MM.just(fa.fix().value().value())
-            )
-    }, OptionT.functor(Id.functor()))
+    Rose.mFunctor().run {
+        runGen(r toT s).hoist(OptionT.monad(Id.monad()), object : FunctionK<OptionTPartialOf<ForId>, OptionTPartialOf<M>> {
+            override fun <A> invoke(fa: Kind<OptionTPartialOf<ForId>, A>): Kind<OptionTPartialOf<M>, A> =
+                OptionT(
+                    MM.just(fa.fix().value().value())
+                )
+        }).fix()
+    }
 }
 
 interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {

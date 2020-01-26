@@ -131,12 +131,20 @@ interface TestTMonadError<M, E> : MonadError<TestTPartialOf<M>, E>, TestTApplica
     override fun <A> just(a: A): Kind<TestTPartialOf<M>, A> = TestT.just(ME(), a)
 }
 
-@extension
+/*
+// @extension on the instances below runs the compiler out of memory ...
+fun <M> TestT.Companion.monadThrow(ME: MonadThrow<M>): MonadThrow<TestTPartialOf<M>> = object : TestTMonadThrow<M> {
+    override fun ME(): MonadError<M, Throwable> = ME
+}
+
 interface TestTMonadThrow<M> : MonadThrow<TestTPartialOf<M>>, TestTMonadError<M, Throwable> {
     override fun ME(): MonadError<M, Throwable>
 }
 
-@extension
+fun <M> TestT.Companion.monadDefer(MD: MonadDefer<M>): MonadDefer<TestTPartialOf<M>> = object : TestTMonadDefer<M> {
+    override fun MD(): MonadDefer<M> = MD
+}
+
 interface TestTMonadDefer<M> : MonadDefer<TestTPartialOf<M>>, TestTMonadThrow<M> {
     override fun ME(): MonadError<M, Throwable> = MD()
     fun MD(): MonadDefer<M>
@@ -154,7 +162,11 @@ interface TestTMonadDefer<M> : MonadDefer<TestTPartialOf<M>>, TestTMonadThrow<M>
         TestT(EitherT(WriterT.monadDefer(MD(), Log.monoid()).defer(fa.andThen { it.fix().runTestT.value() })))
 }
 
-@extension
+
+fun <M> TestT.Companion.async(AS: Async<M>): Async<TestTPartialOf<M>> = object : TestTAsync<M> {
+    override fun MA(): Async<M> = AS
+}
+
 interface TestTAsync<M> : Async<TestTPartialOf<M>>, TestTMonadDefer<M> {
     override fun MD(): MonadDefer<M> = MA()
     fun MA(): Async<M>
@@ -170,8 +182,10 @@ interface TestTAsync<M> : Async<TestTPartialOf<M>>, TestTMonadDefer<M> {
         TestT(eAsync().run { fix().runTestT.continueOn(ctx) })
 }
 
-/* TODO Kapt out of memory error on kapt
-@extension
+fun <M> TestT.Companion.concurrent(MC: Concurrent<M>): Concurrent<TestTPartialOf<M>> = object : TestTConcurrent<M> {
+    override fun MC(): Concurrent<M> = MC
+}
+
 interface TestTConcurrent<M> : Concurrent<TestTPartialOf<M>>, TestTAsync<M> {
     override fun MA(): Async<M> = MC()
     fun MC(): Concurrent<M>
@@ -218,6 +232,6 @@ interface TestTConcurrent<M> : Concurrent<TestTPartialOf<M>>, TestTAsync<M> {
     fun <A> Fiber<EitherTPartialOf<WriterTPartialOf<M, Log>, Failure>, A>.fiberT(): Fiber<TestTPartialOf<M>, A> =
         Fiber(TestT(join().fix()), TestT(cancel().fix()))
 }
- */
 
 // TODO when https://github.com/arrow-kt/arrow/pull/1981 is merged add MonadState etc
+ */

@@ -11,6 +11,7 @@ import arrow.check.gen.instances.gent.monadTrans.monadTrans
 import arrow.check.property.*
 import arrow.check.property.instances.propertyt.monad.monad
 import arrow.check.property.instances.propertyt.monadTrans.liftT
+import arrow.check.property.instances.testt.alternative.alternative
 import arrow.check.property.instances.testt.monad.monad
 import arrow.check.property.instances.testt.monadError.monadError
 import arrow.check.property.instances.testt.monadTrans.monadTrans
@@ -71,7 +72,7 @@ interface PropertyTAlternative<M> : Alternative<PropertyTPartialOf<M>>, Property
     override fun <A> empty(): Kind<PropertyTPartialOf<M>, A> = discard(MM())
 
     override fun <A> Kind<PropertyTPartialOf<M>, A>.orElse(b: Kind<PropertyTPartialOf<M>, A>): Kind<PropertyTPartialOf<M>, A> =
-        PropertyT(TestT.alternative(GenT.monad(MM()), GenT.alternative(MM())).run { fix().unPropertyT.orElse(b.fix().unPropertyT) })
+        PropertyT(TestT.alternative(GenT.monad(MM()), GenT.alternative(MM())).run { fix().unPropertyT.orElse(b.fix().unPropertyT).fix() })
 }
 
 @extension

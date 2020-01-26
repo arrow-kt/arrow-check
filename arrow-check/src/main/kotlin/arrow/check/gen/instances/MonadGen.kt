@@ -21,7 +21,6 @@ import arrow.extension
 import arrow.mtl.ForOptionT
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
-import arrow.mtl.extensions.OptionTAlternative
 import arrow.mtl.extensions.OptionTMonad
 import arrow.mtl.extensions.optiont.alternative.alternative
 import arrow.mtl.extensions.optiont.monad.monad
@@ -35,7 +34,11 @@ import arrow.typeclasses.Monad
 /**
  * Try doing this for a monad without all these helpers^^ As verbose as it is, this is actually quite the nice solution.
  */
-@extension
+fun <M, B> OptionT.Companion.monadGen(MG: MonadGen<M, B>): MonadGen<OptionTPartialOf<M>, OptionTPartialOf<B>> =
+    object : OptionTMonadGen<M, B> {
+        override fun MG(): MonadGen<M, B> = MG
+    }
+
 interface OptionTMonadGen<M, B> : MonadGen<OptionTPartialOf<M>, OptionTPartialOf<B>>, OptionTMonad<M> {
     fun MG(): MonadGen<M, B>
 

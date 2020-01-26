@@ -4,17 +4,18 @@ import arrow.Kind
 import arrow.Kind2
 import arrow.check.gen.*
 import arrow.check.gen.Rose.Companion.liftF
+import arrow.check.gen.instances.rose.eq.eq
 import arrow.check.gen.instances.rose.monadTrans.liftT
 import arrow.check.gen.instances.rose.monadTrans.monadTrans
+import arrow.check.gen.instances.rosef.eq.eq
 import arrow.check.gen.instances.rosef.functor.functor
 import arrow.core.*
 import arrow.core.extensions.sequence.foldable.foldLeft
 import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.core.extensions.sequence.traverse.traverse
+import arrow.core.extensions.sequencek.eq.eq
 import arrow.extension
 import arrow.fx.IO
-import arrow.fx.typeclasses.Bracket
-import arrow.fx.typeclasses.ExitCase
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.typeclasses.*
 import arrow.recursion.typeclasses.Birecursive
@@ -46,6 +47,23 @@ interface RoseFTraverse<C> : Traverse<RoseFPartialOf<C>>, RoseFFoldable<C> {
         }
     }
 }
+
+@extension
+interface RoseFEq<A, C> : Eq<RoseF<A, C>> {
+    fun EQA(): Eq<A>
+    fun EQC(): Eq<C>
+    override fun RoseF<A, C>.eqv(b: RoseF<A, C>): Boolean =
+        EQA().run { res.eqv(b.res) } && SequenceK.eq(EQC()).run { shrunk.k().eqv(b.shrunk.k()) }
+}
+
+@extension
+interface RoseFEqK<C> : EqK<RoseFPartialOf<C>> {
+    fun EQC(): Eq<C>
+    override fun <A> Kind<RoseFPartialOf<C>, A>.eqK(other: Kind<RoseFPartialOf<C>, A>, EQ: Eq<A>): Boolean =
+        RoseF.eq(EQC(), EQ).run { fix().eqv(other.fix()) }
+}
+
+// --------------------- Rose extensions
 
 @extension
 interface RoseFunctor<M> : Functor<RosePartialOf<M>> {
@@ -248,4 +266,19 @@ interface RoseMonadState<M, S> : MonadState<RosePartialOf<M>, S>, RoseMonad<M> {
         MS().run { Rose(MS().get().map { RoseF(it, emptySequence<Rose<M, S>>()) }) }
     override fun set(s: S): Kind<RosePartialOf<M>, Unit> =
         MS().run { Rose(MS().set(s).map { RoseF(it, emptySequence<Rose<M, Unit>>()) }) }
+}
+
+@extension
+interface RoseEq<M, A> : Eq<Rose<M, A>> {
+    fun EQKM(): EqK<M>
+    fun EQA(): Eq<A>
+    override fun Rose<M, A>.eqv(b: Rose<M, A>): Boolean =
+        EQKM().liftEq(RoseF.eq(EQA(), this@RoseEq)).run { runRose.eqv(b.runRose) }
+}
+
+@extension
+interface RoseEqK<M> : EqK<RosePartialOf<M>> {
+    fun EQKM(): EqK<M>
+    override fun <A> Kind<RosePartialOf<M>, A>.eqK(other: Kind<RosePartialOf<M>, A>, EQ: Eq<A>): Boolean =
+        Rose.eq(EQKM(), EQ).run { fix().eqv(other.fix()) }
 }

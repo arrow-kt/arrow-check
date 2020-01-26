@@ -178,11 +178,3 @@ data class RoseF<A, F>(val res: A, val shrunk: Sequence<F>) : RoseFOf<A, F> {
 
     companion object
 }
-
-// TODO monad-morph MFunctor
-fun <M, N, A> Rose<M, A>.hoist(f: FunctionK<M, N>, MF: Functor<M>): Rose<N, A> =
-    Rose(
-        MF.run {
-            f(runRose.map { RoseF(it.res, it.shrunk.map { it.hoist(f, MF) }) })
-        }
-    )
