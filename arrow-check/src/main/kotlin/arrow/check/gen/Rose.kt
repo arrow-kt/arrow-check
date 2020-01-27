@@ -31,7 +31,7 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
 
     fun <B> ap(MA: Applicative<M>, ff: Rose<M, (A) -> B>): Rose<M, B> = MA.run {
         Rose(
-            MA.map(runRose, ff.runRose) { (a, f) ->
+            MA.mapN(runRose, ff.runRose) { (a, f) ->
                 RoseF(
                     f.res(a.res),
                     f.shrunk
@@ -43,7 +43,6 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
             }
         )
     }
-
 
     fun <B> flatMap(MM: Monad<M>, f: (A) -> Rose<M, B>): Rose<M, B> =
         Rose(
@@ -135,24 +134,24 @@ fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<A>>> =
             }
     })
 
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.dropOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
+fun <M, A> SequenceK<RoseF<A, Rose<M, A>>>.dropOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
     SequenceK.fx {
         val (xs, _, zs) = !splits().k()
-        Rose(MM.just((xs + zs).interleave(MM)))
+        Rose(MM.just((xs + zs).k().interleave(MM)))
     }
 
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.shrinkOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
+fun <M, A> SequenceK<RoseF<A, Rose<M, A>>>.shrinkOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
     SequenceK.fx {
         val (xs, y, zs) = !splits().k()
         val y1 = !y.shrunk.k()
         Rose(
             MM.run {
-                y1.runRose.map { (xs + sequenceOf(it) + zs).interleave(MM) }
+                y1.runRose.map { (xs + sequenceOf(it) + zs).k().interleave(MM) }
             }
         )
     }
 
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.interleave(MM: Monad<M>): RoseF<Sequence<A>, Rose<M, Sequence<A>>> =
+fun <M, A> SequenceK<RoseF<A, Rose<M, A>>>.interleave(MM: Monad<M>): RoseF<Sequence<A>, Rose<M, Sequence<A>>> =
     RoseF(
         this.map { it.res },
         dropOne(MM) + shrinkOne(MM)

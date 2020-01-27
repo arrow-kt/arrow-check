@@ -10,6 +10,7 @@ import arrow.check.gen.instances.gent.monadTrans.monadTrans
 import arrow.check.gen.instances.rose.alternative.alternative
 import arrow.check.gen.instances.rose.alternative.orElse
 import arrow.check.gen.instances.rose.applicativeError.handleErrorWith
+import arrow.check.gen.instances.rose.monad.monad
 import arrow.check.gen.instances.rose.monadError.monadError
 import arrow.check.gen.instances.rose.monadReader.local
 import arrow.check.gen.instances.rose.monadReader.monadReader
@@ -17,6 +18,7 @@ import arrow.check.gen.instances.rose.monadTrans.monadTrans
 import arrow.core.AndThen
 import arrow.core.Either
 import arrow.core.andThen
+import arrow.core.toT
 import arrow.extension
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
@@ -82,12 +84,12 @@ interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(MM(), a)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<M>, Either<A, B>>): Kind<GenTPartialOf<M>, B> =
-        f(a).flatMap {
-            it.fold({
-                tailRecM(it, f)
-            }, {
-                just(it)
-            })
+        GenT { (seed, size) ->
+            Rose.monad(OptionT.monad(MM())).tailRecM(a toT seed) { (a, seed) ->
+                f(a).fix().runG(seed toT size).let { (r, nSeed) ->
+                    r.map(OptionT.monad(MM())) { e -> e.mapLeft { it toT nSeed } }
+                }
+            }.fix()
         }
 }
 

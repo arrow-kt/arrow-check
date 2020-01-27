@@ -13,6 +13,7 @@ import arrow.check.gen.instances.rose.monadTrans.monadTrans
 import arrow.check.property.*
 import arrow.core.*
 import arrow.core.extensions.eval.monad.monad
+import arrow.core.extensions.fx
 import arrow.core.extensions.id.functor.functor
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.traverse.sequence
@@ -74,6 +75,11 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
 
     fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> = GenT { (r, s) ->
         f(runGen(r toT s))
+    }
+
+    internal fun runG(sz: Tuple2<RandSeed, Size>): Tuple2<Rose<OptionTPartialOf<M>, A>, RandSeed> {
+        val (l, r) = sz.a.split()
+        return runGen(r toT sz.b) toT l
     }
 
     companion object {
@@ -139,18 +145,6 @@ fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object : 
     override fun <A> Kind<GenTPartialOf<ForId>, A>.orElse(b: Kind<GenTPartialOf<ForId>, A>): Kind<GenTPartialOf<ForId>, A> =
         GenT.alternative(BM()).run {
             orElse(b.fix())
-        }
-
-    override fun <A> Kind<GenTPartialOf<ForId>, A>.list(range: Range<Int>): Kind<GenTPartialOf<ForId>, List<A>> =
-        GenT.monadGen(Eval.monad()).run {
-            GenT(AndThen(this@list.toGenT().generalize(Eval.monad()).list(range).toGenT().runGen).andThen {
-                Rose.mFunctor().run {
-                    it.hoist(OptionT.monad(Eval.monad()), object : FunctionK<OptionTPartialOf<ForEval>, OptionTPartialOf<ForId>> {
-                        override fun <A> invoke(fa: Kind<OptionTPartialOf<ForEval>, A>): Kind<OptionTPartialOf<ForId>, A> =
-                            OptionT(Id(fa.value().value()))
-                    }).fix()
-                }
-            }).fromGenT()
         }
 }
 
@@ -420,7 +414,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         )
     }
 
-    // TODO This stackoverflows for nonstacksafe M. This is solved for ForId, by overwriting it and using Eval and later transforming it
+    // TODO This stackoverflows for nonstacksafe M...
     fun <A> Kind<M, A>.list(range: Range<Int>): Kind<M, List<A>> = sized { s ->
         MM().run {
             fx.monad {
@@ -445,6 +439,45 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 .ensure { it.size >= range.lowerBound(s) }
         }
     }
+
+    // This resulted in a NoSuchMethodError so I copied these methods here...
+    // TODO check from time to time to see if this persists
+    fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<A>>> =
+        firstOrNull().toOption().fold({
+            emptySequence()
+        }, { x ->
+            sequenceOf(Tuple3(emptySequence<A>(), x, drop(1)))
+                // flatMap for added laziness
+                .flatMap {
+                    sequenceOf(it) + drop(1).splits().map { (a, b, c) ->
+                        Tuple3(sequenceOf(x) + a, b, c)
+                    }
+                }
+        })
+
+    fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.dropOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
+        SequenceK.fx {
+            val (xs, _, zs) = !splits().k()
+            Rose(MM.just((xs + zs).interleave(MM)))
+        }
+
+    fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.shrinkOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
+        SequenceK.fx {
+            val (xs, y, zs) = !splits().k()
+            val y1 = !y.shrunk.k()
+            Rose(
+                MM.run {
+                    y1.runRose.map { (xs + sequenceOf(it) + zs).interleave(MM) }
+                }
+            )
+        }
+
+    fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.interleave(MM: Monad<M>): RoseF<Sequence<A>, Rose<M, Sequence<A>>> =
+        RoseF(
+            this.map { it.res },
+            dropOne(MM) + shrinkOne(MM)
+        )
+    // --------------
 
     fun <A> Kind<M, A>.list(range: IntRange): Kind<M, List<A>> = list(Range.constant(range.first, range.last))
 

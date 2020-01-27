@@ -25,6 +25,9 @@ dependencies {
     api "kparsec:kparsec:0.2.1" // Parser combinators to create toString-output parser
 
     testImplementation project(":arrow-check-kotlintest")
+    testImplementation("io.arrow-kt:arrow-test:$arrow_version") { // test helpers and laws
+        exclude group: "io.kotlintest"
+    }
 }
 
 test {
