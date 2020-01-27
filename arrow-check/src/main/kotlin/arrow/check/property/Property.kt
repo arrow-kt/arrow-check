@@ -26,6 +26,39 @@ data class Property(val config: PropertyConfig, val prop: PropertyT<ForIO, Unit>
     fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =
         copy(config = f(config))
 
+    fun withTests(i: TestLimit): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> EarlyTermination(it.confidence, i)
+                    is NoEarlyTermination -> NoEarlyTermination(it.confidence, i)
+                    is NoConfidenceTermination -> NoConfidenceTermination(i)
+                }
+            }
+        }
+
+    fun withConfidence(c: Confidence): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> EarlyTermination(c, it.limit)
+                    is NoEarlyTermination -> NoEarlyTermination(c, it.limit)
+                    is NoConfidenceTermination -> NoEarlyTermination(c, it.limit)
+                }
+            }
+        }
+
+    fun verifiedTermination(): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> it
+                    is NoEarlyTermination -> EarlyTermination(it.confidence, it.limit)
+                    is NoConfidenceTermination -> EarlyTermination(Confidence(), it.limit)
+                }
+            }
+        }
+
     fun withTerminationCriteria(i: TerminationCriteria): Property =
         mapConfig { PropertyConfig.terminationCriteria.set(it, i) }
 
@@ -56,7 +89,8 @@ data class PropertyT<M, A>(val unPropertyT: TestT<GenTPartialOf<M>, A>) : Proper
 
     fun <B> map(MM: Monad<M>, f: (A) -> B): PropertyT<M, B> = PropertyT(unPropertyT.map(GenT.monad(MM), f))
 
-    fun <B> ap(MM: Monad<M>, ff: PropertyT<M, (A) -> B>): PropertyT<M, B> = PropertyT(unPropertyT.ap(Gen.monad(MM), ff.unPropertyT))
+    fun <B> ap(MM: Monad<M>, ff: PropertyT<M, (A) -> B>): PropertyT<M, B> =
+        PropertyT(unPropertyT.ap(Gen.monad(MM), ff.unPropertyT))
 
     companion object
 }
@@ -94,5 +128,10 @@ fun <M, A> discard(MM: Monad<M>): PropertyT<M, A> =
         )
     )
 
-fun <M, A, B> forAllFn(gen: Gen<Fun<A, B>>, MM: Monad<M>, SA: Show<A> = Show.any(), SB: Show<B> = Show.any()): PropertyT<M, (A) -> B> =
+fun <M, A, B> forAllFn(
+    gen: Gen<Fun<A, B>>,
+    MM: Monad<M>,
+    SA: Show<A> = Show.any(),
+    SB: Show<B> = Show.any()
+): PropertyT<M, (A) -> B> =
     forAll(gen, MM, Fun.show(SA, SB)).map(MM) { it.component1() }

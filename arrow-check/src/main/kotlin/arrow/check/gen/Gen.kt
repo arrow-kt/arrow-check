@@ -433,9 +433,10 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         }
     }
 
-    // TODO arrow pr?
+    // TODO arrow pr? This is actually traverse but the current traverse is not stacksafe for stackunsafe monads...
     fun <F, A> Kind<F, A>.replicateSafe(AP: Applicative<F>, n: Int): Kind<F, List<A>> =
-        (0..n).toList().foldRight(Eval.now(AP.just(emptyList<A>())) as Eval<Kind<F, List<A>>>) { _, acc ->
+        if (n <= 0) AP.just(emptyList())
+        else (0..n).toList().foldRight(Eval.now(AP.just(emptyList<A>())) as Eval<Kind<F, List<A>>>) { _, acc ->
             acc.map { AP.run { this@replicateSafe.ap(it.map { xs -> { a: A -> listOf(a) + xs } }) } }
         }.value()
 

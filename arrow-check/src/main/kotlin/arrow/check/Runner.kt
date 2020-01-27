@@ -43,7 +43,6 @@ fun main() {
 
 /**
  * TODO Unsigned type instances for coarbitrary and function. Also generators for unsigned types
- * TODO Gen's and instances for arrow types
  * TODO's
  * - shrinking
  *  - pretty print shrink-trees/gens
@@ -190,9 +189,9 @@ fun <M> runProperty(
     }
 
     val (confidence, minTests) = when (config.terminationCriteria) {
-        is EarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
-        is NoEarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
-        is NoConfidenceTermination -> None to TestLimit(config.terminationCriteria.limit)
+        is EarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
+        is NoEarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
+        is NoConfidenceTermination -> None to config.terminationCriteria.limit
     }
 
     fun successVerified(testCount: TestCount, coverage: Coverage<CoverCount>): Boolean =
@@ -348,13 +347,15 @@ fun <M> shrinkResult(
                         result.fold({
                             val summary = FailureSummary(
                                 size, seed, numShrinks, it.unFailure,
-                                annotations = log.unLog.filterMap {
-                                    if (it is JournalEntry.Annotate) FailureAnnotation.Annotation(it.text).some()
-                                    else if (it is JournalEntry.Input) FailureAnnotation.Input(it.text).some()
-                                    else None
+                                annotations = log.unLog.filterMap { entry ->
+                                    when (entry) {
+                                        is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text).some()
+                                        is JournalEntry.Input -> FailureAnnotation.Input(entry.text).some()
+                                        else -> None
+                                    }
                                 },
-                                footnotes = log.unLog.filterMap {
-                                    if (it is JournalEntry.Footnote) it.text.some()
+                                footnotes = log.unLog.filterMap { entry ->
+                                    if (entry is JournalEntry.Footnote) entry.text.some()
                                     else None
                                 }
                             )
