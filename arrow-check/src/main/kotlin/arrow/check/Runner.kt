@@ -16,19 +16,28 @@ import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
 import pretty.*
 import arrow.check.gen.*
+import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.rosef.traverse.traverse
 import arrow.check.property.*
 import arrow.check.property.Failure
 import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
 import arrow.check.property.instances.propertyt.monadTest.monadTest
 import arrow.check.property.instances.testt.monadTest.failException
+import arrow.core.extensions.id.applicative.applicative
+import arrow.core.extensions.list.foldable.traverse_
 import arrow.fx.extensions.io.monadDefer.monadDefer
 import arrow.fx.typeclasses.MonadDefer
+import arrow.mtl.typeclasses.Nested
+import arrow.mtl.typeclasses.nest
+import arrow.mtl.typeclasses.unnest
+import arrow.recursion.hylo
+import arrow.recursion.hyloM
 import kotlin.random.Random
 
 fun main() {
     check {
-        val i = forAll { int(0..1000) }.bind()
-        throw IllegalStateException("Hello world")
+        val (a, b) = forAll { tupledN(int(0..5), int(0..5)).also { it.fix() } }.bind()
+        a.eqv(b).bind()
     }.unsafeRunSync()
 }
 
@@ -267,8 +276,6 @@ fun <M> runProperty(
                                     )
                                 ).right()
                             }, { node ->
-                                // I do not understand what makes this necessary
-                                (node as RoseF<Tuple2<Log, Either<Failure, Unit>>, Rose<OptionTPartialOf<M>, Tuple2<Log, Either<Failure, Unit>>>>)
                                 node.res.let { (log, result) ->
                                     result.fold({
                                         // shrink failure
@@ -319,11 +326,6 @@ fun <M> runProperty(
     }, Id.traverse(), MM)
 }
 
-data class ShrinkState<M>(
-    val numShrinks: ShrinkCount,
-    val node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>
-)
-
 // TODO inline classes for params
 fun <M> shrinkResult(
     MM: Monad<M>,
@@ -333,46 +335,53 @@ fun <M> shrinkResult(
     shrinkRetries: Int,
     node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>,
     hook: (FailureSummary) -> Kind<M, Unit>
-): Kind<M, Result> =
-    ShrinkState(ShrinkCount(0), node).elgotM({ MM.just(it.value()) }, { (numShrinks, curr) ->
-        MM.fx.monad {
-            curr.res.fold({
-                Result.GivenUp.left()
-            }, { (log, result) ->
-                result.fold({
-                    val summary = FailureSummary(
-                        size, seed, numShrinks, it.unFailure,
-                        annotations = log.unLog.filterMap {
-                            if (it is JournalEntry.Annotate) FailureAnnotation.Annotation(it.text).some()
-                            else if (it is JournalEntry.Input) FailureAnnotation.Input(it.text).some()
-                            else None
-                        },
-                        footnotes = log.unLog.filterMap {
-                            if (it is JournalEntry.Footnote) it.text.some()
-                            else None
-                        }
-                    )
+): Kind<M, Result> = Rose.birecursive<M, Option<Tuple2<Log, Either<Failure, Unit>>>>(MM).run {
+    Rose(MM.just(node)).hylo<Nested<M, RoseFPartialOf<Option<Tuple2<Log, Either<Failure, Unit>>>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, (ShrinkCount) -> Kind<M, Result>>({
+        val curr = it.unnest()
+        curr.let {
+            { numShrinks: ShrinkCount ->
+                MM.fx.monad {
+                    val (res, shrinks) = it.bind().fix()
+                    res.fold({
+                        Result.GivenUp
+                    }, { (log, result) ->
+                        result.fold({
+                            val summary = FailureSummary(
+                                size, seed, numShrinks, it.unFailure,
+                                annotations = log.unLog.filterMap {
+                                    if (it is JournalEntry.Annotate) FailureAnnotation.Annotation(it.text).some()
+                                    else if (it is JournalEntry.Input) FailureAnnotation.Input(it.text).some()
+                                    else None
+                                },
+                                footnotes = log.unLog.filterMap {
+                                    if (it is JournalEntry.Footnote) it.text.some()
+                                    else None
+                                }
+                            )
 
-                    hook(summary).bind()
+                            hook(summary).bind()
 
-                    if (numShrinks.unShrinkCount >= shrinkLimit)
-                        Result.Failure(summary).left()
-                    else curr.shrunk.foldRight<Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, Kind<M, Either<Result, Id<ShrinkState<M>>>>>(
-                        Eval.now(MM.just(Result.Failure(summary).left()))
-                    ) { v, acc ->
-                        Eval.now(
-                            MM.fx.monad {
-                                val r = v.runTreeN(MM, shrinkRetries).bind()
-                                if (r.isFailure())
-                                    Id(ShrinkState(ShrinkCount(numShrinks.unShrinkCount + 1), r)).right()
-                                else acc.value().bind()
-                            }
-                        )
-                    }.value().bind()
-                }, { Result.Success.left() })
-            })
+                            if (numShrinks.unShrinkCount >= shrinkLimit)
+                                Result.Failure(summary)
+                            else shrinks.map { it(ShrinkCount(numShrinks.unShrinkCount + 1)) }
+                                .foldRight(Eval.now(MM.just(Result.Failure(summary)))) { v, acc ->
+                                    Eval.now(
+                                        MM.fx.monad {
+                                            val test = !v
+                                            if (test is Result.Failure) test
+                                            else acc.value().bind()
+                                        }
+                                    )
+                                }.value().bind()
+                        }, { Result.Success })
+                    })
+                }
+            }
         }
-    }, Id.traverse(), MM)
+    }, {
+        it.runTreeN(MM, shrinkRetries).nest()
+    }, FF()).invoke(ShrinkCount(0))
+}
 
 fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(
     MM: Monad<M>,
@@ -391,7 +400,7 @@ fun <M, A> Option<RoseF<A, Rose<OptionTPartialOf<M>, A>>>.unwrap(FF: Functor<M>)
     }, {
         RoseF(
             it.res.some(),
-            it.shrunk.map { FF.run { Rose(it.runRose.value().map { it.unwrap(FF) }) } })
+            it.shrunk.map { r -> FF.run { Rose(r.runRose.value().map { opt -> opt.unwrap(FF) }) } })
     })
 
 fun <M, A, L, W> RoseF<Option<Tuple2<W, Either<L, A>>>, M>.isFailure(): Boolean =

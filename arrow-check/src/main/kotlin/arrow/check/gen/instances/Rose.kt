@@ -82,7 +82,6 @@ interface RoseApplicative<M> : Applicative<RosePartialOf<M>> {
 
     override fun <A, B> Kind<RosePartialOf<M>, A>.ap(ff: Kind<RosePartialOf<M>, (A) -> B>): Kind<RosePartialOf<M>, B> =
         fix().ap(MA(), ff.fix())
-
 }
 
 @extension
@@ -215,7 +214,7 @@ interface RoseApplicativeError<M, E> : ApplicativeError<RosePartialOf<M>, E>, Ro
     override fun <A> raiseError(e: E): Kind<RosePartialOf<M>, A> = liftF(AE(), AE().raiseError(e))
 
     override fun <A> Kind<RosePartialOf<M>, A>.handleErrorWith(f: (E) -> Kind<RosePartialOf<M>, A>): Kind<RosePartialOf<M>, A> {
-        fun RoseF<A, Rose<M, A>>.handleErrorRoseF(): RoseF<A, Rose<M, A>> = RoseF(res, shrunk.map { handleErrorWith(f).fix() })
+        fun RoseF<A, Rose<M, A>>.handleErrorRoseF(): RoseF<A, Rose<M, A>> = RoseF(res, shrunk.map { it.handleErrorWith(f).fix() })
         return AE().run {
             Rose(fix().runRose.handleErrorWith(f.andThen { it.fix().runRose }).map {
                 it.handleErrorRoseF()

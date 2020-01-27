@@ -74,7 +74,7 @@ class ShrinkingSpec : PropertySpec({
         }
          */
         "List.shrink should produce a sequence of smaller or equal sized lists" toT property {
-            val l = forAll { int(-100..100).list(0..10000) }.bind()
+            val l = forAllT { int(-100..100).list(0..10000) }.bind()
 
             // only checking first 100 because all would take too long
             val first100 = l.shrink().take(100).toList()

@@ -1,8 +1,10 @@
 package arrow.check.gen
 
 import arrow.Kind
+import arrow.check.gen.instances.rose.birecursive.birecursive
 import arrow.core.*
 import arrow.core.extensions.fx
+import arrow.mtl.typeclasses.nest
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
@@ -34,12 +36,29 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
             MA.mapN(runRose, ff.runRose) { (a, f) ->
                 RoseF(
                     f.res(a.res),
-                    f.shrunk
-                        .map { it.map(MA) { it(a.res) } } +
-                            a.shrunk
-                                .map { it.ap(MA, ff) }
+                    f.shrunk.map { it.map(MA) { it(a.res) } } +
+                            a.shrunk.map { it.ap(MA, ff) }
 
                 )
+            }
+        )
+    }
+
+    /**
+     * Parallel shrinking. This breaks monad-applicative consistency laws in GenT because it's used in place of ap there
+     */
+    fun <B> zipTree(MA: Applicative<M>, ff: () -> Rose<M, B>): Rose<M, Tuple2<A, B>> = MA.run {
+        Rose(
+            this@Rose.runRose.lazyAp {
+                ff().let { ff ->
+                    ff.runRose.map { r ->
+                        { l: RoseF<A, Rose<M, A>> ->
+                            RoseF(
+                                l.res toT r.res,
+                                l.shrunk.k().map { it.zipTree(MA) { ff } } + r.shrunk.map { this@Rose.zipTree(MA) { it } })
+                        }
+                    }
+                }
             }
         )
     }
@@ -103,14 +122,20 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
             )
 
         fun <M, A> unfold(MM: Monad<M>, a: A, f: (A) -> Sequence<A>): Rose<M, A> =
-            Rose(
-                MM.just(
-                    RoseF(
-                        a,
-                        unfoldForest(MM, a, f)
-                    )
+            Rose.birecursive<M, A>(MM).run {
+                a.ana {
+                    MM.just(RoseF(it, f(it))).nest()
+                }
+            }
+        /*
+        Rose(
+            MM.just(
+                RoseF(
+                    a,
+                    unfoldForest(MM, a, f)
                 )
             )
+        )*/
 
         fun <M, A> unfoldForest(MM: Monad<M>, a: A, f: (A) -> Sequence<A>): Sequence<Rose<M, A>> =
             f(a).map { unfold(MM, it, f) }

@@ -2,6 +2,7 @@ package arrow.check.gen
 
 import arrow.Kind
 import arrow.check.gen.instances.gent.alternative.alternative
+import arrow.check.gen.instances.gent.applicative.applicative
 import arrow.check.gen.instances.gent.monad.monad
 import arrow.check.gen.instances.rose.alternative.alternative
 import arrow.check.gen.instances.rose.applicative.applicative
@@ -52,28 +53,22 @@ typealias Gen<A> = GenT<ForId, A>
 class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M>, A>) : GenTOf<M, A> {
 
     fun <B> genMap(MF: Functor<M>, f: (A) -> B): GenT<M, B> =
-        GenT(runGen andThen { r -> r.map(OptionT.functor(MF), f) })
+        GenT(AndThen(runGen).andThen { r -> r.map(OptionT.functor(MF), f) })
 
     /**
      * This breaks applicative monad laws because they now behave different, but that
      *  is essential to good shrinking results. And tbh since we assume sameness by just size and same distribution in
      *  monad laws as well, we could consider this equal as well.
      */
-    fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> = GenT { (seed, size) ->
-        val (l, r) = seed.split()
-        Rose.applicative(OptionT.applicative(MA)).mapN(
-            this@GenT.runGen(l toT size),
-            ff.runGen(r toT size)
-        ) { (a, b) -> b(a) }.fix()
-    }
+    fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
+        Rose.applicative(OptionT.applicative(MA)).run { res.zipTree(OptionT.applicative(MA)) { ff.runGen(sizeAndSeed) }.map { (a, f) -> f(a) }.fix() }
+    })
 
     fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
         res.flatMap(OptionT.monad(MM)) { f(it).runGen(sizeAndSeed) }
     })
 
-    fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> = GenT { (r, s) ->
-        f(runGen(r toT s))
-    }
+    fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> = GenT(AndThen(runGen).andThen(f))
 
     internal fun runGWithSize(sz: Tuple2<RandSeed, Size>): Tuple2<Rose<OptionTPartialOf<M>, A>, Tuple2<RandSeed, Size>> {
         val (l, r) = sz.a.split()
@@ -419,7 +414,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 val n = !int_(range)
                 !this@list.toGenT().mapTree {
                     Rose.just(OptionT.monad(BM()), it)
-                }.fromGenT().replicate(n)
+                }.fromGenT().replicateSafe(this@run, n)
             }.toGenT().mapTree { r ->
                 Rose(
                     roseM().run {
@@ -437,6 +432,12 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 .ensure { it.size >= range.lowerBound(s) }
         }
     }
+
+    // TODO arrow pr?
+    fun <F, A> Kind<F, A>.replicateSafe(AP: Applicative<F>, n: Int): Kind<F, List<A>> =
+        (0..n).toList().foldRight(Eval.now(AP.just(emptyList<A>())) as Eval<Kind<F, List<A>>>) { _, acc ->
+            acc.map { AP.run { this@replicateSafe.ap(it.map { xs -> { a: A -> listOf(a) + xs } }) } }
+        }.value()
 
     // This resulted in a NoSuchMethodError so I copied these methods here...
     // TODO check from time to time to see if this persists
