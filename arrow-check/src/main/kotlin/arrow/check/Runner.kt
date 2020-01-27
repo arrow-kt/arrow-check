@@ -1,6 +1,12 @@
 package arrow.check
 
 import arrow.Kind
+import arrow.check.gen.*
+import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.property.*
+import arrow.check.property.Failure
+import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
+import arrow.check.property.instances.propertyt.monadTest.monadTest
 import arrow.core.*
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
@@ -8,47 +14,23 @@ import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.fx.IO
 import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.functor.unit
-import arrow.fx.fix
-import arrow.mtl.OptionTPartialOf
-import arrow.mtl.value
-import arrow.recursion.elgotM
-import arrow.typeclasses.Functor
-import arrow.typeclasses.Monad
-import pretty.*
-import arrow.check.gen.*
-import arrow.check.gen.instances.rose.birecursive.birecursive
-import arrow.check.gen.instances.rosef.traverse.traverse
-import arrow.check.property.*
-import arrow.check.property.Failure
-import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
-import arrow.check.property.instances.propertyt.monadTest.monadTest
-import arrow.check.property.instances.testt.monadTest.failException
-import arrow.core.extensions.id.applicative.applicative
-import arrow.core.extensions.list.foldable.traverse_
 import arrow.fx.extensions.io.monadDefer.monadDefer
+import arrow.fx.fix
 import arrow.fx.typeclasses.MonadDefer
+import arrow.mtl.OptionTPartialOf
 import arrow.mtl.typeclasses.Nested
 import arrow.mtl.typeclasses.nest
 import arrow.mtl.typeclasses.unnest
+import arrow.mtl.value
+import arrow.recursion.elgotM
 import arrow.recursion.hylo
-import arrow.recursion.hyloM
+import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
+import pretty.Doc
+import pretty.spaced
+import pretty.text
 import kotlin.random.Random
 
-fun main() {
-    check {
-        val (a, b) = forAll { tupledN(int(0..5), int(0..5)).also { it.fix() } }.bind()
-        a.eqv(b).bind()
-    }.unsafeRunSync()
-}
-
-/**
- * TODO Unsigned type instances for coarbitrary and function. Also generators for unsigned types
- * TODO's
- * - shrinking
- *  - pretty print shrink-trees/gens
- * - toString() output pretty printer
- *  - move to new lib to allow independent use
- */
 fun checkGroup(groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> =
     detectConfig().flatMap { checkGroup(it, groupName, props) }
 
