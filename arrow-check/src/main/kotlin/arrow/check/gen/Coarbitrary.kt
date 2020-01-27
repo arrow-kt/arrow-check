@@ -24,9 +24,7 @@ interface Coarbitrary<A> : CoarbitraryOf<A> {
 }
 
 fun <M, B> GenT<M, B>.variant(i: Long): GenT<M, B> =
-    GenT { (rand, size) ->
-        runGen(rand.variant(i) toT size)
-    }
+    GenT(AndThen(runGen).compose { (seed, size) -> seed.variant(i) toT size })
 
 // keep it here for now, maybe add that for TupleN later
 @extension

@@ -96,13 +96,29 @@ interface RoseMonad<M> : Monad<RosePartialOf<M>> {
         Rose.just(MM(), a)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<RosePartialOf<M>, Either<A, B>>): Kind<RosePartialOf<M>, B> =
-        f(a).flatMap {
-            it.fold({
-                tailRecM(it, f)
-            }, {
-                just(it)
-            })
-        }
+        Rose(
+            MM().run {
+                fun roseFRec(r: RoseF<Either<A, B>, Rose<M, Either<A, B>>>): Kind<M, RoseF<B, Rose<M, B>>> =
+                    r.shrunk.map { Rose(it.runRose.flatMap(::roseFRec)) }.let { branches ->
+                        r.res.fold({
+                            tailRecM(RoseF(it, branches)) { (a, branches) ->
+                                f(a).fix().runRose.map { (e, newBranches) ->
+                                    e.fold({
+                                        RoseF(it, branches + newBranches.map {
+                                            Rose(it.runRose.flatMap(::roseFRec))
+                                        }).left()
+                                    }, {
+                                        RoseF(it, branches).right()
+                                    })
+                                }
+                            }
+                        }, {
+                            just(RoseF(it, branches))
+                        })
+                    }
+                roseFRec(RoseF(a.left(), emptySequence()))
+            }
+        )
 }
 
 @extension
@@ -219,8 +235,6 @@ interface RoseMonadError<M, E> : MonadError<RosePartialOf<M>, E>, RoseApplicativ
 
     override fun <A> just(a: A): Kind<RosePartialOf<M>, A> = Rose.just(ME(), a)
 }
-
-// TODO bracket?
 
 @extension
 interface RoseMonadReader<M, D> : MonadReader<RosePartialOf<M>, D>, RoseMonad<M> {

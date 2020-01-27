@@ -3,25 +3,28 @@ package arrow.check.gen
 import arrow.Kind
 import arrow.check.gen.instances.gent.alternative.alternative
 import arrow.check.gen.instances.gent.monad.monad
+import arrow.check.gen.instances.gent.monadError.monadError
 import arrow.check.gen.instances.gent.monadTrans.liftT
 import arrow.check.gen.instances.gent.monadTrans.monadTrans
 import arrow.check.gen.instances.gent.monoid.monoid
 import arrow.check.gen.instances.rose.eq.eq
 import arrow.check.property.Size
-import arrow.core.ForId
-import arrow.core.Id
-import arrow.core.Tuple2
+import arrow.core.*
+import arrow.core.extensions.either.eqK.eqK
+import arrow.core.extensions.either.monad.monad
+import arrow.core.extensions.either.monadError.monadError
 import arrow.core.extensions.eq
 import arrow.core.extensions.id.eqK.eqK
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.monoid
-import arrow.core.toT
 import arrow.mtl.OptionT
 import arrow.mtl.extensions.optiont.eqK.eqK
 import arrow.test.UnitSpec
 import arrow.test.generators.GenK
 import arrow.test.generators.genK
+import arrow.test.generators.throwable
 import arrow.test.laws.AlternativeLaws
+import arrow.test.laws.MonadErrorLaws
 import arrow.test.laws.MonadTransLaws
 import arrow.test.laws.MonoidLaws
 import arrow.typeclasses.Eq
@@ -33,12 +36,11 @@ class GenTLawsSpec : UnitSpec() {
     init {
         val zeroSeed = (RandSeed(0) toT Size(0))
         testLaws(
-            /* TODO GenT<M, A> is not stacksafe it M isn't. Decide what this means for the choice of `M` in the default gen!
             MonadErrorLaws.laws<GenTPartialOf<EitherPartialOf<Throwable>>>(
                 GenT.monadError(Either.monadError()),
                 GenT.genK(Either.genK(Gen.throwable()), Either.monad()),
                 GenT.eqK(Either.eqK(Eq<Throwable> { a, b -> a::class == b::class }), zeroSeed)
-            ),*/
+            ),
             MonadTransLaws.laws(
                 GenT.monadTrans(),
                 Id.monad(),

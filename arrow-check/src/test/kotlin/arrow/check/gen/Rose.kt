@@ -1,39 +1,46 @@
 package arrow.check.gen
 
 import arrow.Kind
+import arrow.check.gen.instances.rose.applicative.applicative
 import arrow.check.gen.instances.rose.eq.eq
 import arrow.check.gen.instances.rose.eqK.eqK
+import arrow.check.gen.instances.rose.functor.functor
+import arrow.check.gen.instances.rose.monad.monad
+import arrow.check.gen.instances.rose.monadError.monadError
 import arrow.check.gen.instances.rose.monadTrans.liftT
 import arrow.check.gen.instances.rosef.eq.eq
 import arrow.check.gen.instances.rosef.eqK.eqK
 import arrow.check.gen.instances.rosef.traverse.traverse
-import arrow.core.ForId
-import arrow.core.Id
-import arrow.core.SequenceK
+import arrow.core.*
+import arrow.core.extensions.either.eqK.eqK
+import arrow.core.extensions.either.monad.monad
+import arrow.core.extensions.either.monadError.monadError
 import arrow.core.extensions.eq
 import arrow.core.extensions.id.eqK.eqK
 import arrow.core.extensions.id.monad.monad
-import arrow.core.fix
 import arrow.test.UnitSpec
 import arrow.test.generators.GenK
 import arrow.test.generators.genK
+import arrow.test.generators.throwable
 import arrow.test.laws.EqKLaws
 import arrow.test.laws.EqLaws
+import arrow.test.laws.MonadErrorLaws
 import arrow.test.laws.TraverseLaws
+import arrow.typeclasses.Eq
 import arrow.typeclasses.Monad
 
 class RoseLawsSpec : UnitSpec() {
     init {
         testLaws(
-            /* TODO stacksafety. When that is resolved also add MonadWriter, MonadState tests
+            // TODO stacksafety. When that is resolved also add MonadWriter, MonadState tests
             MonadErrorLaws.laws(
                 Rose.monadError(Either.monadError<Throwable>()),
                 Rose.functor(Either.monad<Throwable>()),
                 Rose.applicative(Either.monad<Throwable>()),
                 Rose.monad(Either.monad<Throwable>()),
-                Rose.genK(Either.genK(Gen.throwable()), Either.monad()),
+                Rose.genK(Either.genK(io.kotlintest.properties.Gen.throwable()), Either.monad()),
                 Rose.eqK(Either.eqK(Eq<Throwable> { a, b -> a::class == b::class }))
-            ), */
+            ),
             EqLaws.laws(
                 Rose.eq(Id.eqK(), Int.eq()),
                 Rose.genK(Id.genK(), Id.monad()).genK(io.kotlintest.properties.Gen.int()) as io.kotlintest.properties.Gen<Rose<ForId, Int>>

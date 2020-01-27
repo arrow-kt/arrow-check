@@ -84,10 +84,10 @@ interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(MM(), a)
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<M>, Either<A, B>>): Kind<GenTPartialOf<M>, B> =
-        GenT { (seed, size) ->
-            Rose.monad(OptionT.monad(MM())).tailRecM(a toT seed) { (a, seed) ->
-                f(a).fix().runG(seed toT size).let { (r, nSeed) ->
-                    r.map(OptionT.monad(MM())) { e -> e.mapLeft { it toT nSeed } }
+        GenT { sizeAndSeed ->
+            Rose.monad(OptionT.monad(MM())).tailRecM(a toT sizeAndSeed) { (a, sizeAndSeed) ->
+                f(a).fix().runGWithSize(sizeAndSeed).let { (r, newSizeAndSeed) ->
+                    r.map(OptionT.monad(MM())) { e -> e.mapLeft { it toT newSizeAndSeed } }
                 }
             }.fix()
         }

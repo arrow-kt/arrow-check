@@ -113,7 +113,7 @@ interface MonadTest<M> : Monad<M> {
 
     fun failException(e: Throwable): Kind<M, Unit> =
         failWith(
-            ("Exception:".text() softLine e.toString().doc()).nest(4)
+            ("━━━ Failed: (Exception) ━━━".text() + hardLine() + e.toString().doc())
         )
 
     fun failure(): Kind<M, Unit> = failWith(nil())

@@ -28,6 +28,7 @@ import kotlin.random.Random
 fun main() {
     check {
         val i = forAll { int(0..1000) }.bind()
+        throw IllegalStateException("Hello world")
     }.unsafeRunSync()
 }
 

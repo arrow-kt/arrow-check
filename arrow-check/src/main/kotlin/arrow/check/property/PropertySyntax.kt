@@ -17,7 +17,6 @@ import arrow.typeclasses.Show
 import pretty.Doc
 import kotlin.coroutines.startCoroutine
 
-// TODO monadIO once https://github.com/arrow-kt/arrow/pull/1943 is merged
 fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): Property {
     val continuation = PropertyTestContinuation<Unit>()
     val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = {

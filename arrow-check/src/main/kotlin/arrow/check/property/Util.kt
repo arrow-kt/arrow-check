@@ -199,7 +199,6 @@ fun wilson(k: Int, n: Int, z: Double): Double {
     return (p + z * z / (2 * n) + z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
 }
 
-
 // Quickcheck added this without erfc, so I'll use that. Credits to them:
 //  https://github.com/nick8325/quickcheck/blob/master/Test/QuickCheck/Test.hs
 //  and the source quickcheck used https://web.archive.org/web/20151110174102/http://home.online.no/~pjacklam/notes/invnorm/

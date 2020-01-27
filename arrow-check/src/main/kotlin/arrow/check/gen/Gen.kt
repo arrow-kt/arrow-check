@@ -67,19 +67,17 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
         ) { (a, b) -> b(a) }.fix()
     }
 
-    fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> = GenT { (s, size) ->
-        val (l, r) = s.split()
-        this@GenT.runGen(r toT size)
-            .flatMap(OptionT.monad(MM)) { f(it).runGen(l toT size) }
-    }
+    fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
+        res.flatMap(OptionT.monad(MM)) { f(it).runGen(sizeAndSeed) }
+    })
 
     fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> = GenT { (r, s) ->
         f(runGen(r toT s))
     }
 
-    internal fun runG(sz: Tuple2<RandSeed, Size>): Tuple2<Rose<OptionTPartialOf<M>, A>, RandSeed> {
+    internal fun runGWithSize(sz: Tuple2<RandSeed, Size>): Tuple2<Rose<OptionTPartialOf<M>, A>, Tuple2<RandSeed, Size>> {
         val (l, r) = sz.a.split()
-        return runGen(r toT sz.b) toT l
+        return runGen(r toT sz.b) toT (l toT sz.b)
     }
 
     companion object {
