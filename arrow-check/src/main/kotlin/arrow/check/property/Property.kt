@@ -1,33 +1,23 @@
 package arrow.check.property
 
-import arrow.Kind
-import arrow.Kind2
-import arrow.core.Either
+import arrow.check.gen.*
+import arrow.check.gen.`fun`.show.show
+import arrow.check.gen.instances.gent.functor.functor
+import arrow.check.gen.instances.gent.monad.monad
+import arrow.check.pretty.showPretty
+import arrow.check.property.instances.propertyt.monadTest.monadTest
+import arrow.check.property.instances.testt.monadTrans.monadTrans
+import arrow.check.property.log.monoid.monoid
 import arrow.core.Id
 import arrow.core.extensions.id.monad.monad
-import arrow.core.extensions.listk.monoid.monoid
-import arrow.extension
 import arrow.fx.ForIO
 import arrow.mtl.EitherT
 import arrow.mtl.WriterT
 import arrow.mtl.WriterTPartialOf
 import arrow.mtl.extensions.writert.functor.functor
-import arrow.mtl.typeclasses.MonadTrans
-import arrow.mtl.value
-import arrow.typeclasses.*
+import arrow.typeclasses.Monad
+import arrow.typeclasses.Show
 import pretty.Doc
-import pretty.doc
-import arrow.check.arbitrary.*
-import arrow.check.arbitrary.`fun`.show.show
-import arrow.check.arbitrary.gent.alternative.orElse
-import arrow.check.arbitrary.gent.functor.functor
-import arrow.check.arbitrary.gent.monad.monad
-import arrow.check.arbitrary.gent.monadTrans.monadTrans
-import arrow.check.pretty.showPretty
-import arrow.check.property.log.monoid.monoid
-import arrow.check.property.propertyt.monadTest.monadTest
-import arrow.check.property.testt.monad.monad
-import arrow.check.property.testt.monadTrans.monadTrans
 
 // -------------- Property
 
@@ -35,6 +25,39 @@ data class Property(val config: PropertyConfig, val prop: PropertyT<ForIO, Unit>
 
     fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =
         copy(config = f(config))
+
+    fun withTests(i: TestLimit): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> EarlyTermination(it.confidence, i)
+                    is NoEarlyTermination -> NoEarlyTermination(it.confidence, i)
+                    is NoConfidenceTermination -> NoConfidenceTermination(i)
+                }
+            }
+        }
+
+    fun withConfidence(c: Confidence): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> EarlyTermination(c, it.limit)
+                    is NoEarlyTermination -> NoEarlyTermination(c, it.limit)
+                    is NoConfidenceTermination -> NoEarlyTermination(c, it.limit)
+                }
+            }
+        }
+
+    fun verifiedTermination(): Property =
+        mapConfig {
+            PropertyConfig.terminationCriteria.modify(it) {
+                when (it) {
+                    is EarlyTermination -> it
+                    is NoEarlyTermination -> EarlyTermination(it.confidence, it.limit)
+                    is NoConfidenceTermination -> EarlyTermination(Confidence(), it.limit)
+                }
+            }
+        }
 
     fun withTerminationCriteria(i: TerminationCriteria): Property =
         mapConfig { PropertyConfig.terminationCriteria.set(it, i) }
@@ -66,85 +89,11 @@ data class PropertyT<M, A>(val unPropertyT: TestT<GenTPartialOf<M>, A>) : Proper
 
     fun <B> map(MM: Monad<M>, f: (A) -> B): PropertyT<M, B> = PropertyT(unPropertyT.map(GenT.monad(MM), f))
 
-    fun <B> ap(MM: Monad<M>, ff: PropertyT<M, (A) -> B>): PropertyT<M, B> = PropertyT(unPropertyT.ap(Gen.monad(MM), ff.unPropertyT))
+    fun <B> ap(MM: Monad<M>, ff: PropertyT<M, (A) -> B>): PropertyT<M, B> =
+        PropertyT(unPropertyT.ap(Gen.monad(MM), ff.unPropertyT))
 
     companion object
 }
-
-@extension
-interface PropertyTFunctor<M> : Functor<PropertyTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A, B> Kind<PropertyTPartialOf<M>, A>.map(f: (A) -> B): Kind<PropertyTPartialOf<M>, B> =
-        fix().map(MM(), f)
-}
-
-@extension
-interface PropertyTApplicative<M> : Applicative<PropertyTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A> just(a: A): Kind<PropertyTPartialOf<M>, A> = PropertyT(TestT.just(GenT.monad(MM()), a))
-
-    override fun <A, B> Kind<PropertyTPartialOf<M>, A>.ap(ff: Kind<PropertyTPartialOf<M>, (A) -> B>): Kind<PropertyTPartialOf<M>, B> =
-        fix().ap(MM(), ff.fix())
-}
-
-@extension
-interface PropertyTMonad<M> : Monad<PropertyTPartialOf<M>> {
-    fun MM(): Monad<M>
-
-    override fun <A> just(a: A): Kind<PropertyTPartialOf<M>, A> =
-        PropertyT(TestT.monad(GenT.monad(MM())).just(a).fix())
-
-    override fun <A, B> Kind<PropertyTPartialOf<M>, A>.flatMap(f: (A) -> Kind<PropertyTPartialOf<M>, B>): Kind<PropertyTPartialOf<M>, B> =
-        TestT.monad(GenT.monad(MM())).run {
-            PropertyT(
-                fix().unPropertyT.flatMap { a ->
-                    f(a).fix().unPropertyT
-                }.fix()
-            )
-        }
-
-    override fun <A, B> tailRecM(
-        a: A, f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
-    ): Kind<PropertyTPartialOf<M>, B> =
-        f(a).flatMap { it.fold({ tailRecM(it, f) }, { just(it) }) }
-}
-
-@extension
-interface PropertyTAlternative<M> : Alternative<PropertyTPartialOf<M>>, PropertyTApplicative<M> {
-    override fun MM(): Monad<M>
-
-    override fun <A> empty(): Kind<PropertyTPartialOf<M>, A> = discard(MM())
-
-    override fun <A> Kind<PropertyTPartialOf<M>, A>.orElse(b: Kind<PropertyTPartialOf<M>, A>): Kind<PropertyTPartialOf<M>, A> =
-        PropertyT(
-            TestT(
-                EitherT(
-                    WriterT(
-                        fix().unPropertyT.runTestT.value().value().orElse(MM(), b.fix().unPropertyT.runTestT.value().value())
-                    )
-                )
-            )
-        )
-}
-
-@extension
-interface PropertyTMonadTest<M> : MonadTest<PropertyTPartialOf<M>>, PropertyTMonad<M> {
-    override fun MM(): Monad<M>
-
-    override fun <A> Test<A>.liftTest(): Kind<PropertyTPartialOf<M>, A> =
-        PropertyT(hoist(GenT.monad(MM())))
-}
-
-@extension
-interface PropertyTMonadTrans : MonadTrans<ForPropertyT> {
-    override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForPropertyT, G, A> =
-        GenT.monadTrans().run { liftT(MF) }.let {
-            TestT.monadTrans().run { it.liftT(GenT.monad(MF)).fix() }.let(::PropertyT)
-        }
-}
-
 
 // ---------
 
@@ -179,5 +128,10 @@ fun <M, A> discard(MM: Monad<M>): PropertyT<M, A> =
         )
     )
 
-fun <M, A, B> forAllFn(gen: Gen<Fun<A, B>>, MM: Monad<M>, SA: Show<A> = Show.any(), SB: Show<B> = Show.any()): PropertyT<M, (A) -> B> =
+fun <M, A, B> forAllFn(
+    gen: Gen<Fun<A, B>>,
+    MM: Monad<M>,
+    SA: Show<A> = Show.any(),
+    SB: Show<B> = Show.any()
+): PropertyT<M, (A) -> B> =
     forAll(gen, MM, Fun.show(SA, SB)).map(MM) { it.component1() }

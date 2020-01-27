@@ -1,4 +1,4 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.core.toT
 

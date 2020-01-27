@@ -1,4 +1,4 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.core.toT
 import pretty.spaced
@@ -9,7 +9,7 @@ import arrow.check.PropertySpec
 
 class ShrinkingSpec : PropertySpec({
     "Shrinking"(listOf(
-        "Long.shrinktowards should produce an ordered list of values approaching the target" toT property {
+        "Long.shrinkTowards should produce an ordered list of values approaching the target" toT property {
             val (l, target) = forAll {
                 long(Range.constant(0L, Long.MIN_VALUE, Long.MAX_VALUE)).let {
                     tupledN(
@@ -45,7 +45,7 @@ class ShrinkingSpec : PropertySpec({
         },
         // TODO this fails because of floating point precision. Is that bad? Should that be solved?
         /*
-        "Double.shrinktowards should produce an ordered list of values approaching the target" {
+        "Double.shrinkTowards should produce an ordered list of values approaching the target" {
             val (l, target) = forAll { double(Range.constant(0.0, Double.MIN_VALUE, Double.MAX_VALUE)).let { tupledN(it, it) } }.bind()
 
             // only checking first 100 because all would take too long
@@ -74,12 +74,17 @@ class ShrinkingSpec : PropertySpec({
         }
          */
         "List.shrink should produce a sequence of smaller or equal sized lists" toT property {
-            val l = forAll { int(-100..100).list(0..100) }.bind()
+            val l = forAllT { int(-100..100).list(0..100) }.bind()
 
             // only checking first 100 because all would take too long
             val first100 = l.shrink().take(100).toList()
 
+            cover(0.5, "Empty", l.isEmpty()).bind()
+            cover(95.0, "Non-Empty", l.isNotEmpty()).bind()
+
             annotate { "First 100:".text() spaced first100.showPretty() }.bind()
+
+            if (l.isEmpty() && first100.isNotEmpty()) failWith("List was empty, but shrinks were not!").bind()
 
             // order
             val ordered = first100.zipWithNext().filter { (a, b) -> a.size > b.size }
@@ -87,6 +92,6 @@ class ShrinkingSpec : PropertySpec({
                 val (f, s) = ordered.unzip()
                 diff(f, s) { _, _ -> false }.bind()
             }
-        }
+        }.verifiedTermination()
     ))
 })

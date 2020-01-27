@@ -150,9 +150,9 @@ val defaultMinTests = TestLimit(100)
 data class Confidence(val certainty: Long = 10.0.pow(9.0).toLong(), val tolerance: Double = 0.9)
 
 sealed class TerminationCriteria
-data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: Int = 100): TerminationCriteria()
-data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: Int = 100): TerminationCriteria()
-data class NoConfidenceTermination(val limit: Int = 100): TerminationCriteria()
+data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)): TerminationCriteria()
+data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)): TerminationCriteria()
+data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)): TerminationCriteria()
 
 inline class TestLimit(val unTestLimit: Int)
 inline class DiscardRatio(val unDiscardRatio: Double)
@@ -198,7 +198,6 @@ fun wilson(k: Int, n: Int, z: Double): Double {
     val p = k / n.toDouble()
     return (p + z * z / (2 * n) + z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
 }
-
 
 // Quickcheck added this without erfc, so I'll use that. Credits to them:
 //  https://github.com/nick8325/quickcheck/blob/master/Test/QuickCheck/Test.hs

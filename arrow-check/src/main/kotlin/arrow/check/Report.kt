@@ -9,7 +9,7 @@ import pretty.ansistyle.monoid.monoid
 import pretty.symbols.bullet
 import pretty.symbols.comma
 import pretty.symbols.dot
-import arrow.check.arbitrary.RandSeed
+import arrow.check.gen.RandSeed
 import arrow.check.property.*
 import kotlin.math.floor
 import kotlin.math.max

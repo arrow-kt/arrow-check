@@ -14,6 +14,7 @@ dependencies {
     // TODO also should some of those be api? Because the types and methods are exposed, not sure
     //  how exactly that works
     implementation "io.arrow-kt:arrow-fx:$arrow_version" // IO and arrow fx
+    implementation "io.arrow-kt:arrow-fx-mtl:$arrow_version" // IO and arrow fx
     implementation "io.arrow-kt:arrow-free:$arrow_version" // Trampoline for stacksafety tests
     implementation "io.arrow-kt:arrow-optics:$arrow_version" // lenses and @optics
     implementation "io.arrow-kt:arrow-syntax:$arrow_version" // helper functions like curried...
@@ -24,6 +25,9 @@ dependencies {
     api "kparsec:kparsec:0.2.1" // Parser combinators to create toString-output parser
 
     testImplementation project(":arrow-check-kotlintest")
+    testImplementation("io.arrow-kt:arrow-test:$arrow_version") { // test helpers and laws
+        exclude group: "io.kotlintest"
+    }
 }
 
 test {

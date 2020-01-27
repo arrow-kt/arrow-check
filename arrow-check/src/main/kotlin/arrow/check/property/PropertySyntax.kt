@@ -1,29 +1,29 @@
 package arrow.check.property
 
 import arrow.Kind
+import arrow.check.gen.*
+import arrow.check.property.instances.PropertyTMonadTest
+import arrow.check.property.instances.propertyt.monad.monad
+import arrow.check.property.instances.propertyt.monadTrans.monadTrans
 import arrow.core.Either
 import arrow.core.ForId
-import arrow.core.Id
-import arrow.core.extensions.id.monad.monad
 import arrow.fx.ForIO
 import arrow.fx.IO
-import arrow.fx.IOOf
 import arrow.fx.extensions.io.monad.monad
 import arrow.typeclasses.Monad
 import arrow.typeclasses.MonadContinuation
 import arrow.typeclasses.MonadSyntax
 import arrow.typeclasses.Show
 import pretty.Doc
-import arrow.check.arbitrary.*
-import arrow.check.arbitrary.`fun`.show.show
-import arrow.check.property.propertyt.monad.monad
-import arrow.check.property.propertyt.monadTrans.monadTrans
 import kotlin.coroutines.startCoroutine
 
-// TODO monadIO once https://github.com/arrow-kt/arrow/pull/1943 is merged
 fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): Property {
     val continuation = PropertyTestContinuation<Unit>()
-    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = { just(c()).fix() }
+    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = {
+        // Until https://github.com/arrow-kt/arrow/issues/1976 has a good fix
+        unit().bind()
+        just(c()).fix()
+    }
     wrapReturn.startCoroutine(continuation, continuation)
     return Property(
         config = propertyConfig,
@@ -81,13 +81,13 @@ interface PropertyTest<M> : PropertyTMonadTest<M> {
         forAllWithT(showA, GenT.monadGen(MM()).f().fix())
 
     fun <A> forAllWith(showA: (A) -> Doc<Markup>, f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, A>) =
-        forAllWith(showA, GenT.monadGen(Id.monad()).f().fix())
+        forAllWith(showA, GenT.monadGen().f().fix())
 
     fun <A> forAllT(SA: Show<A> = Show.any(), f: MonadGen<GenTPartialOf<M>, M>.() -> GenTOf<M, A>) =
         forAllT(GenT.monadGen(MM()).f().fix(), SA)
 
     fun <A> forAll(SA: Show<A> = Show.any(), f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, A>) =
-        forAll(GenT.monadGen(Id.monad()).f().fix(), SA)
+        forAll(GenT.monadGen().f().fix(), SA)
 
     fun <A, B> forAllFn(SA: Show<A> = Show.any(), SB: Show<B> = Show.any(), f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, Fun<A, B>>) =
         forAllFn(GenT.monadGen().f().fix(), SA, SB)

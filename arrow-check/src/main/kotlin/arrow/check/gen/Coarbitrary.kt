@@ -1,16 +1,10 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
-import arrow.Kind
 import arrow.core.*
 import arrow.extension
-import arrow.syntax.collections.tail
-import arrow.typeclasses.Contravariant
-import arrow.typeclasses.Decidable
-import arrow.typeclasses.Divide
-import arrow.typeclasses.Divisible
-import arrow.check.arbitrary.either.coarbitrary.coarbitrary
-import arrow.check.arbitrary.listk.coarbitrary.coarbitrary
-import arrow.check.arbitrary.tuple2.coarbitrary.coarbitrary
+import arrow.check.gen.either.coarbitrary.coarbitrary
+import arrow.check.gen.listk.coarbitrary.coarbitrary
+import arrow.check.gen.tuple2.coarbitrary.coarbitrary
 
 // @higherkind boilerplate
 class ForCoarbitrary private constructor() {
@@ -30,9 +24,7 @@ interface Coarbitrary<A> : CoarbitraryOf<A> {
 }
 
 fun <M, B> GenT<M, B>.variant(i: Long): GenT<M, B> =
-    GenT { (rand, size) ->
-        runGen(rand.variant(i) toT size)
-    }
+    GenT(AndThen(runGen).compose { (seed, size) -> seed.variant(i) toT size })
 
 // keep it here for now, maybe add that for TupleN later
 @extension

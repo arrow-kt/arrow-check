@@ -2,34 +2,47 @@ package arrow.check
 
 import arrow.Kind
 import arrow.core.*
-import arrow.core.extensions.either.applicative.applicative
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
 import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.fx.IO
 import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.functor.unit
-import arrow.fx.extensions.io.monad.monad
 import arrow.fx.fix
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.value
 import arrow.recursion.elgotM
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Monad
-import kparsec.renderPretty
-import kparsec.runParser
-import kparsec.stream
 import pretty.*
-import arrow.check.arbitrary.*
-import arrow.check.pretty.KValue
-import arrow.check.pretty.listParser
+import arrow.check.gen.*
+import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.rosef.traverse.traverse
 import arrow.check.property.*
 import arrow.check.property.Failure
+import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
+import arrow.check.property.instances.propertyt.monadTest.monadTest
+import arrow.check.property.instances.testt.monadTest.failException
+import arrow.core.extensions.id.applicative.applicative
+import arrow.core.extensions.list.foldable.traverse_
+import arrow.fx.extensions.io.monadDefer.monadDefer
+import arrow.fx.typeclasses.MonadDefer
+import arrow.mtl.typeclasses.Nested
+import arrow.mtl.typeclasses.nest
+import arrow.mtl.typeclasses.unnest
+import arrow.recursion.hylo
+import arrow.recursion.hyloM
 import kotlin.random.Random
+
+fun main() {
+    check {
+        val (a, b) = forAll { tupledN(int(0..5), int(0..5)).also { it.fix() } }.bind()
+        a.eqv(b).bind()
+    }.unsafeRunSync()
+}
 
 /**
  * TODO Unsigned type instances for coarbitrary and function. Also generators for unsigned types
- * TODO Gen's and instances for arrow types
  * TODO's
  * - shrinking
  *  - pretty print shrink-trees/gens
@@ -144,7 +157,7 @@ internal fun checkReport(
     prop: Property
 ): IO<Report<Result>> =
     IO.fx {
-        val report = !runProperty(IO.monad(), size, seed, prop.config, prop.prop) {
+        val report = !runProperty(IO.monadDefer(), size, seed, prop.config, prop.prop) {
             // TODO Live update will come back once I finish concurrent output
             IO.unit
         }
@@ -163,17 +176,22 @@ data class State(
 
 // TODO also clean this up... split it apart etc
 fun <M> runProperty(
-    MM: Monad<M>,
+    MM: MonadDefer<M>,
     initialSize: Size,
     initialSeed: RandSeed,
     config: PropertyConfig,
     prop: PropertyT<M, Unit>,
     hook: (Report<Progress>) -> Kind<M, Unit>
 ): Kind<M, Report<Result>> {
+    // Catch all errors M throws and report them using failException. This also catches all errors in all shrink branches the same way
+    val wrappedProp = prop.handleErrorWith(MM) {
+        PropertyT.monadTest(MM).failException(it)
+    }
+
     val (confidence, minTests) = when (config.terminationCriteria) {
-        is EarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
-        is NoEarlyTermination -> config.terminationCriteria.confidence.some() to TestLimit(config.terminationCriteria.limit)
-        is NoConfidenceTermination -> None to TestLimit(config.terminationCriteria.limit)
+        is EarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
+        is NoEarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
+        is NoConfidenceTermination -> None to config.terminationCriteria.limit
     }
 
     fun successVerified(testCount: TestCount, coverage: Coverage<CoverCount>): Boolean =
@@ -237,9 +255,8 @@ fun <M> runProperty(
                     ) ->
                         MM.just(Report(numTests, numDiscards, currCoverage, Result.GivenUp).left())
                     else -> seed.split().let { (s1, s2) ->
-                        // TODO catch errors
                         MM.fx.monad {
-                            val res = !prop.unPropertyT.runTestT
+                            val res = !wrappedProp.unPropertyT.runTestT
                                 .value() // EitherT
                                 .value().fix() // WriterT
                                 .runGen(s1 toT size)
@@ -308,11 +325,6 @@ fun <M> runProperty(
     }, Id.traverse(), MM)
 }
 
-data class ShrinkState<M>(
-    val numShrinks: ShrinkCount,
-    val node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>
-)
-
 // TODO inline classes for params
 fun <M> shrinkResult(
     MM: Monad<M>,
@@ -322,46 +334,55 @@ fun <M> shrinkResult(
     shrinkRetries: Int,
     node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>,
     hook: (FailureSummary) -> Kind<M, Unit>
-): Kind<M, Result> =
-    ShrinkState(ShrinkCount(0), node).elgotM({ MM.just(it.value()) }, { (numShrinks, curr) ->
-        MM.fx.monad {
-            curr.res.fold({
-                Result.GivenUp.left()
-            }, { (log, result) ->
-                result.fold({
-                    val summary = FailureSummary(
-                        size, seed, numShrinks, it.unFailure,
-                        annotations = log.unLog.filterMap {
-                            if (it is JournalEntry.Annotate) FailureAnnotation.Annotation(it.text).some()
-                            else if (it is JournalEntry.Input) FailureAnnotation.Input(it.text).some()
-                            else None
-                        },
-                        footnotes = log.unLog.filterMap {
-                            if (it is JournalEntry.Footnote) it.text.some()
-                            else None
-                        }
-                    )
+): Kind<M, Result> = Rose.birecursive<M, Option<Tuple2<Log, Either<Failure, Unit>>>>(MM).run {
+    Rose(MM.just(node)).hylo<Nested<M, RoseFPartialOf<Option<Tuple2<Log, Either<Failure, Unit>>>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, (ShrinkCount) -> Kind<M, Result>>({
+        val curr = it.unnest()
+        curr.let {
+            { numShrinks: ShrinkCount ->
+                MM.fx.monad {
+                    val (res, shrinks) = it.bind().fix()
+                    res.fold({
+                        Result.GivenUp
+                    }, { (log, result) ->
+                        result.fold({
+                            val summary = FailureSummary(
+                                size, seed, numShrinks, it.unFailure,
+                                annotations = log.unLog.filterMap { entry ->
+                                    when (entry) {
+                                        is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text).some()
+                                        is JournalEntry.Input -> FailureAnnotation.Input(entry.text).some()
+                                        else -> None
+                                    }
+                                },
+                                footnotes = log.unLog.filterMap { entry ->
+                                    if (entry is JournalEntry.Footnote) entry.text.some()
+                                    else None
+                                }
+                            )
 
-                    hook(summary).bind()
+                            hook(summary).bind()
 
-                    if (numShrinks.unShrinkCount >= shrinkLimit)
-                        Result.Failure(summary).left()
-                    else curr.shrunk.foldRight<Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, Kind<M, Either<Result, Id<ShrinkState<M>>>>>(
-                        Eval.now(MM.just(Result.Failure(summary).left()))
-                    ) { v, acc ->
-                        Eval.now(
-                            MM.fx.monad {
-                                val r = v.runTreeN(MM, shrinkRetries).bind()
-                                if (r.isFailure())
-                                    Id(ShrinkState(ShrinkCount(numShrinks.unShrinkCount + 1), r)).right()
-                                else acc.value().bind()
-                            }
-                        )
-                    }.value().bind()
-                }, { Result.Success.left() })
-            })
+                            if (numShrinks.unShrinkCount >= shrinkLimit)
+                                Result.Failure(summary)
+                            else shrinks.map { it(ShrinkCount(numShrinks.unShrinkCount + 1)) }
+                                .foldRight(Eval.now(MM.just(Result.Failure(summary)))) { v, acc ->
+                                    Eval.now(
+                                        MM.fx.monad {
+                                            val test = !v
+                                            if (test is Result.Failure) test
+                                            else acc.value().bind()
+                                        }
+                                    )
+                                }.value().bind()
+                        }, { Result.Success })
+                    })
+                }
+            }
         }
-    }, Id.traverse(), MM)
+    }, {
+        it.runTreeN(MM, shrinkRetries).nest()
+    }, FF()).invoke(ShrinkCount(0))
+}
 
 fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(
     MM: Monad<M>,
@@ -377,7 +398,11 @@ fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(
 fun <M, A> Option<RoseF<A, Rose<OptionTPartialOf<M>, A>>>.unwrap(FF: Functor<M>): RoseF<Option<A>, Rose<M, Option<A>>> =
     fold({
         RoseF(None, emptySequence())
-    }, { RoseF(it.res.some(), it.shrunk.map { FF.run { Rose(it.runRose.value().map { it.unwrap(FF) }) } }) })
+    }, {
+        RoseF(
+            it.res.some(),
+            it.shrunk.map { r -> FF.run { Rose(r.runRose.value().map { opt -> opt.unwrap(FF) }) } })
+    })
 
 fun <M, A, L, W> RoseF<Option<Tuple2<W, Either<L, A>>>, M>.isFailure(): Boolean =
     res.fold({ false }, { it.b.isLeft() })

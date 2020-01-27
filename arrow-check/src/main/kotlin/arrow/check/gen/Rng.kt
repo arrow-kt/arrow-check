@@ -1,10 +1,10 @@
-package arrow.check.arbitrary
+package arrow.check.gen
 
 import arrow.core.Tuple2
 import arrow.core.toT
 
 /**
- * TODO run a good random number testsuite like dieharder over this!
+ * TODO run a random number testsuite like dieharder over this!
  * This whole thing is copypasta simply to make SplittableRandom more accessible
  * re-implementation of SplittableRandom
  *  by http://gee.cs.oswego.edu/dl/papers/oopsla14.pdf
