@@ -22,17 +22,13 @@ import arrow.test.UnitSpec
 import arrow.test.generators.GenK
 import arrow.test.generators.genK
 import arrow.test.generators.throwable
-import arrow.test.laws.EqKLaws
-import arrow.test.laws.EqLaws
-import arrow.test.laws.MonadErrorLaws
-import arrow.test.laws.TraverseLaws
+import arrow.test.laws.*
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Monad
 
 class RoseLawsSpec : UnitSpec() {
     init {
         testLaws(
-            // TODO stacksafety. When that is resolved also add MonadWriter, MonadState tests
             MonadErrorLaws.laws(
                 Rose.monadError(Either.monadError<Throwable>()),
                 Rose.functor(Either.monad<Throwable>()),
@@ -48,7 +44,7 @@ class RoseLawsSpec : UnitSpec() {
             EqKLaws.laws(
                 Rose.eqK(Id.eqK()),
                 Rose.genK(Id.genK(), Id.monad())
-            )
+            ) // TODO test MonadState and MonadWriter laws as soon as genK and eqK become visible in arrow-test https://github.com/arrow-kt/arrow/pull/1981
         )
     }
 }

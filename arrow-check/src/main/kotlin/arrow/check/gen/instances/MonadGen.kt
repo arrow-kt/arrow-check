@@ -233,5 +233,3 @@ interface GenTMonadTransDistributive : MonadTransDistributive<ForGenT> {
         }
     }
 }
-
-// TODO mtl instances after reordering

@@ -407,7 +407,6 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         )
     }
 
-    // TODO This stackoverflows for nonstacksafe M...
     fun <A> Kind<M, A>.list(range: Range<Int>): Kind<M, List<A>> = sized { s ->
         MM().run {
             fx.monad {
@@ -667,6 +666,7 @@ fun <A> Gen<A>.printTree(SA: Show<A> = Show.any()): Unit =
     printTreeWith(Size(30), RandSeed(Random.nextLong()), SA)
 
 // TODO I did write a prettyprinter library for propCheck so I should maybe use it? :)
+//  Also implement this to render directly line by line so that infinite stuff still renders bit by bit
 fun <A> Gen<A>.printTreeWith(size: Size, randSeed: RandSeed, SA: Show<A> = Show.any()) =
     runGen(randSeed toT size)
         .let {

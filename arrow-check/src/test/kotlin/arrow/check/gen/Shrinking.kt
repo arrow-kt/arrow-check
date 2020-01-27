@@ -9,7 +9,7 @@ import arrow.check.PropertySpec
 
 class ShrinkingSpec : PropertySpec({
     "Shrinking"(listOf(
-        "Long.shrinktowards should produce an ordered list of values approaching the target" toT property {
+        "Long.shrinkTowards should produce an ordered list of values approaching the target" toT property {
             val (l, target) = forAll {
                 long(Range.constant(0L, Long.MIN_VALUE, Long.MAX_VALUE)).let {
                     tupledN(
@@ -45,7 +45,7 @@ class ShrinkingSpec : PropertySpec({
         },
         // TODO this fails because of floating point precision. Is that bad? Should that be solved?
         /*
-        "Double.shrinktowards should produce an ordered list of values approaching the target" {
+        "Double.shrinkTowards should produce an ordered list of values approaching the target" {
             val (l, target) = forAll { double(Range.constant(0.0, Double.MIN_VALUE, Double.MAX_VALUE)).let { tupledN(it, it) } }.bind()
 
             // only checking first 100 because all would take too long

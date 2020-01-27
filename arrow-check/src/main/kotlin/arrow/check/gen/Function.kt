@@ -86,10 +86,12 @@ sealed class Fn<A, B> : FnOf<A, B> {
 
     class PairFn<A, B, C>(val fn: Fn<A, Fn<B, C>>) : Fn<Tuple2<A, B>, C>()
 
-    // TODO clean this up
-    class MapFn<A, B, C>(val f: (A) -> B, val cF: (B) -> A, val g: Fn<B, C>) : Fn<A, C>()
-    class MapFnRec<A, B, C>(val f: (A) -> Eval<B>, val cF: (B) -> A, val g: Fn<B, C>) : Fn<A, C>()
+    class MapFn<A, B, C>(val f: (A) -> Eval<B>, val cF: (B) -> A, val g: Fn<B, C>) : Fn<A, C>()
 
+    /**
+     * TODO Is this still needed. This is actually just a shortcut for small values, but everything can technically be
+     *  represented with just tuples/eithers/units and mappings from and to those
+     */
     class TableFn<A, B>(val m: Map<A, Eval<B>>) : Fn<A, B>()
 
     companion object
@@ -108,11 +110,6 @@ interface FnFunctor<C> : Functor<FnPartialOf<C>> {
         is Fn.PairFn<*, *, A> -> Fn.PairFn((t.fn as Fn<C, Fn<C, A>>).map { it.map(f).fix() }.fix()) as Fn<C, B>
         is Fn.TableFn -> Fn.TableFn(t.m.mapValues { it.value.map(f) })
         is Fn.MapFn<*, *, A> -> Fn.MapFn(
-            t.f as (Any?) -> C,
-            t.cF as (C) -> Any?,
-            (t.g as Fn<C, A>).map(f).fix()
-        ) as Fn<C, B>
-        is Fn.MapFnRec<*, *, A> -> Fn.MapFnRec(
             t.f as (Any?) -> Eval<C>,
             t.cF as (C) -> Any?,
             (t.g as Fn<C, A>).map(f).fix()
@@ -149,8 +146,7 @@ fun <A, B> abstract(fn: Fn<A, B>, d: B): Function1<A, Eval<B>> = when (fn) {
             (abstract(fn.r, d).f as (Any?) -> Eval<B>)(it)
         })
     } as Function1<A, Eval<B>>
-    is Fn.MapFn<*, *, B> -> Function1 { (abstract(fn.g, d).f as (Any?) -> Eval<B>)((fn.f as (A) -> Any?)(it)) }
-    is Fn.MapFnRec<*, *, B> -> Function1 {
+    is Fn.MapFn<*, *, B> -> Function1 {
         (fn.f as (A) -> Eval<Any?>)(it).flatMap { (abstract(fn.g, d).f as (Any?) -> Eval<B>)(it) }
     }
     is Fn.TableFn -> Function1 { fn.m.getOrDefault(it, Eval.now(d)) }
@@ -165,7 +161,6 @@ fun <A, B> Fn<A, B>.table(): Map<A, B> = when (this) {
     }.toMap() as Map<A, B>
     is Fn.TableFn -> m.mapValues { it.value.value() }
     is Fn.MapFn<*, *, B> -> g.table().mapKeys { (cF as (Any?) -> A).invoke(it.key) }
-    is Fn.MapFnRec<*, *, B> -> g.table().mapKeys { (cF as (Any?) -> A).invoke(it.key) }
 }
 
 fun <A, B> shrinkFun(fn: Fn<A, B>, shrinkB: (B) -> Sequence<B>): Sequence<Fn<A, B>> = when (fn) {
@@ -186,12 +181,6 @@ fun <A, B> shrinkFun(fn: Fn<A, B>, shrinkB: (B) -> Sequence<B>): Sequence<Fn<A, 
         when (it) {
             is Fn.NilFn -> Fn.NilFn<A, B>()
             else -> Fn.MapFn(fn.f, fn.cF as (Any?) -> A, it as Fn<Any?, B>)
-        }
-    }
-    is Fn.MapFnRec<A, *, B> -> shrinkFun(fn.g, shrinkB).map {
-        when (it) {
-            is Fn.NilFn -> Fn.NilFn<A, B>()
-            else -> Fn.MapFnRec(fn.f, fn.cF as (Any?) -> A, it as Fn<Any?, B>)
         }
     }
     is Fn.TableFn -> shrinkList(fn.m.toList()) { (a, evalB) ->
@@ -234,12 +223,11 @@ interface Func<A> {
     fun <B> function(f: (A) -> B): Fn<A, B>
 }
 
-fun <A, B, C> funMap(fb: Func<B>, f: (A) -> B, cF: (B) -> A, g: (A) -> C): Fn<A, C> = fb.run {
-    Fn.MapFn(f, cF, function(AndThen(cF).andThen(g)))
-}
+fun <A, B, C> funMap(fb: Func<B>, f: (A) -> B, cF: (B) -> A, g: (A) -> C): Fn<A, C> =
+    funMapRec(fb, f.andThen { Eval.now(it) }, cF, g)
 
 fun <A, B, C> funMapRec(fb: Func<B>, f: (A) -> Eval<B>, cF: (B) -> A, g: (A) -> C): Fn<A, C> = fb.run {
-    Fn.MapFnRec(f, cF, function(AndThen(cF).andThen(g)))
+    Fn.MapFn(f, cF, function(AndThen(cF).andThen(g)))
 }
 
 private fun <A, B, C> ((Tuple2<A, B>) -> C).curry(): ((A) -> ((B) -> C)) =
@@ -357,9 +345,9 @@ interface OptionFunc<A> : Func<Option<A>> {
         }, f)
 }
 
-// TODO Move
 // Model haskell lists to prevent overflows with strict lists
 // This is a bit wasteful, maybe there is a better solution?
+// TODO test if this is still needed. At least it works for now
 data class Stream<A>(val unStream: ListF<A, Eval<Stream<A>>>) {
     fun <B> foldRight(lb: Eval<B>, f: (A, Eval<B>) -> Eval<B>): Eval<B> = when (unStream) {
         is ListF.NilF -> lb
