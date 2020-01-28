@@ -35,6 +35,13 @@ typealias FunKindedJ<A, B> = arrow.HkJ2<ForFun, A, B>
 inline fun <A, B> FunOf<A, B>.fix(): Fun<A, B> =
     this as Fun<A, B>
 
+/**
+ * A single generated function which has a default value [d] and a [Fn] which represents the actual function `A -> B`.
+ *
+ * The default is used in cases where the function returns nil or cannot lookup a value to return.
+ *
+ * This should never be used in a test directly, always access it through [forAllFn] as that hides implementation details properly.
+ */
 class Fun<A, B>(val d: B, val fn: Fn<A, Rose<OptionTPartialOf<ForId>, B>>) : FunOf<A, B> {
     operator fun component1(): (A) -> B =
         abstract(fn, Rose.just(OptionT.applicative(Id.monad()), d)).map {
@@ -44,6 +51,25 @@ class Fun<A, B>(val d: B, val fn: Fn<A, Rose<OptionTPartialOf<ForId>, B>>) : Fun
 
     companion object
 }
+
+/**
+ * Turn a generator for [B] into a generator for a function of `A -> B`.
+ *
+ * This requires a [Func] instance (to know how to represent `A -> B` as `Fn<A, B>` and a [Coarbitrary] instance to provide
+ *  variance for the generator so that it produces different values for different inputs.
+ */
+fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun<A, B>> =
+    Gen.applicative(Id.monad()).mapN(
+        this@toFunction,
+        Gen { (s, sz) ->
+            Rose.unfold(
+                OptionT.monad(Id.monad()),
+                AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }
+            ) {
+                shrinkFun(it) { it.runRose.value().value().fold({ emptySequence() }, { it.shrunk }) }
+            }
+        }
+    ) { (d, fn) -> Fun(d, fn) }.fix()
 
 @extension
 interface FunShow<A, B> : Show<Fun<A, B>> {
@@ -76,6 +102,11 @@ typealias FnKindedJ<A, B> = arrow.HkJ2<ForFn, A, B>
 inline fun <A, B> FnOf<A, B>.fix(): Fn<A, B> =
     this as Fn<A, B>
 
+/**
+ * Representation of a function as a datatype.
+ *
+ * This is what a generated function looks like internally.
+ */
 sealed class Fn<A, B> : FnOf<A, B> {
 
     class UnitFn<B>(val b: B) : Fn<Unit, B>()
@@ -117,20 +148,11 @@ interface FnFunctor<C> : Functor<FnPartialOf<C>> {
     }
 }
 
-// fn gen
-fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun<A, B>> =
-    Gen.applicative(Id.monad()).mapN(
-        this@toFunction,
-        Gen { (s, sz) ->
-            Rose.unfold(
-                OptionT.monad(Id.monad()),
-                AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }
-            ) {
-                shrinkFun(it) { it.runRose.value().value().fold({ emptySequence() }, { it.shrunk }) }
-            }
-        }
-    ) { (d, fn) -> Fun(d, fn) }.fix()
-
+/**
+ * Create a function from a [Fn].
+ *
+ * This basically evaluates the datatype all the way through and wraps it in [Function1]. It returns [Eval] to trampoline the recursive parts.
+ */
 fun <A, B> abstract(fn: Fn<A, B>, d: B): Function1<A, Eval<B>> = when (fn) {
     is Fn.UnitFn -> Function1 { Eval.now(fn.b) }
     is Fn.NilFn -> Function1 { Eval.now(d) }
@@ -152,6 +174,9 @@ fun <A, B> abstract(fn: Fn<A, B>, d: B): Function1<A, Eval<B>> = when (fn) {
     is Fn.TableFn -> Function1 { fn.m.getOrDefault(it, Eval.now(d)) }
 }
 
+/**
+ * Collect a mapping of input to output from this function. This is later used to show it.
+ */
 fun <A, B> Fn<A, B>.table(): Map<A, B> = when (this) {
     is Fn.UnitFn -> mapOf(Unit to b) as Map<A, B> // also safe, please add gadts
     is Fn.NilFn -> emptyMap()
@@ -163,6 +188,9 @@ fun <A, B> Fn<A, B>.table(): Map<A, B> = when (this) {
     is Fn.MapFn<*, *, B> -> g.table().mapKeys { (cF as (Any?) -> A).invoke(it.key) }
 }
 
+/**
+ * Shrink a function given a method to shrink its result.
+ */
 fun <A, B> shrinkFun(fn: Fn<A, B>, shrinkB: (B) -> Sequence<B>): Sequence<Fn<A, B>> = when (fn) {
     is Fn.NilFn -> emptySequence()
     is Fn.UnitFn -> sequenceOf(Fn.NilFn<A, B>()) + (shrinkB(fn.b).map { Fn.UnitFn(it) } as Sequence<Fn<A, B>>)
@@ -191,6 +219,12 @@ fun <A, B> shrinkFun(fn: Fn<A, B>, shrinkB: (B) -> Sequence<B>): Sequence<Fn<A, 
     }
 }
 
+/**
+ * Quickcheck style list shrinking. This is basically interleave, but for lists ad without the rose tree stuff.
+ *
+ * TODO maybe this can be unified since A in these cases is probably RoseF like in interleave...
+ * This also has the same caveats as interleave :/
+ */
 fun <A> shrinkList(list: List<A>, f: (A) -> Sequence<A>): Sequence<List<A>> {
     fun <F> removes(k: Int, n: Int, l: List<F>): Sequence<List<F>> =
         if (k > n) emptySequence()
@@ -199,7 +233,7 @@ fun <A> shrinkList(list: List<A>, f: (A) -> Sequence<A>): Sequence<List<A>> {
 
     fun shrinkListIt(l: List<A>): Sequence<List<A>> = when (l.size) {
         0 -> emptySequence()
-        else -> iterate({ it / 2 }, l.size).takeWhile { it > 0 }
+        else -> generateSequence(l.size) { it / 2 }.takeWhile { it > 0 }
             .map { k -> removes(k, l.size, l) }.reduce { a, b -> a + b }
     }
 
@@ -213,19 +247,36 @@ fun <A> shrinkList(list: List<A>, f: (A) -> Sequence<A>): Sequence<List<A>> {
     else shrinkListIt(list) + sequenceOf(Unit).flatMap { shrinkOne(list) }
 }
 
-fun <T : Any> iterate(f: (T) -> T, start: T) = generateSequence(start) { f(it) }
-
 private fun <A, B, C> combineFn(l: Fn<A, C>, r: Fn<B, C>): Fn<Either<A, B>, C> =
     if (l is Fn.NilFn && r is Fn.NilFn) Fn.NilFn()
     else Fn.EitherFn(l, r)
 
+/**
+ * Typeclass for creating [Fn] values from functions.
+ *
+ * See the helpers [funMap], [funMapRec], [funPair], [funEither], [unitFunc] for how to implement it.
+ */
 interface Func<A> {
     fun <B> function(f: (A) -> B): Fn<A, B>
 }
 
+/**
+ * Create a [Fn] by using an isomorphism `A <-> B` and [B]'s [Func] instance.
+ *
+ * This is what most [Func] defintions should use!
+ *
+ * However note that this is not stacksafe in the `A -> B` conversion which is strict. So if your type does a lot of recursive calls inside [f] it can overflow.
+ *
+ * For a stacksafe variant see [funMapRec]
+ */
 fun <A, B, C> funMap(fb: Func<B>, f: (A) -> B, cF: (B) -> A, g: (A) -> C): Fn<A, C> =
-    funMapRec(fb, f.andThen { Eval.now(it) }, cF, g)
+    funMapRec(fb, AndThen(f).andThen { Eval.now(it) }, cF, g)
 
+/**
+ * Stacksafe variant of [funMap].
+ *
+ * This wraps [f] in [Eval] which makes the conversion to [B] lazy and since it is in [Eval] it will be trampolined.
+ */
 fun <A, B, C> funMapRec(fb: Func<B>, f: (A) -> Eval<B>, cF: (B) -> A, g: (A) -> C): Fn<A, C> = fb.run {
     Fn.MapFn(f, cF, function(AndThen(cF).andThen(g)))
 }
@@ -233,6 +284,11 @@ fun <A, B, C> funMapRec(fb: Func<B>, f: (A) -> Eval<B>, cF: (B) -> A, g: (A) -> 
 private fun <A, B, C> ((Tuple2<A, B>) -> C).curry(): ((A) -> ((B) -> C)) =
     { a -> { b -> this(a toT b) } }
 
+/**
+ * Create a [Fn] from a function that takes a [Tuple2] as an input.
+ *
+ * Since the instance for [Tuple2] already exists one should generally not need this as [funMap] can be used to reuse that instance.
+ */
 fun <A, B, C> funPair(fA: Func<A>, fB: Func<B>, f: (Tuple2<A, B>) -> C): Fn<Tuple2<A, B>, C> = fA.run {
     fB.run {
         Fn.PairFn(
@@ -241,6 +297,11 @@ fun <A, B, C> funPair(fA: Func<A>, fB: Func<B>, f: (Tuple2<A, B>) -> C): Fn<Tupl
     }
 }
 
+/**
+ * Create a [Fn] from a function that takes an [Either] as an input.
+ *
+ * Since the instance for [Either] already exists one should generally not need this as [funMap] can be used to reuse that instance.
+ */
 fun <A, B, C> funEither(fA: Func<A>, fB: Func<B>, f: (Either<A, B>) -> C): Fn<Either<A, B>, C> =
     Fn.EitherFn(
         fA.run { function(AndThen(f).compose { it.left() }) },
@@ -279,7 +340,11 @@ interface BooleanFunc : Func<Boolean> {
 
 fun Boolean.Companion.func(): Func<Boolean> = object : BooleanFunc {}
 
-// go straight to a list of single bit's encoded as boolean
+/**
+ * This encodes a long as 8 unsigned bytes, which are themselves represented as a lookup table.
+ *
+ * This may change in the future to represent a List<Boolean> instead which means we can drop the Fn.Table constructor
+ */
 interface LongFunc : Func<Long> {
     override fun <B> function(f: (Long) -> B): Fn<Long, B> =
         funMap(
@@ -321,7 +386,7 @@ fun UByte.Companion.func(): Func<UByte> = object : UByteFunc {}
 fun <A, B> funList(vals: Collection<A>, f: (A) -> B): Fn<A, B> =
     Fn.TableFn(vals.map { it toT Eval.later { f(it) } }.toMap())
 
-private fun <A> List<A>.padTo(i: Int, a: A): List<A> =
+private tailrec fun <A> List<A>.padTo(i: Int, a: A): List<A> =
     if (size < i) (this + listOf(a)).padTo(i, a)
     else this
 

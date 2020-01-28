@@ -16,17 +16,28 @@ typealias CoarbitraryOf<A> = arrow.Kind<ForCoarbitrary, A>
 inline fun <A> CoarbitraryOf<A>.fix(): Coarbitrary<A> =
     this as Coarbitrary<A>
 
+/**
+ * Typeclass which abstracts the behaviour of changing a generator based on some input of type [A]
+ *
+ * This is used when generating functions to provide variance for the generator that produces the result of a function by using the input to vary the random number generator.
+ */
 interface Coarbitrary<A> : CoarbitraryOf<A> {
 
+    /**
+     * Transform a generator upon receiving an [A]. This usually ends up calling [variant] a bunch of times to change the random nubmer generator.
+     */
     fun <M, B> GenT<M, B>.coarbitrary(a: A): GenT<M, B>
 
     companion object
 }
 
+/**
+ * Change the seed of the random number generator. This is implemented in a way such that even similar inputs yield vastly different results.
+ */
 fun <M, B> GenT<M, B>.variant(i: Long): GenT<M, B> =
     GenT(AndThen(runGen).compose { (seed, size) -> seed.variant(i) toT size })
 
-// keep it here for now, maybe add that for TupleN later
+// instances
 @extension
 interface Tuple2Coarbitrary<A, B> : Coarbitrary<Tuple2<A, B>> {
     fun CA(): Coarbitrary<A>
