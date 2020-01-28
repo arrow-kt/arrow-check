@@ -127,15 +127,6 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
                     MM.just(RoseF(it, f(it))).nest()
                 }
             }
-        /*
-        Rose(
-            MM.just(
-                RoseF(
-                    a,
-                    unfoldForest(MM, a, f)
-                )
-            )
-        )*/
 
         fun <M, A> unfoldForest(MM: Monad<M>, a: A, f: (A) -> Sequence<A>): Sequence<Rose<M, A>> =
             f(a).map { unfold(MM, it, f) }
