@@ -1,4 +1,4 @@
-# Λrrow Check - Property based testing in kotlin
+# Λrrow Check - Property based testing in Kotlin
 
 > Never write test data by hand again. Generate it!
 
