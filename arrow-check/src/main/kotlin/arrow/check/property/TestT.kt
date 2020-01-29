@@ -150,63 +150,6 @@ interface MonadTest<M> : Monad<M> {
     fun <A> A.neqv(other: A, EQA: Eq<A> = Eq.any(), SA: Show<A> = Show.any()): Kind<M, Unit> =
         diff(this, other, SA) { a, b -> EQA.run { a.neqv(b) } }
 
-    // TODO check if either roundtripeffect and roundtrip can be unififed somehow without producing uglier output
-    fun <F, A, B> A.roundtrip(
-        encode: (A) -> B,
-        decode: (B) -> Kind<F, A>,
-        AP: Applicative<F>,
-        EQF: Eq<Kind<F, A>> = Eq.any(),
-        SFA: Show<Kind<F, A>> = Show.any(),
-        SB: Show<B> = Show.any()
-    ): Kind<M, Unit> {
-        val fa = AP.just(this)
-        val intermediate = encode(this)
-        val decoded = decode(intermediate)
-
-        return if (EQF.run { fa.eqv(decoded) }) succeeded()
-        else failWith(
-            SFA.run {
-                val diff = fa.show().diff(decoded.show())
-
-                "━━━ Intermediate ━━━".text() + hardLine() +
-                        intermediate.showPretty(SB) + hardLine() +
-                        "━━━ Failed (".text() +
-                        "- Original".text().annotate(Markup.DiffRemoved(0)) +
-                        " =/= ".text() +
-                        "+ Roundtrip".text().annotate(Markup.DiffAdded(0)) +
-                        ") ━━━".text() +
-                        hardLine() + diff.toDoc()
-            }
-        )
-    }
-
-    fun <A, B> A.roundtripEffect(
-        encode: (A) -> B,
-        decode: (B) -> Kind<M, A>,
-        EQF: Eq<A> = Eq.any(),
-        SFA: Show<A> = Show.any(),
-        SB: Show<B> = Show.any()
-    ): Kind<M, Unit> = fx.monad {
-        val intermediate = encode(this@roundtripEffect)
-        val decoded = decode(intermediate).bind()
-
-        if (EQF.run { this@roundtripEffect.eqv(decoded) }) succeeded().bind()
-        else failWith(
-            SFA.run {
-                val diff = this@roundtripEffect.show().diff(decoded.show())
-
-                "━━━ Intermediate ━━━".text() + hardLine() +
-                        intermediate.showPretty(SB) + hardLine() +
-                        "━━━ Failed (".text() +
-                        "- Original".text().annotate(Markup.DiffRemoved(0)) +
-                        " =/= ".text() +
-                        "+ Roundtrip".text().annotate(Markup.DiffAdded(0)) +
-                        ") ━━━".text() +
-                        hardLine() + diff.toDoc()
-            }
-        ).bind()
-    }
-
     fun <A, B> A.roundtrip(
         encode: (A) -> B,
         decode: (B) -> A,
@@ -222,4 +165,58 @@ interface MonadTest<M> : Monad<M> {
             SA.run { value().show() }
         }, SB
     )
+
+    fun <A, B> A.roundtripEffect(
+        encode: (A) -> Kind<M, B>,
+        decode: (B) -> Kind<M, A>,
+        EQ: Eq<A> = Eq.any(),
+        SA: Show<A> = Show.any(),
+        SB: Show<B> = Show.any()
+    ): Kind<M, Unit> = this.roundtripEffect(
+        encode,
+        decode.andThen { it.map(::Id) },
+        Id.applicative(),
+        Id.eq(EQ) as Eq<Kind<ForId, A>>,
+        Show {
+            SA.run { value().show() }
+        }, SB
+    )
+
+    fun <F, A, B> A.roundtrip(
+        encode: (A) -> B,
+        decode: (B) -> Kind<F, A>,
+        AP: Applicative<F>,
+        EQF: Eq<Kind<F, A>> = Eq.any(),
+        SFA: Show<Kind<F, A>> = Show.any(),
+        SB: Show<B> = Show.any()
+    ): Kind<M, Unit> = roundtripEffect(encode.andThen { just(it) }, decode.andThen { just(it) }, AP, EQF, SFA, SB)
+
+    fun <F, A, B> A.roundtripEffect(
+        encode: (A) -> Kind<M, B>,
+        decode: (B) -> Kind<M, Kind<F, A>>,
+        AP: Applicative<F>,
+        EQF: Eq<Kind<F, A>> = Eq.any(),
+        SFA: Show<Kind<F, A>> = Show.any(),
+        SB: Show<B> = Show.any()
+    ): Kind<M, Unit> = fx.monad {
+        val fa = AP.just(this@roundtripEffect)
+        val intermediate = encode(this@roundtripEffect).bind()
+        val decoded = decode(intermediate).bind()
+
+        if (EQF.run { fa.eqv(decoded) }) succeeded().bind()
+        else failWith(
+            SFA.run {
+                val diff = fa.show().diff(decoded.show())
+
+                "━━━ Intermediate ━━━".text() + hardLine() +
+                        intermediate.showPretty(SB) + hardLine() +
+                        "━━━ Failed (".text() +
+                        "- Original".text().annotate(Markup.DiffRemoved(0)) +
+                        " =/= ".text() +
+                        "+ Roundtrip".text().annotate(Markup.DiffAdded(0)) +
+                        ") ━━━".text() +
+                        hardLine() + diff.toDoc()
+            }
+        ).bind()
+    }
 }
