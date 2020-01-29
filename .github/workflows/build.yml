@@ -17,5 +17,7 @@ jobs:
     - name: Validate Gradle Wrapper
       uses: gradle/wrapper-validation-action@v1
     - name: Build with Gradle
+      env: 
+        JAVA_OPTS: -Xms512m -Xmx2048m
       run: |
         ./gradlew clean build
