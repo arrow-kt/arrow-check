@@ -5,7 +5,7 @@ import arrow.check.gen.`fun`.show.show
 import arrow.check.gen.instances.gent.functor.functor
 import arrow.check.gen.instances.gent.monad.monad
 import arrow.check.pretty.showPretty
-import arrow.check.property.instances.propertyt.monadTest.monadTest
+import arrow.check.property.instances.monadTest
 import arrow.check.property.instances.testt.monadTrans.monadTrans
 import arrow.check.property.log.monoid.monoid
 import arrow.core.Id

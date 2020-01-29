@@ -5,8 +5,8 @@ import arrow.check.gen.*
 import arrow.check.gen.instances.rose.birecursive.birecursive
 import arrow.check.property.*
 import arrow.check.property.Failure
+import arrow.check.property.instances.monadTest
 import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
-import arrow.check.property.instances.propertyt.monadTest.monadTest
 import arrow.core.*
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
