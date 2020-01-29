@@ -79,7 +79,10 @@ interface TestTAlternative<M> : Alternative<TestTPartialOf<M>>, TestTApplicative
         TestT(EitherT(WriterT(AF().run { fix().runTestT.value().value().orElse(b.fix().runTestT.value().value()) })))
 }
 
-@extension
+fun <M> TestT.Companion.monadTest(MM: Monad<M>): MonadTest<TestTPartialOf<M>> = object : TestTMonadTest<M> {
+    override fun MM(): Monad<M> = MM
+}
+
 interface TestTMonadTest<M> : MonadTest<TestTPartialOf<M>>, TestTMonad<M> {
     override fun MM(): Monad<M>
 

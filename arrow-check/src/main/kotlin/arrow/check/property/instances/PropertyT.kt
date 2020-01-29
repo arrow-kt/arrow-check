@@ -75,7 +75,10 @@ interface PropertyTAlternative<M> : Alternative<PropertyTPartialOf<M>>, Property
         PropertyT(TestT.alternative(GenT.monad(MM()), GenT.alternative(MM())).run { fix().unPropertyT.orElse(b.fix().unPropertyT).fix() })
 }
 
-@extension
+fun <M> PropertyT.Companion.monadTest(MM: Monad<M>): MonadTest<PropertyTPartialOf<M>> = object : PropertyTMonadTest<M> {
+    override fun MM(): Monad<M> = MM
+}
+
 interface PropertyTMonadTest<M> : MonadTest<PropertyTPartialOf<M>>, PropertyTMonad<M> {
     override fun MM(): Monad<M>
 
