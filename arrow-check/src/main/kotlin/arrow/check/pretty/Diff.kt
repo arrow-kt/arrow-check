@@ -206,7 +206,7 @@ fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
         val snd = editScript[1]
         if (fst is Edit.Remove && snd is Edit.Add) {
             listOf(
-                ValueDiff(ValueDiffF.ValueD(fst.a, snd.a))
+                fst.a.toDiff(snd.a)
             ) + editScript.drop(2).map { it.toValueDiff() }
         } else editScript.map { it.toValueDiff() }
     } else editScript.map { it.toValueDiff() }
