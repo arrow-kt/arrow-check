@@ -275,7 +275,16 @@ fun ValueDiff.toLineDiff(): Doc<DiffType> = ValueDiff.birecursive().run {
                                     .align())
                     }
                 }
-            }.b.indent(1) // save space for +/- // This also ensures the layout algorithm is optimal
+            }.let { (t, d) ->
+                // If the top level diff is a StringDiff we need to manually add the prefix and the first annotation
+                if (diff is ValueDiffF.StringDiff)
+                    when (t) {
+                        is DiffType.Same -> nil()
+                        is DiffType.Added -> ("+".text() spaced d.indent(1)).annotate(DiffType.Added)
+                        is DiffType.Removed -> ("-".text() spaced d.indent(1)).annotate(DiffType.Removed)
+                    }
+                else d.indent(1) // save space for +/- // This also ensures the layout algorithm is optimal
+            }
     }
 }
 
