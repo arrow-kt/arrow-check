@@ -717,7 +717,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         }
     }
 
-    // TODO arrow pr?
+    // TODO Replace with traverse after the lazyAp pr to use eval is in!
     // This is actually traverse but the current traverse is not stacksafe for stackunsafe monads...
     private fun <F, A> Kind<F, A>.replicateSafe(AP: Applicative<F>, n: Int): Kind<F, List<A>> =
         if (n <= 0) AP.just(emptyList())

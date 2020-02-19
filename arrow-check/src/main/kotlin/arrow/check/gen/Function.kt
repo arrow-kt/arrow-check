@@ -71,7 +71,7 @@ interface FunShow<A, B> : Show<Fun<A, B>> {
     fun SB(): Show<B>
 
     // I might want to add a safeguard to this in terms of IO.timeout or something because when this renders badly shrunk,
-    //  or unshrunk values, it will take ages!
+    //  or unshrunk values, it would take ages!
     override fun Fun<A, B>.show(): String =
         fn.table().let { ls ->
             ls.toList()
@@ -105,6 +105,17 @@ inline fun <A, B> FnOf<A, B>.fix(): Fn<A, B> =
  * Representation of a function as a datatype.
  *
  * This is what a generated function looks like internally.
+ *
+ * There are two non-recursive cases here: [UnitFn] and [TableFn] both of them describe a mapping from an input to a set
+ *  output. All other combinators simply thread through to these two.
+ *
+ * Technically [TableFn] is not necessary but it is quite convenient. Most datatypes map to produces or sums
+ *  of long eventually and long is represented as an 8-tuple of ubytes that themselves are stored entirely in [TableFn]. This
+ *  could be broken down to [UnitFn] as well where a single bit is [EitherFn] of two [UnitFn]'s.
+ *
+ * It is very important that types like [TableFn] or [MapFn] are as lazy as possible as they can map huge domains and co-domains
+ *  and thus can easily lead to out-of-memory errors. [Eval] also helps with the recursive nature of those generators to prevent
+ *  stackoverflows.
  */
 sealed class Fn<A, B> : FnOf<A, B> {
 
@@ -221,7 +232,7 @@ fun <A, B> shrinkFun(fn: Fn<A, B>, shrinkB: (B) -> Sequence<B>): Sequence<Fn<A, 
 }
 
 /**
- * Quickcheck style list shrinking. This is basically interleave, but for lists ad without the rose tree stuff.
+ * Quickcheck style list shrinking. This is basically interleave, but for lists and without the rose tree stuff.
  *
  * TODO maybe this can be unified since A in these cases is probably RoseF like in interleave...
  * This also has the same caveats as interleave :/
