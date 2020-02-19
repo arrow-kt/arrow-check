@@ -2,11 +2,11 @@ package arrow.check
 
 import arrow.Kind
 import arrow.check.gen.*
-import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.birecursive
 import arrow.check.property.*
 import arrow.check.property.Failure
+import arrow.check.property.instances.monadError
 import arrow.check.property.instances.monadTest
-import arrow.check.property.instances.propertyt.applicativeError.handleErrorWith
 import arrow.core.*
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
@@ -166,8 +166,10 @@ fun <M> runProperty(
     hook: (Report<Progress>) -> Kind<M, Unit>
 ): Kind<M, Report<Result>> {
     // Catch all errors M throws and report them using failException. This also catches all errors in all shrink branches the same way
-    val wrappedProp = prop.handleErrorWith(MM) {
-        PropertyT.monadTest(MM).failException(it)
+    val wrappedProp = PropertyT.monadError(MM).run {
+        prop.handleErrorWith {
+            PropertyT.monadTest(MM).failException(it)
+        }.fix()
     }
 
     val (confidence, minTests) = when (config.terminationCriteria) {

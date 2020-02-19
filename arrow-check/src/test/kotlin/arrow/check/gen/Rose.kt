@@ -1,16 +1,7 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.rose.applicative.applicative
-import arrow.check.gen.instances.rose.eq.eq
-import arrow.check.gen.instances.rose.eqK.eqK
-import arrow.check.gen.instances.rose.functor.functor
-import arrow.check.gen.instances.rose.monad.monad
-import arrow.check.gen.instances.rose.monadError.monadError
-import arrow.check.gen.instances.rose.monadTrans.liftT
-import arrow.check.gen.instances.rosef.eq.eq
-import arrow.check.gen.instances.rosef.eqK.eqK
-import arrow.check.gen.instances.rosef.traverse.traverse
+import arrow.check.gen.instances.*
 import arrow.core.*
 import arrow.core.extensions.either.eqK.eqK
 import arrow.core.extensions.either.monad.monad
@@ -77,5 +68,5 @@ fun <B> RoseF.Companion.genK(bGen: io.kotlintest.properties.Gen<B>): GenK<RoseFP
 // FIXME this should be a recusive gen, but with kotlintest that is not possible (with sufficient termination guarantees that is)
 fun <M> Rose.Companion.genK(genK: GenK<M>, MM: Monad<M>): GenK<RosePartialOf<M>> = object : GenK<RosePartialOf<M>> {
     override fun <A> genK(gen: io.kotlintest.properties.Gen<A>): io.kotlintest.properties.Gen<Kind<RosePartialOf<M>, A>> =
-        genK.genK(gen).map { it.liftT(MM) }
+        genK.genK(gen).map { Rose.monadTrans().run { it.liftT(MM) } }
 }

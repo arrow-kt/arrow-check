@@ -3,21 +3,8 @@ package arrow.check.gen.instances
 import arrow.Kind
 import arrow.Kind2
 import arrow.check.gen.*
-import arrow.check.gen.instances.gent.mFunctor.mFunctor
-import arrow.check.gen.instances.gent.monad.monad
-import arrow.check.gen.instances.gent.monadTrans.monadTrans
-import arrow.check.gen.instances.gent.monadTransDistributive.monadTransDistributive
-import arrow.check.gen.instances.optiont.mFunctor.hoist
-import arrow.check.gen.instances.optiont.mFunctor.mFunctor
-import arrow.check.gen.instances.optiont.monadTransDistributive.monadTransDistributive
-import arrow.check.gen.instances.rose.mFunctor.hoist
-import arrow.check.gen.instances.rose.mFunctor.mFunctor
-import arrow.check.gen.instances.rose.monad.monad
-import arrow.check.gen.instances.rose.monadTrans.monadTrans
-import arrow.check.gen.instances.rose.monadTransDistributive.monadTransDistributive
 import arrow.core.AndThen
 import arrow.core.FunctionK
-import arrow.extension
 import arrow.mtl.ForOptionT
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
@@ -86,28 +73,36 @@ interface MFunctor<F> {
     fun <M, N, A> Kind2<F, M, A>.hoist(MM: Monad<M>, f: FunctionK<M, N>): Kind2<F, N, A>
 }
 
-@extension
+// @extension
 interface OptionTMFunctor : MFunctor<ForOptionT> {
     override fun <M, N, A> Kind2<ForOptionT, M, A>.hoist(MM: Monad<M>, f: FunctionK<M, N>): Kind2<ForOptionT, N, A> =
         OptionT(f(fix().value()))
 }
 
-@extension
+fun OptionT.Companion.mFunctor(): MFunctor<ForOptionT> = object : OptionTMFunctor {}
+
+// @extension
 interface RoseMFunctor : MFunctor<ForRose> {
     override fun <M, N, A> Kind2<ForRose, M, A>.hoist(MM: Monad<M>, f: FunctionK<M, N>): Kind2<ForRose, N, A> =
         Rose(MM.run { f.invoke(fix().runRose.map { RoseF(it.res, it.shrunk.map { it.hoist(MM, f).fix() }) }) })
 }
 
-@extension
+fun Rose.Companion.mFunctor(): MFunctor<ForRose> = object : RoseMFunctor {}
+
+// @extension
 interface GenTMFunctor : MFunctor<ForGenT> {
     override fun <M, N, A> Kind2<ForGenT, M, A>.hoist(MM: Monad<M>, f: FunctionK<M, N>): Kind2<ForGenT, N, A> =
         GenT(AndThen(fix().runGen).andThen {
-            it.hoist(OptionT.monad(MM), object : FunctionK<OptionTPartialOf<M>, OptionTPartialOf<N>> {
-                override fun <A> invoke(fa: Kind<OptionTPartialOf<M>, A>): Kind<OptionTPartialOf<N>, A> =
-                    fa.fix().hoist(MM, f)
-            }).fix()
+            Rose.mFunctor().run {
+                it.hoist(OptionT.monad(MM), object : FunctionK<OptionTPartialOf<M>, OptionTPartialOf<N>> {
+                    override fun <A> invoke(fa: Kind<OptionTPartialOf<M>, A>): Kind<OptionTPartialOf<N>, A> =
+                        OptionT.mFunctor().run { fa.fix().hoist(MM, f) }
+                }).fix()
+            }
         })
 }
+
+fun GenT.Companion.mFunctor(): MFunctor<ForGenT> = object : GenTMFunctor {}
 
 // TODO add MFunctor instances for EitherT, WriterT, StateT, Kleisli, TestT, GenT as soon as the argument reorder is in
 
@@ -135,7 +130,7 @@ interface MonadTransDistributive<G> {
     }
 }
 
-@extension
+// @extension
 interface OptionTMonadTransDistributive : MonadTransDistributive<ForOptionT> {
     override fun <F, M, A> Kind2<ForOptionT, Kind<F, M>, A>.distributeT(
         MTF: MonadTrans<F>,
@@ -155,7 +150,9 @@ interface OptionTMonadTransDistributive : MonadTransDistributive<ForOptionT> {
         }
 }
 
-@extension
+fun OptionT.Companion.monadTransDistributive(): MonadTransDistributive<ForOptionT> = object : OptionTMonadTransDistributive {}
+
+// @extension
 interface RoseMonadTransDistributive : MonadTransDistributive<ForRose> {
     override fun <F, M, A> Kind2<ForRose, Kind<F, M>, A>.distributeT(
         MTF: MonadTrans<F>,
@@ -183,7 +180,9 @@ interface RoseMonadTransDistributive : MonadTransDistributive<ForRose> {
     }
 }
 
-@extension
+fun Rose.Companion.monadTransDistributive(): MonadTransDistributive<ForRose> = object : RoseMonadTransDistributive {}
+
+// @extension
 interface GenTMonadTransDistributive : MonadTransDistributive<ForGenT> {
 
     override fun <F, M, A> Kind2<ForGenT, Kind<F, M>, A>.distributeT(
@@ -233,3 +232,5 @@ interface GenTMonadTransDistributive : MonadTransDistributive<ForGenT> {
         }
     }
 }
+
+fun GenT.Companion.monadTransDistributive(): MonadTransDistributive<ForGenT> = object : GenTMonadTransDistributive {}

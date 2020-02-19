@@ -1,13 +1,11 @@
 package arrow.check.property
 
 import arrow.check.gen.*
-import arrow.check.gen.`fun`.show.show
-import arrow.check.gen.instances.gent.functor.functor
-import arrow.check.gen.instances.gent.monad.monad
+import arrow.check.gen.instances.functor
+import arrow.check.gen.instances.monad
 import arrow.check.pretty.showPretty
 import arrow.check.property.instances.monadTest
-import arrow.check.property.instances.testt.monadTrans.monadTrans
-import arrow.check.property.log.monoid.monoid
+import arrow.check.property.instances.monadTrans
 import arrow.core.Id
 import arrow.core.extensions.id.monad.monad
 import arrow.fx.ForIO

@@ -1,7 +1,7 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.rose.birecursive.birecursive
+import arrow.check.gen.instances.birecursive
 import arrow.core.*
 import arrow.core.extensions.fx
 import arrow.mtl.typeclasses.nest

@@ -1,6 +1,7 @@
 package arrow.check.pretty
 
 import arrow.Kind
+import arrow.check.property.Markup
 import arrow.core.*
 import arrow.core.extensions.fx
 import arrow.core.extensions.list.foldable.foldLeft
@@ -13,12 +14,7 @@ import arrow.syntax.collections.tail
 import arrow.typeclasses.Functor
 import kparsec.runParser
 import pretty.*
-import pretty.ansistyle.monoid.monoid
 import pretty.symbols.*
-import arrow.check.pretty.kvalue.eq.eq
-import arrow.check.pretty.valuediff.birecursive.birecursive
-import arrow.check.pretty.valuedifff.functor.functor
-import arrow.check.property.Markup
 import kotlin.math.min
 
 class ForValueDiffF private constructor()
@@ -55,7 +51,7 @@ sealed class ValueDiffF<out F> : ValueDiffFOf<F> {
     companion object
 }
 
-@extension
+// @extension
 interface ValueDiffFFunctor : Functor<ForValueDiffF> {
     override fun <A, B> Kind<ForValueDiffF, A>.map(f: (A) -> B): Kind<ForValueDiffF, B> = when (val d = fix()) {
         is ValueDiffF.ValueD -> ValueDiffF.ValueD(d.l, d.r)
@@ -69,16 +65,20 @@ interface ValueDiffFFunctor : Functor<ForValueDiffF> {
     }
 }
 
+fun ValueDiffF.Companion.functor(): Functor<ForValueDiffF> = object : ValueDiffFFunctor {}
+
 data class ValueDiff(val unDiff: ValueDiffF<ValueDiff>) {
     companion object
 }
 
-@extension
+// @extension
 interface ValueDiffBirecursive : Birecursive<ValueDiff, ForValueDiffF> {
     override fun FF(): Functor<ForValueDiffF> = ValueDiffF.functor()
     override fun ValueDiff.projectT(): Kind<ForValueDiffF, ValueDiff> = unDiff
     override fun Kind<ForValueDiffF, ValueDiff>.embedT(): ValueDiff = ValueDiff(this.fix())
 }
+
+fun ValueDiff.Companion.birecursive(): Birecursive<ValueDiff, ForValueDiffF> = object : ValueDiffBirecursive {}
 
 infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).let { (a, b) ->
     when {
