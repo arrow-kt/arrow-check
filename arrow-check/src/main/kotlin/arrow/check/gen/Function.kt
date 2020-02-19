@@ -1,24 +1,18 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.either.func.func
-import arrow.check.gen.fn.functor.functor
-import arrow.check.gen.fn.functor.map
-import arrow.check.gen.instances.gent.applicative.applicative
-import arrow.check.gen.listk.func.func
-import arrow.check.gen.option.func.func
-import arrow.check.gen.tuple2.func.func
+import arrow.check.gen.instances.applicative
 import arrow.core.*
 import arrow.core.extensions.eval.monad.flatten
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.functorFilter.filterMap
-import arrow.extension
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.extensions.optiont.applicative.applicative
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.value
 import arrow.recursion.pattern.ListF
+import arrow.recursion.pattern.NonEmptyListF
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Show
@@ -45,7 +39,7 @@ class Fun<A, B>(val d: B, val fn: Fn<A, Rose<OptionTPartialOf<ForId>, B>>) : Fun
     companion object
 }
 
-@extension
+// @extension
 interface FunShow<A, B> : Show<Fun<A, B>> {
     fun SA(): Show<A>
     fun SB(): Show<B>
@@ -60,6 +54,11 @@ interface FunShow<A, B> : Show<Fun<A, B>> {
                     SA().run { k.show() } + " -> " + SB().run { v.show() }
                 } + listOf("_ -> " + SB().run { d.show() })
         }.toString()
+}
+
+fun <A, B> Fun.Companion.show(SA: Show<A>, SB: Show<B>): Show<Fun<A, B>> = object : FunShow<A, B> {
+    override fun SA(): Show<A> = SA
+    override fun SB(): Show<B> = SB
 }
 
 // Gen instance
@@ -98,7 +97,7 @@ sealed class Fn<A, B> : FnOf<A, B> {
 }
 
 // Typesafety? No.
-@extension
+// @extension
 interface FnFunctor<C> : Functor<FnPartialOf<C>> {
     override fun <A, B> Kind<FnPartialOf<C>, A>.map(f: (A) -> B): Kind<FnPartialOf<C>, B> = when (val t = this.fix()) {
         is Fn.UnitFn -> Fn.UnitFn(f(t.b)) as Fn<C, B> // Safe because C == Unit, god I wish we had gadts here
@@ -117,6 +116,8 @@ interface FnFunctor<C> : Functor<FnPartialOf<C>> {
     }
 }
 
+fun <C> Fn.Companion.functor(): Functor<FnPartialOf<C>> = object : FnFunctor<C> {}
+
 // fn gen
 fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun<A, B>> =
     Gen.applicative(Id.monad()).mapN(
@@ -124,7 +125,7 @@ fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun
         Gen { (s, sz) ->
             Rose.unfold(
                 OptionT.monad(Id.monad()),
-                AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }
+                Fn.functor<A>().run { AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) } }.fix()
             ) {
                 shrinkFun(it) { it.runRose.value().value().fold({ emptySequence() }, { it.shrunk }) }
             }
@@ -135,8 +136,8 @@ fun <A, B> abstract(fn: Fn<A, B>, d: B): Function1<A, Eval<B>> = when (fn) {
     is Fn.UnitFn -> Function1 { Eval.now(fn.b) }
     is Fn.NilFn -> Function1 { Eval.now(d) }
     is Fn.PairFn<*, *, B> -> Function1 { (x, y): Tuple2<Any?, Any?> ->
-        Fn.functor<B>().run {
-            abstract(fn.fn.map { (abstract(it, d).f as (Any?) -> Eval<B>)(y) }, Eval.now(d)).f(x).flatten().fix()
+        Fn.functor<Any?>().run {
+            abstract(fn.fn.map { (abstract(it, d).f as (Any?) -> Eval<B>)(y) }.fix(), Eval.now(d)).f(x).flatten().fix()
         }
     } as Function1<A, Eval<B>>
     is Fn.EitherFn<*, *, B> -> Function1 { e: Either<Any?, Any?> ->
@@ -236,7 +237,9 @@ private fun <A, B, C> ((Tuple2<A, B>) -> C).curry(): ((A) -> ((B) -> C)) =
 fun <A, B, C> funPair(fA: Func<A>, fB: Func<B>, f: (Tuple2<A, B>) -> C): Fn<Tuple2<A, B>, C> = fA.run {
     fB.run {
         Fn.PairFn(
-            function(f.curry()).map { function(it) }
+            Fn.functor<A>().run {
+                function(f.curry()).map { function(it) }.fix()
+            }
         )
     }
 }
@@ -253,7 +256,7 @@ fun unitFunc(): Func<Unit> = object : Func<Unit> {
     override fun <B> function(f: (Unit) -> B): Fn<Unit, B> = Fn.UnitFn(f(Unit))
 }
 
-@extension
+// @extension
 interface Tuple2Func<A, B> : Func<Tuple2<A, B>> {
     fun AF(): Func<A>
     fun BF(): Func<B>
@@ -262,12 +265,22 @@ interface Tuple2Func<A, B> : Func<Tuple2<A, B>> {
         funPair(AF(), BF(), f)
 }
 
-@extension
+fun <A, B> Tuple2.Companion.func(AF: Func<A>, BF: Func<B>): Func<Tuple2<A, B>> = object : Tuple2Func<A, B> {
+    override fun AF(): Func<A> = AF
+    override fun BF(): Func<B> = BF
+}
+
+// @extension
 interface EitherFunc<L, R> : Func<Either<L, R>> {
     fun LF(): Func<L>
     fun RF(): Func<R>
 
     override fun <B> function(f: (Either<L, R>) -> B): Fn<Either<L, R>, B> = funEither(LF(), RF(), f)
+}
+
+fun <L, R> Either.Companion.func(LF: Func<L>, RF: Func<R>): Func<Either<L, R>> = object : EitherFunc<L, R> {
+    override fun LF(): Func<L> = LF
+    override fun RF(): Func<R> = RF
 }
 
 interface BooleanFunc : Func<Boolean> {
@@ -334,7 +347,7 @@ private fun Long.toByteList(): List<UByte> = when (this) {
     else -> listOf(this.and(UByte.MAX_VALUE.toLong()).toUByte()) + this.ushr(8).toByteList()
 }
 
-@extension
+// @extension
 interface OptionFunc<A> : Func<Option<A>> {
     fun AF(): Func<A>
     override fun <B> function(f: (Option<A>) -> B): Fn<Option<A>, B> =
@@ -343,6 +356,10 @@ interface OptionFunc<A> : Func<Option<A>> {
         }, {
             it.toOption()
         }, f)
+}
+
+fun <A> Option.Companion.func(AF: Func<A>): Func<Option<A>> = object : OptionFunc<A> {
+    override fun AF(): Func<A> = AF
 }
 
 // Model haskell lists to prevent overflows with strict lists
@@ -378,7 +395,7 @@ interface StreamFunc<A> : Func<Stream<A>> {
         }, f)
 }
 
-@extension
+// @extension
 interface ListKFunc<A> : Func<ListK<A>> {
     fun AF(): Func<A>
     override fun <B> function(f: (ListK<A>) -> B): Fn<ListK<A>, B> =
@@ -387,6 +404,10 @@ interface ListKFunc<A> : Func<ListK<A>> {
                 acc.map { (listOf(v) + it).k() }
             }.value()
         }, f)
+}
+
+fun <A> ListK.Companion.func(AF: Func<A>): Func<ListK<A>> = object : ListKFunc<A> {
+    override fun AF(): Func<A> = AF
 }
 
 interface IntFunc : Func<Int> {
@@ -427,21 +448,29 @@ interface FloatFunc : Func<Float> {
 
 fun Float.Companion.func(): Func<Float> = object : FloatFunc {}
 
-@extension
+// @extension
 interface ConstFunc<A, T> : Func<Const<A, T>> {
     fun AF(): Func<A>
     override fun <B> function(f: (Const<A, T>) -> B): Fn<Const<A, T>, B> =
         funMap(AF(), { it.value() }, { Const(it) }, f)
 }
 
-@extension
+fun <A, T> Const.Companion.func(AF: Func<A>): Func<Const<A, T>> = object : ConstFunc<A, T> {
+    override fun AF(): Func<A> = AF
+}
+
+// @extension
 interface IdFunc<A> : Func<Id<A>> {
     fun AF(): Func<A>
     override fun <B> function(f: (Id<A>) -> B): Fn<Id<A>, B> =
         funMap(AF(), { it.value() }, ::Id, f)
 }
 
-@extension
+fun <A> Id.Companion.func(AF: Func<A>): Func<Id<A>> = object : IdFunc<A> {
+    override fun AF(): Func<A> = AF
+}
+
+// @extension
 interface IorFunc<A, C> : Func<Ior<A, C>> {
     fun AF(): Func<A>
     fun BF(): Func<C>
@@ -461,7 +490,12 @@ interface IorFunc<A, C> : Func<Ior<A, C>> {
         }, f)
 }
 
-@extension
+fun <A, C> Ior.Companion.func(AF: Func<A>, CF: Func<C>): Func<Ior<A, C>> = object : IorFunc<A, C> {
+    override fun AF(): Func<A> = AF
+    override fun BF(): Func<C> = CF
+}
+
+// @extension
 interface MapKFunc<K, V> : Func<MapK<K, V>> {
     fun KF(): Func<K>
     fun VF(): Func<V>
@@ -473,8 +507,13 @@ interface MapKFunc<K, V> : Func<MapK<K, V>> {
         }, f)
 }
 
-@extension
-interface SetVFunc<V> : Func<SetK<V>> {
+fun <K, V> MapK.Companion.func(KF: Func<K>, VF: Func<V>): Func<MapK<K, V>> = object : MapKFunc<K, V> {
+    override fun KF(): Func<K> = KF
+    override fun VF(): Func<V> = VF
+}
+
+// @extension
+interface SetKFunc<V> : Func<SetK<V>> {
     fun VF(): Func<V>
     override fun <B> function(f: (SetK<V>) -> B): Fn<SetK<V>, B> =
         funMap(ListK.func(VF()), {
@@ -484,7 +523,11 @@ interface SetVFunc<V> : Func<SetK<V>> {
         }, f)
 }
 
-@extension
+fun <V> SetK.Companion.func(VF: Func<V>): Func<SetK<V>> = object : SetKFunc<V> {
+    override fun VF(): Func<V> = VF
+}
+
+// @extension
 interface NonEmptyListFunc<A> : Func<NonEmptyList<A>> {
     fun AF(): Func<A>
     override fun <B> function(f: (Nel<A>) -> B): Fn<Nel<A>, B> =
@@ -495,7 +538,11 @@ interface NonEmptyListFunc<A> : Func<NonEmptyList<A>> {
         }, f)
 }
 
-@extension
+fun <A> NonEmptyList.Companion.func(AF: Func<A>): Func<NonEmptyList<A>> = object : NonEmptyListFunc<A> {
+    override fun AF(): Func<A> = AF
+}
+
+// @extension
 interface SequenceKFunc<A> : Func<SequenceK<A>> {
     fun AF(): Func<A>
     override fun <B> function(f: (SequenceK<A>) -> B): Fn<SequenceK<A>, B> =
@@ -504,6 +551,10 @@ interface SequenceKFunc<A> : Func<SequenceK<A>> {
         }, {
             it.asSequence().k()
         }, f)
+}
+
+fun <A> SequenceK.Companion.func(AF: Func<A>): Func<SequenceK<A>> = object : SequenceKFunc<A> {
+    override fun AF(): Func<A> = AF
 }
 
 interface SortedMapKFunc<K : Comparable<K>, V> : Func<SortedMapK<K, V>> {
@@ -523,7 +574,7 @@ fun <K : Comparable<K>, V> SortedMapK.Companion.func(KF: Func<K>, VF: Func<V>): 
         override fun VF(): Func<V> = VF
     }
 
-@extension
+// @extension
 interface ValidatedFunc<E, A> : Func<Validated<E, A>> {
     fun EF(): Func<E>
     fun AF(): Func<A>
@@ -531,6 +582,12 @@ interface ValidatedFunc<E, A> : Func<Validated<E, A>> {
         funMap(Either.func(EF(), AF()), { it.toEither() }, {
             it.fold(::Invalid, ::Valid)
         }, f)
+}
+
+
+fun <E, A> Validated.Companion.func(EF: Func<E>, AF: Func<A>): Func<Validated<E, A>> = object : ValidatedFunc<E, A> {
+    override fun AF(): Func<A> = AF
+    override fun EF(): Func<E> = EF
 }
 
 interface StringFunc : Func<String> {

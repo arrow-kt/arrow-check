@@ -5,7 +5,6 @@ import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
-import arrow.check.property.log.monoid.monoid
 import arrow.core.*
 import arrow.core.extensions.id.applicative.applicative
 import arrow.core.extensions.id.eq.eq

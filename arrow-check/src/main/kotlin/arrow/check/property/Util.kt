@@ -55,13 +55,15 @@ inline class Log(val unLog: List<JournalEntry>) {
     companion object
 }
 
-@extension
+// @extension
 interface LogMonoid: Monoid<Log> {
     override fun Log.combine(b: Log): Log = Log(
         ListK.monoid<JournalEntry>().run { unLog + b.unLog }
     )
     override fun empty(): Log = Log(ListK.empty())
 }
+
+fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
 
 sealed class JournalEntry {
     // inputs forAll adds those

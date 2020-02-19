@@ -1,13 +1,7 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.gent.alternative.alternative
-import arrow.check.gen.instances.gent.monad.monad
-import arrow.check.gen.instances.gent.monadError.monadError
-import arrow.check.gen.instances.gent.monadTrans.liftT
-import arrow.check.gen.instances.gent.monadTrans.monadTrans
-import arrow.check.gen.instances.gent.monoid.monoid
-import arrow.check.gen.instances.rose.eq.eq
+import arrow.check.gen.instances.*
 import arrow.check.property.Size
 import arrow.core.*
 import arrow.core.extensions.either.eqK.eqK
@@ -64,7 +58,7 @@ class GenTLawsSpec : UnitSpec() {
 
 fun <M> GenT.Companion.genK(genKF: GenK<M>, MM: Monad<M>): GenK<GenTPartialOf<M>> = object : GenK<GenTPartialOf<M>> {
     override fun <A> genK(gen: Gen<A>): Gen<Kind<GenTPartialOf<M>, A>> =
-        genKF.genK(gen).map { it.liftT(MM) }
+        genKF.genK(gen).map { GenT.monadTrans().run { it.liftT(MM) } }
 }
 
 /**

@@ -3,23 +3,8 @@ package arrow.check.gen.instances
 import arrow.Kind
 import arrow.Kind2
 import arrow.check.gen.*
-import arrow.check.gen.instances.gent.applicative.applicative
-import arrow.check.gen.instances.gent.functor.functor
-import arrow.check.gen.instances.gent.monadTrans.liftT
-import arrow.check.gen.instances.gent.monadTrans.monadTrans
-import arrow.check.gen.instances.rose.alternative.alternative
-import arrow.check.gen.instances.rose.alternative.orElse
-import arrow.check.gen.instances.rose.applicativeError.handleErrorWith
-import arrow.check.gen.instances.rose.monad.monad
-import arrow.check.gen.instances.rose.monadError.monadError
-import arrow.check.gen.instances.rose.monadReader.local
-import arrow.check.gen.instances.rose.monadReader.monadReader
-import arrow.check.gen.instances.rose.monadTrans.monadTrans
-import arrow.core.AndThen
-import arrow.core.Either
-import arrow.core.andThen
-import arrow.core.toT
-import arrow.extension
+import arrow.check.property.Size
+import arrow.core.*
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.OptionT
@@ -27,11 +12,10 @@ import arrow.mtl.extensions.optiont.alternative.alternative
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadError.monadError
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
-import arrow.mtl.typeclasses.MonadReader
 import arrow.mtl.typeclasses.MonadTrans
 import arrow.typeclasses.*
 
-@extension
+// @extension
 interface GenTFunctor<M> : Functor<GenTPartialOf<M>> {
     fun FM(): Functor<M>
 
@@ -39,7 +23,11 @@ interface GenTFunctor<M> : Functor<GenTPartialOf<M>> {
         fix().genMap(FM(), f)
 }
 
-@extension
+fun <M> GenT.Companion.functor(FM: Functor<M>): Functor<GenTPartialOf<M>> = object : GenTFunctor<M> {
+    override fun FM(): Functor<M> = FM
+}
+
+// @extension
 interface GenTApplicative<M> : Applicative<GenTPartialOf<M>> {
     fun MM(): Monad<M>
 
@@ -49,12 +37,16 @@ interface GenTApplicative<M> : Applicative<GenTPartialOf<M>> {
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(MM(), a)
 }
 
+fun <M> GenT.Companion.applicative(MM: Monad<M>): Applicative<GenTPartialOf<M>> = object : GenTApplicative<M> {
+    override fun MM(): Monad<M> = MM
+}
+
 /**
  * This violates monad laws because every flatMap splits the rng. In practice that is not a problem
  *  because the distribution of A's a Gen produces stays the same.
  * This can however be problematic when using the unsafe methods [promote], [delay].
  */
-@extension
+// @extension
 interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
     fun MM(): Monad<M>
 
@@ -93,17 +85,31 @@ interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
         }
 }
 
-@extension
+fun <M> GenT.Companion.monad(MM: Monad<M>): Monad<GenTPartialOf<M>> = object : GenTMonad<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface GenTAlternative<M> : Alternative<GenTPartialOf<M>>, GenTApplicative<M> {
     override fun MM(): Monad<M>
     override fun <A> empty(): Kind<GenTPartialOf<M>, A> =
         GenT { Rose.alternative(OptionT.alternative(MM()), OptionT.monad(MM())).empty<A>().fix() }
 
     override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
-        GenT { t -> (fix().runGen(t).orElse(OptionT.alternative(MM()), OptionT.monad(MM()), b.fix().runGen(t))) }
+        GenT(AndThen.id<Tuple2<RandSeed, Size>>().flatMap { t ->
+            AndThen(fix().runGen).andThen { rose ->
+                Rose.alternative(OptionT.alternative(MM()), OptionT.monad(MM())).run {
+                    rose.lazyOrElse { (b.fix().runGen(t)) }.fix()
+                }
+            }
+        })
 }
 
-@extension
+fun <M> GenT.Companion.alternative(MM: Monad<M>): Alternative<GenTPartialOf<M>> = object : GenTAlternative<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface GenTMonadTrans : MonadTrans<ForGenT> {
     override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForGenT, G, A> = GenT {
         OptionT.monadTrans().run {
@@ -112,31 +118,47 @@ interface GenTMonadTrans : MonadTrans<ForGenT> {
     }
 }
 
-@extension
+fun GenT.Companion.monadTrans(): MonadTrans<ForGenT> = object : GenTMonadTrans {}
+
+// @extension
 interface GenTMonadIO<M> : MonadIO<GenTPartialOf<M>>, GenTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
     override fun <A> IO<A>.liftIO(): Kind<GenTPartialOf<M>, A> = MIO().run {
-        liftIO().liftT(this)
+        GenT.monadTrans().run {
+            liftIO().liftT(MIO())
+        }
     }
 }
 
-@extension
+fun <M> GenT.Companion.monadIO(MIO: MonadIO<M>): MonadIO<GenTPartialOf<M>> = object : GenTMonadIO<M> {
+    override fun MIO(): MonadIO<M> = MIO
+}
+
+// @extension
 interface GenTApplicativeError<M, E> : ApplicativeError<GenTPartialOf<M>, E>, GenTApplicative<M> {
     override fun MM(): Monad<M> = ME()
     fun ME(): MonadError<M, E>
 
     override fun <A> Kind<GenTPartialOf<M>, A>.handleErrorWith(f: (E) -> Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
-        GenT { i ->
-            fix().runGen(i).handleErrorWith(OptionT.monadError(ME())) { f(it).fix().runGen(i) }
-        }
+        GenT(AndThen.id<Tuple2<RandSeed, Size>>().flatMap { t ->
+            AndThen(fix().runGen).andThen { rose ->
+                Rose.applicativeError(OptionT.monadError(ME())).run {
+                    rose.handleErrorWith { f(it).fix().runGen(t) }.fix()
+                }
+            }
+        })
 
     override fun <A> raiseError(e: E): Kind<GenTPartialOf<M>, A> = GenT {
         Rose.monadError(OptionT.monadError(ME())).raiseError<A>(e).fix()
     }
 }
 
-@extension
+fun <M, E> GenT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<GenTPartialOf<M>, E> = object : GenTApplicativeError<M, E> {
+    override fun ME(): MonadError<M, E> = ME
+}
+
+// @extension
 interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativeError<M, E>, GenTMonad<M> {
     override fun MM(): Monad<M> = ME()
     override fun ME(): MonadError<M, E>
@@ -145,17 +167,31 @@ interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativ
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(ME(), a)
 }
 
-@extension
+fun <M, E> GenT.Companion.monadError(ME: MonadError<M, E>): MonadError<GenTPartialOf<M>, E> = object : GenTMonadError<M, E> {
+    override fun ME(): MonadError<M, E> = ME
+}
+
+// @extension
 interface GenTSemigroup<M, A> : Semigroup<GenT<M, A>> {
     fun MM(): Monad<M>
     fun SA(): Semigroup<A>
     override fun GenT<M, A>.combine(b: GenT<M, A>): GenT<M, A> = GenT.applicative(MM()).mapN(this, b) { (a, b) -> SA().run { a + b } }.fix()
 }
 
-@extension
+fun <M, A> GenT.Companion.semigroup(MM: Monad<M>, SA: Semigroup<A>): Semigroup<GenT<M, A>> = object : GenTSemigroup<M, A> {
+    override fun MM(): Monad<M> = MM
+    override fun SA(): Semigroup<A> = SA
+}
+
+// @extension
 interface GenTMonoid<M, A> : Monoid<GenT<M, A>>, GenTSemigroup<M, A> {
     override fun MM(): Monad<M>
     override fun SA(): Semigroup<A> = MA()
     fun MA(): Monoid<A>
     override fun empty(): GenT<M, A> = GenT.monadTrans().run { MM().just(MA().empty()).liftT(MM()).fix() }
+}
+
+fun <M, A> GenT.Companion.monoid(MM: Monad<M>, MA: Monoid<A>): Monoid<GenT<M, A>> = object : GenTMonoid<M, A> {
+    override fun MA(): Monoid<A> = MA
+    override fun MM(): Monad<M> = MM
 }
