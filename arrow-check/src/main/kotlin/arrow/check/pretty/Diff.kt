@@ -8,7 +8,6 @@ import arrow.core.extensions.list.foldable.foldLeft
 import arrow.core.extensions.list.functor.map
 import arrow.core.extensions.list.functor.tupleLeft
 import arrow.core.extensions.list.monadFilter.filterMap
-import arrow.extension
 import arrow.recursion.typeclasses.Birecursive
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Functor
@@ -26,6 +25,9 @@ inline fun <F> ValueDiffFOf<F>.fix(): ValueDiffF<F> = this as ValueDiffF<F>
 sealed class ValueDiffF<out F> : ValueDiffFOf<F> {
     // two values that are entirely different
     data class ValueD(val l: KValue, val r: KValue) : ValueDiffF<Nothing>()
+
+    // string diff. Used to implement nice multiline string diffs
+    data class StringDiff<F>(val v: Nel<F>) : ValueDiffF<F>()
 
     // a value was removed
     data class ValueDRemoved(val v: KValue) : ValueDiffF<Nothing>()
@@ -57,6 +59,7 @@ interface ValueDiffFFunctor : Functor<ForValueDiffF> {
         is ValueDiffF.ValueD -> ValueDiffF.ValueD(d.l, d.r)
         is ValueDiffF.TupleD -> ValueDiffF.TupleD(d.vals.map(f))
         is ValueDiffF.ListD -> ValueDiffF.ListD(d.vals.map(f))
+        is ValueDiffF.StringDiff -> ValueDiffF.StringDiff(d.v.map(f))
         is ValueDiffF.Record -> ValueDiffF.Record(d.conName, d.props.map { (k, v) -> k toT f(v) })
         is ValueDiffF.Cons -> ValueDiffF.Cons(d.consName, d.props.map(f))
         is ValueDiffF.Same -> ValueDiffF.Same(d.v)
@@ -93,6 +96,15 @@ infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).let { (a, b
             ValueDiff(ValueDiffF.TupleD(a.vals.diffOrderedLists(b.vals)))
         a is KValue.KList && b is KValue.KList ->
             ValueDiff(ValueDiffF.ListD(a.vals.diffOrderedLists(b.vals)))
+        a is KValue.RawString && b is KValue.RawString && (a.s.contains("\n") || b.s.contains("\n")) ->
+            ValueDiff(
+                ValueDiffF.StringDiff(
+                    // Safe because either a or b contain a newline and thus the resulting list must have  size >= 1
+                    Nel.fromListUnsafe(a.s.split("\n").mapIndexed { i, v -> KValue.RawString("${i + 1}. $v") }
+                        .diffOrderedLists(b.s.split("\n").mapIndexed { i, v -> KValue.RawString("${i + 1}. $v") })
+                    )
+                )
+            )
         else -> ValueDiff(ValueDiffF.ValueD(a, b))
     }
 }
@@ -241,6 +253,9 @@ fun ValueDiff.toLineDiff(): Doc<DiffType> = ValueDiff.birecursive().run {
                     // everything below contains a diff, that's why custom tuple/list methods are used that are always vertical without group
                     is ValueDiffF.TupleD -> DiffType.Same toT vd.vals.tupledNested()
                     is ValueDiffF.ListD -> DiffType.Same toT vd.vals.listNested()
+                    is ValueDiffF.StringDiff -> (vd.v.head toT vd.v.tail).let { (x, xs) ->
+                        x.a toT (space() + x.b + xs.map { (t, d) -> (hardLine() spaced d).annotate(t) }.hCat())
+                    }
                     is ValueDiffF.Cons -> DiffType.Same toT (vd.consName.text() +
                             vd.props
                                 .tupledNested()
