@@ -34,7 +34,7 @@ fun <M, B> GenT<M, B>.variant(i: Long): GenT<M, B> =
     GenT(AndThen(runGen).compose { (seed, size) -> seed.variant(i) toT size })
 
 // instances
-@extension
+// @extension
 interface Tuple2Coarbitrary<A, B> : Coarbitrary<Tuple2<A, B>> {
     fun CA(): Coarbitrary<A>
     fun CB(): Coarbitrary<B>
