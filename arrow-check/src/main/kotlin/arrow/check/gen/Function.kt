@@ -58,7 +58,7 @@ fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun
         Gen { (s, sz) ->
             Rose.unfold(
                 OptionT.monad(Id.monad()),
-                AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }
+                Fn.functor<A>().run { AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }.fix() }
             ) {
                 shrinkFun(it) { it.runRose.value().value().fold({ emptySequence() }, { it.shrunk }) }
             }
