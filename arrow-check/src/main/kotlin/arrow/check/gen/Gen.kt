@@ -1,16 +1,7 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.gent.alternative.alternative
-import arrow.check.gen.instances.gent.applicative.applicative
-import arrow.check.gen.instances.gent.monad.monad
-import arrow.check.gen.instances.rose.alternative.alternative
-import arrow.check.gen.instances.rose.applicative.applicative
-import arrow.check.gen.instances.rose.birecursive.birecursive
-import arrow.check.gen.instances.rose.mFunctor.mFunctor
-import arrow.check.gen.instances.rose.monad.monad
-import arrow.check.gen.instances.rose.monadFilter.filterMap
-import arrow.check.gen.instances.rose.monadTrans.monadTrans
+import arrow.check.gen.instances.*
 import arrow.check.property.*
 import arrow.core.*
 import arrow.core.extensions.eval.monad.monad
@@ -677,7 +668,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 val (x, gen) = this@filterMap.scale { Size(2 * k + it.unSize) }.freeze().bind()
                 f(x).fold({ t(k + 1).bind() }, {
                     gen.toGenT()
-                        .mapTree { it.filterMap(OptionT.alternative(BM()), OptionT.monad(BM()), f) }
+                        .mapTree { Rose.monadFilter(OptionT.alternative(BM()), OptionT.monad(BM())).run { it.filterMap(f) }.fix() }
                         .fromGenT().bind()
                 })
             }

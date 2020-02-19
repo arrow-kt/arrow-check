@@ -69,10 +69,12 @@ fun <A> A.showPretty(SA: Show<A> = Show.any()): Doc<Nothing> = SA.run {
     }, ::identity)
 }.doc().group()
 
-@extension
+// @extension
 interface KValueEq : Eq<KValue> {
     override fun KValue.eqv(b: KValue): Boolean = this == b
 }
+
+fun KValue.Companion.eq(): Eq<KValue> = object : KValueEq {}
 
 typealias Parser<A> = KParsecT<Nothing, String, Char, ForId, A>
 

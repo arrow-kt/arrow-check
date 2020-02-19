@@ -3,8 +3,8 @@ package arrow.check.property
 import arrow.Kind
 import arrow.check.gen.*
 import arrow.check.property.instances.PropertyTMonadTest
-import arrow.check.property.instances.propertyt.monad.monad
-import arrow.check.property.instances.propertyt.monadTrans.monadTrans
+import arrow.check.property.instances.monad
+import arrow.check.property.instances.monadTrans
 import arrow.core.Either
 import arrow.core.ForId
 import arrow.fx.ForIO

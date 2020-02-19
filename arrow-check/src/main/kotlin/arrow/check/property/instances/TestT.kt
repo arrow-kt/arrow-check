@@ -3,36 +3,22 @@ package arrow.check.property.instances
 import arrow.Kind
 import arrow.Kind2
 import arrow.check.property.*
-import arrow.check.property.instances.testt.monad.flatMap
-import arrow.check.property.instances.testt.monad.monad
-import arrow.check.property.instances.testt.monadTrans.liftT
-import arrow.check.property.log.monoid.monoid
 import arrow.core.Either
-import arrow.core.Tuple2
-import arrow.extension
 import arrow.fx.IO
-import arrow.fx.RacePair
-import arrow.fx.RaceTriple
-import arrow.fx.mtl.concurrent
-import arrow.fx.mtl.eithert.async.async
-import arrow.fx.mtl.eithert.monadDefer.monadDefer
-import arrow.fx.mtl.writert.async.async
-import arrow.fx.mtl.writert.monadDefer.monadDefer
-import arrow.fx.typeclasses.*
-import arrow.mtl.*
-import arrow.mtl.extensions.eithert.functor.unit
+import arrow.fx.typeclasses.MonadIO
+import arrow.mtl.EitherT
+import arrow.mtl.WriterT
+import arrow.mtl.WriterTPartialOf
 import arrow.mtl.extensions.writert.applicative.applicative
 import arrow.mtl.extensions.writert.functor.functor
 import arrow.mtl.extensions.writert.monad.monad
 import arrow.mtl.extensions.writert.monadError.monadError
-import arrow.mtl.typeclasses.MonadReader
 import arrow.mtl.typeclasses.MonadTrans
-import arrow.mtl.typeclasses.MonadWriter
+import arrow.mtl.value
 import arrow.syntax.function.andThen
 import arrow.typeclasses.*
-import kotlin.coroutines.CoroutineContext
 
-@extension
+// @extension
 interface TestTFunctor<M> : Functor<TestTPartialOf<M>> {
     fun MM(): Monad<M>
 
@@ -40,7 +26,11 @@ interface TestTFunctor<M> : Functor<TestTPartialOf<M>> {
         fix().map(MM(), f)
 }
 
-@extension
+fun <M> TestT.Companion.functor(MM: Monad<M>): Functor<TestTPartialOf<M>> = object : TestTFunctor<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface TestTApplicative<M> : Applicative<TestTPartialOf<M>> {
     fun MM(): Monad<M>
 
@@ -50,7 +40,11 @@ interface TestTApplicative<M> : Applicative<TestTPartialOf<M>> {
     override fun <A> just(a: A): Kind<TestTPartialOf<M>, A> = TestT.just(MM(), a)
 }
 
-@extension
+fun <M> TestT.Companion.appllicative(MM: Monad<M>): Applicative<TestTPartialOf<M>> = object : TestTApplicative<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface TestTMonad<M> : Monad<TestTPartialOf<M>> {
     fun MM(): Monad<M>
 
@@ -70,23 +64,36 @@ interface TestTMonad<M> : Monad<TestTPartialOf<M>> {
         }
 }
 
-@extension
+fun <M> TestT.Companion.monad(MM: Monad<M>): Monad<TestTPartialOf<M>> = object : TestTMonad<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface TestTAlternative<M> : Alternative<TestTPartialOf<M>>, TestTApplicative<M> {
     override fun MM(): Monad<M>
     fun AF(): Alternative<M>
-    override fun <A> empty(): Kind<TestTPartialOf<M>, A> = AF().empty<A>().liftT(MM())
+    override fun <A> empty(): Kind<TestTPartialOf<M>, A> = TestT.monadTrans().run { AF().empty<A>().liftT(MM()) }
     override fun <A> Kind<TestTPartialOf<M>, A>.orElse(b: Kind<TestTPartialOf<M>, A>): Kind<TestTPartialOf<M>, A> =
         TestT(EitherT(WriterT(AF().run { fix().runTestT.value().value().orElse(b.fix().runTestT.value().value()) })))
 }
 
-@extension
-interface TestTMonadTest<M> : MonadTest<TestTPartialOf<M>>, TestTMonad<M> {
-    override fun MM(): Monad<M>
-
-    override fun <A> Test<A>.liftTest(): Kind<TestTPartialOf<M>, A> = hoist(MM())
+fun <M> TestT.Companion.alternative(MM: Monad<M>, AF: Alternative<M>): Alternative<TestTPartialOf<M>> = object : TestTAlternative<M> {
+    override fun AF(): Alternative<M> = AF
+    override fun MM(): Monad<M> = MM
 }
 
-@extension
+interface TestTMonadTest<M> : MonadTest<TestTPartialOf<M>>, TestTMonad<M> {
+
+    override fun MM(): Monad<M>
+    override fun <A> Test<A>.liftTest(): Kind<TestTPartialOf<M>, A> = hoist(MM())
+
+}
+
+fun <M> TestT.Companion.monadTest(MM: Monad<M>): MonadTest<TestTPartialOf<M>> = object : TestTMonadTest<M> {
+    override fun MM(): Monad<M> = MM
+}
+
+// @extension
 interface TestTMonadTrans : MonadTrans<ForTestT> {
     override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForTestT, G, A> = TestT(
         EitherT.liftF<WriterTPartialOf<G, Log>, Failure, A>(
@@ -96,16 +103,24 @@ interface TestTMonadTrans : MonadTrans<ForTestT> {
     )
 }
 
-@extension
+fun TestT.Companion.monadTrans(): MonadTrans<ForTestT> = object : TestTMonadTrans {}
+
+// @extension
 interface TestTMonadIO<M> : MonadIO<TestTPartialOf<M>>, TestTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
     override fun <A> IO<A>.liftIO(): Kind<TestTPartialOf<M>, A> = MIO().run {
-        liftIO().liftT(this)
+        TestT.monadTrans().run {
+            liftIO().liftT(MIO())
+        }
     }
 }
 
-@extension
+fun <M> TestT.Companion.monadIO(MIO: MonadIO<M>): MonadIO<TestTPartialOf<M>> = object : TestTMonadIO<M> {
+    override fun MIO(): MonadIO<M> = MIO
+}
+
+// @extension
 interface TestTApplicativeError<M, E> : ApplicativeError<TestTPartialOf<M>, E>, TestTApplicative<M> {
     override fun MM(): Monad<M> = ME()
     fun ME(): MonadError<M, E>
@@ -119,16 +134,26 @@ interface TestTApplicativeError<M, E> : ApplicativeError<TestTPartialOf<M>, E>, 
         }
 
     override fun <A> raiseError(e: E): Kind<TestTPartialOf<M>, A> =
-        ME().raiseError<A>(e).liftT(ME())
+        TestT.monadTrans().run {
+            ME().raiseError<A>(e).liftT(ME())
+        }
 }
 
-@extension
+fun <M, E> TestT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<TestTPartialOf<M>, E> = object : TestTApplicativeError<M, E> {
+    override fun ME(): MonadError<M, E> = ME
+}
+
+// @extension
 interface TestTMonadError<M, E> : MonadError<TestTPartialOf<M>, E>, TestTApplicativeError<M, E>, TestTMonad<M> {
     override fun MM(): Monad<M> = ME()
     override fun ME(): MonadError<M, E>
     override fun <A, B> Kind<TestTPartialOf<M>, A>.ap(ff: Kind<TestTPartialOf<M>, (A) -> B>): Kind<TestTPartialOf<M>, B> =
         fix().ap(ME(), ff.fix())
     override fun <A> just(a: A): Kind<TestTPartialOf<M>, A> = TestT.just(ME(), a)
+}
+
+fun <M, E> TestT.Companion.monadError(ME: MonadError<M, E>): MonadError<TestTPartialOf<M>, E> = object : TestTMonadError<M, E> {
+    override fun ME(): MonadError<M, E> = ME
 }
 
 // TODO when https://github.com/arrow-kt/arrow/pull/1981 is merged add MonadState etc
