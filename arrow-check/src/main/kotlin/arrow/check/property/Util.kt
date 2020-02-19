@@ -18,6 +18,7 @@ import kotlin.math.sqrt
 sealed class Markup {
     data class DiffRemoved(val offset: Int) : Markup()
     data class DiffAdded(val offset: Int) : Markup()
+    data class DiffSame(val offset: Int) : Markup()
     object Diff : Markup()
     object Annotation : Markup()
     object Footnote : Markup()

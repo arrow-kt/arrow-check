@@ -205,9 +205,7 @@ fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
         val fst = editScript[0]
         val snd = editScript[1]
         if (fst is Edit.Remove && snd is Edit.Add) {
-            listOf(
-                fst.a.toDiff(snd.a)
-            ) + editScript.drop(2).map { it.toValueDiff() }
+            listOf(fst.a.toDiff(snd.a)) + editScript.drop(2).map { it.toValueDiff() }
         } else editScript.map { it.toValueDiff() }
     } else editScript.map { it.toValueDiff() }
 }
@@ -321,11 +319,11 @@ infix fun String.diff(str: String): ValueDiff {
 
 fun ValueDiff.toDoc(): Doc<Markup> =
     column { cc ->
-        toLineDiff().alterAnnotations {
+        toLineDiff().reAnnotate {
             when (it) {
-                is DiffType.Removed -> listOf(Markup.DiffRemoved(cc))
-                is DiffType.Added -> listOf(Markup.DiffAdded(cc))
-                is DiffType.Same -> emptyList()
+                is DiffType.Removed -> Markup.DiffRemoved(cc)
+                is DiffType.Added -> Markup.DiffAdded(cc)
+                is DiffType.Same -> Markup.DiffSame(cc)
             }
         }
     }.annotate(Markup.Diff)
