@@ -3,11 +3,14 @@ package arrow.check.pretty
 import arrow.Kind
 import arrow.check.property.Markup
 import arrow.core.*
+import arrow.core.extensions.eq
 import arrow.core.extensions.fx
 import arrow.core.extensions.list.foldable.foldLeft
 import arrow.core.extensions.list.functor.map
 import arrow.core.extensions.list.functor.tupleLeft
 import arrow.core.extensions.list.monadFilter.filterMap
+import arrow.core.extensions.listk.eq.eq
+import arrow.core.extensions.tuple2.eq.eq
 import arrow.extension
 import arrow.recursion.typeclasses.Birecursive
 import arrow.syntax.collections.tail
@@ -68,6 +71,35 @@ interface ValueDiffFFunctor : Functor<ForValueDiffF> {
 
 fun ValueDiffF.Companion.functor(): Functor<ForValueDiffF> = object : ValueDiffFFunctor {}
 
+// @extension
+interface ValueDiffFEq<F> : Eq<ValueDiffF<F>> {
+    fun EQF(): Eq<F>
+
+    override fun ValueDiffF<F>.eqv(b: ValueDiffF<F>): Boolean = when {
+        this is ValueDiffF.Same && b is ValueDiffF.Same ->
+            KValue.eq().run { v.eqv(b.v) }
+        this is ValueDiffF.ValueD && b is ValueDiffF.ValueD ->
+            KValue.eq().run { l.eqv(b.l) && r.eqv(b.r) }
+        this is ValueDiffF.ValueDRemoved && b is ValueDiffF.ValueDRemoved ->
+            KValue.eq().run { v.eqv(b.v) }
+        this is ValueDiffF.ValueDAdded && b is ValueDiffF.ValueDAdded ->
+            KValue.eq().run { v.eqv(b.v) }
+        this is ValueDiffF.TupleD && b is ValueDiffF.TupleD ->
+            ListK.eq(EQF()).run { vals.k().eqv(b.vals.k()) }
+        this is ValueDiffF.ListD && b is ValueDiffF.ListD ->
+            ListK.eq(EQF()).run { vals.k().eqv(b.vals.k()) }
+        this is ValueDiffF.Cons && b is ValueDiffF.Cons ->
+            consName == b.consName && ListK.eq(EQF()).run { props.k().eqv(b.props.k()) }
+        this is ValueDiffF.Record && b is ValueDiffF.Record ->
+            conName == b.conName && ListK.eq(Tuple2.eq(String.eq(), EQF())).run { props.k().eqv(b.props.k()) }
+        else -> false
+    }
+}
+
+fun <F> ValueDiffF.Companion.eq(EQF: Eq<F>): Eq<ValueDiffF<F>> = object : ValueDiffFEq<F> {
+    override fun EQF(): Eq<F> = EQF
+}
+
 data class ValueDiff(val unDiff: ValueDiffF<ValueDiff>) {
     companion object
 }
@@ -81,7 +113,14 @@ interface ValueDiffBirecursive : Birecursive<ValueDiff, ForValueDiffF> {
 
 fun ValueDiff.Companion.birecursive(): Birecursive<ValueDiff, ForValueDiffF> = object : ValueDiffBirecursive {}
 
-fun ValueDiff.Companion.eq(): Eq<ValueDiff> = Eq.any()
+// @extension
+interface ValueDiffEq : Eq<ValueDiff> {
+    override fun ValueDiff.eqv(b: ValueDiff): Boolean = ValueDiffF.eq(this@ValueDiffEq).run {
+        unDiff.eqv(b.unDiff)
+    }
+}
+
+fun ValueDiff.Companion.eq(): Eq<ValueDiff> = object : ValueDiffEq {}
 
 infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).let { (a, b) ->
     when {

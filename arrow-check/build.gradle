@@ -14,11 +14,11 @@ dependencies {
     // TODO also should some of those be api? Because the types and methods are exposed, not sure
     //  how exactly that works
     implementation "io.arrow-kt:arrow-fx:$arrow_version" // IO and arrow fx
-    implementation "io.arrow-kt:arrow-fx-mtl:$arrow_version" // IO and arrow fx
     implementation "io.arrow-kt:arrow-free:$arrow_version" // Trampoline for stacksafety tests
     implementation "io.arrow-kt:arrow-optics:$arrow_version" // lenses and @optics
     implementation "io.arrow-kt:arrow-syntax:$arrow_version" // helper functions like curried...
     implementation "io.arrow-kt:arrow-mtl:$arrow_version" // StateT, Reader, Writer...
+    implementation "io.arrow-kt:arrow-fx-mtl:$arrow_version" // fx instances for mtl types
     implementation "io.arrow-kt:arrow-recursion:$arrow_version" // Recursion schemes
     api "kotlin-pretty:kotlin-pretty:0.5.0" // Pretty printing diffs
     api "kotlin-pretty:kotlin-pretty-ansi:0.5.0" // Ansi terminal support with colors
