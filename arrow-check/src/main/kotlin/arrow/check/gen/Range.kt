@@ -53,7 +53,6 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
             xSized toT ySized
         }
 
-
         fun linear(start: Float, end: Float): Range<Float> = linearFrom(start, start, end)
         fun linearFrom(origin: Float, start: Float, end: Float): Range<Float> =
             linearFrom(origin.toDouble(), start.toDouble(), end.toDouble()).map { it.toFloat() }

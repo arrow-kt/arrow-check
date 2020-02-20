@@ -475,6 +475,8 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         map { it toT Unit }.map(range).map { it.keys }
     }
 
+    fun <A> Kind<M, A>.set(range: IntRange): Kind<M, Set<A>> = set(Range.constant(range.first, range.last))
+
     fun <K, A> Kind<M, Tuple2<K, A>>.map(range: Range<Int>): Kind<M, Map<K, A>> = sized { s ->
         MM().run {
             fx.monad {
@@ -486,6 +488,8 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 .ensure { it.size >= range.lowerBound(s) }
         }
     }
+
+    fun <K, A> Kind<M, Tuple2<K, A>>.map(range: IntRange): Kind<M, Map<K, A>> = map(Range.constant(range.first, range.last))
 
     fun <K, A> Kind<M, Tuple2<K, A>>.uniqueByKey(n: Int): Kind<M, List<Kind<M, Tuple2<K, A>>>> {
         fun go(k: Int, map: Map<K, Kind<M, Tuple2<K, A>>>): Kind<M, List<Kind<M, Tuple2<K, A>>>> =
@@ -523,6 +527,9 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
 
     fun <A> Kind<M, A>.nonEmptyList(range: Range<Int>): Kind<M, NonEmptyList<A>> =
         list(range).filterMap { NonEmptyList.fromList(it) }
+
+    fun <A> Kind<M, A>.nonEmptyList(range: IntRange): Kind<M, NonEmptyList<A>> =
+        nonEmptyList(Range.constant(range.first, range.last))
 
     // subterms
     fun <A> Kind<M, A>.freeze(): Kind<M, Tuple2<A, Kind<M, A>>> =

@@ -82,7 +82,7 @@ fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForId>(String
 
 // Top level parser
 fun outputParser(): Parser<KValue> = parser().run {
-    valueParser { true }.k().altSum(this, ListK.foldable()).apTap(eof()).fix()
+    valueParser { false }.k().altSum(this, ListK.foldable()).apTap(eof()).fix()
 }
 
 fun valueParser(pred: (Char) -> Boolean): List<Parser<KValue>> = parser().run {
