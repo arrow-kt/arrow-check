@@ -51,7 +51,8 @@ sealed class IconType {
 // TODO if possible (might be hard within the jvm, but maybe gradle has options) later on we can extend this with source pos info to print text at specific points in test source
 inline class Failure(val unFailure: Doc<Markup>)
 
-inline class Log(val unLog: List<JournalEntry>) {
+// TODO inline class with meta. Atm this would break a few methods that use the monoid instance
+data class Log(val unLog: List<JournalEntry>) {
     companion object
 }
 
