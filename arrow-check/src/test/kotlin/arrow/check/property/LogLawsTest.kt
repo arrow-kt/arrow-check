@@ -8,18 +8,21 @@ import arrow.typeclasses.Eq
 import io.kotlintest.properties.Gen
 import pretty.doc
 
+fun <A> Label.Companion.gen(gen: Gen<A>): Gen<Label<A>> =
+    Gen.bind(
+        Gen.option(Gen.string().map { LabelTable(it) }),
+        Gen.string().map { LabelName(it) },
+        Gen.double().map { CoverPercentage(it) },
+        gen
+    ) { t, l, p, b -> Label(t, l, p, b) }
+
 class LogLawsTest : UnitSpec() {
     init {
         val journalEntryGen = Gen.oneOf(
             Gen.string().map { JournalEntry.Input { it.doc() } },
             Gen.string().map { JournalEntry.Annotate { it.doc() } },
             Gen.string().map { JournalEntry.Footnote { it.doc() } },
-            Gen.bind(
-                Gen.option(Gen.string().map { LabelTable(it) }),
-                Gen.string().map { LabelName(it) },
-                Gen.double().map { CoverPercentage(it) },
-                Gen.bool()
-            ) { t, l, p, b -> Label(t, l, p, b) }.map { JournalEntry.JournalLabel(it) }
+            Label.gen(Gen.bool()).map { JournalEntry.JournalLabel(it) }
         )
 
         testLaws(

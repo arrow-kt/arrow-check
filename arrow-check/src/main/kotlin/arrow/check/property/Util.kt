@@ -82,7 +82,9 @@ data class Label<A>(
     val name: LabelName,
     val min: CoverPercentage,
     val annotation: A
-)
+) {
+    companion object
+}
 
 inline class CoverPercentage(val unCoverPercentage: Double)
 
