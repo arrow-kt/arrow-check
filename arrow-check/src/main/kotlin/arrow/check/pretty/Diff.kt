@@ -11,6 +11,7 @@ import arrow.core.extensions.list.monadFilter.filterMap
 import arrow.extension
 import arrow.recursion.typeclasses.Birecursive
 import arrow.syntax.collections.tail
+import arrow.typeclasses.Eq
 import arrow.typeclasses.Functor
 import kparsec.runParser
 import pretty.*
@@ -79,6 +80,8 @@ interface ValueDiffBirecursive : Birecursive<ValueDiff, ForValueDiffF> {
 }
 
 fun ValueDiff.Companion.birecursive(): Birecursive<ValueDiff, ForValueDiffF> = object : ValueDiffBirecursive {}
+
+fun ValueDiff.Companion.eq(): Eq<ValueDiff> = Eq.any()
 
 infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).let { (a, b) ->
     when {
