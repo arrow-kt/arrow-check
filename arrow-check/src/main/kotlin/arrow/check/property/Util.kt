@@ -75,6 +75,8 @@ sealed class JournalEntry {
     data class Footnote(val text: () -> Doc<Markup>) : JournalEntry()
     // labels, classes, tables
     data class JournalLabel(val label: Label<Boolean>): JournalEntry()
+
+    companion object
 }
 
 data class Label<A>(
