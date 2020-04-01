@@ -52,7 +52,7 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
      *  monad laws as well, we could consider this equal as well.
      */
     fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
-        Rose.applicative(OptionT.applicative(MA)).run { res.zipTree(OptionT.applicative(MA)) { ff.runGen(sizeAndSeed) }.map { (a, f) -> f(a) }.fix() }
+        Rose.applicative(OptionT.applicative(MA)).run { res.zipTree(OptionT.monad(MA), Eval.later { ff.runGen(sizeAndSeed) }).map { (a, f) -> f(a) }.fix() }
     })
 
     fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
@@ -85,9 +85,6 @@ fun <M> GenT.Companion.monadGen(MM: Monad<M>): MonadGen<GenTPartialOf<M>, M> = o
 
     override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
         fix().genAp(BM(), ff.fix())
-
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.lazyAp(ff: () -> Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(BM(), ff().fix())
 
     override fun <A, B> Kind<GenTPartialOf<M>, A>.flatMap(f: (A) -> Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, B> =
         MM().run { flatMap(f) }

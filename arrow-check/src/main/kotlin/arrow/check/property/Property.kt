@@ -115,7 +115,7 @@ fun <M, A> forAll(gen: Gen<A>, MM: Monad<M>, SA: Show<A> = Show.any()): Property
 fun <M, A> discard(MM: Monad<M>): PropertyT<M, A> =
     PropertyT(
         TestT(
-            EitherT.liftF<WriterTPartialOf<GenTPartialOf<M>, Log>, Failure, A>(
+            EitherT.liftF<Failure, WriterTPartialOf<Log, GenTPartialOf<M>>, A>(
                 WriterT.functor(GenT.functor(MM)),
                 WriterT.liftF(
                     GenT.monadGen(Id.monad()).discard<A>().fix().generalize(MM),

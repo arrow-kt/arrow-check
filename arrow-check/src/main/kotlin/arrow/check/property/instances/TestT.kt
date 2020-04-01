@@ -96,7 +96,7 @@ fun <M> TestT.Companion.monadTest(MM: Monad<M>): MonadTest<TestTPartialOf<M>> = 
 // @extension
 interface TestTMonadTrans : MonadTrans<ForTestT> {
     override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForTestT, G, A> = TestT(
-        EitherT.liftF<WriterTPartialOf<G, Log>, Failure, A>(
+        EitherT.liftF<Failure, WriterTPartialOf<Log, G>, A>(
             WriterT.functor(MF),
             WriterT.liftF(this, Log.monoid(), MF)
         )

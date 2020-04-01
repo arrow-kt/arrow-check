@@ -20,12 +20,18 @@ dependencies {
     implementation "io.arrow-kt:arrow-syntax:$arrow_version" // helper functions like curried...
     implementation "io.arrow-kt:arrow-mtl:$arrow_version" // StateT, Reader, Writer...
     implementation "io.arrow-kt:arrow-recursion:$arrow_version" // Recursion schemes
-    api "kotlin-pretty:kotlin-pretty:0.5.0" // Pretty printing diffs
-    api "kotlin-pretty:kotlin-pretty-ansi:0.5.0" // Ansi terminal support with colors
-    api "kparsec:kparsec:0.2.1" // Parser combinators to create toString-output parser
+    api "kotlin-pretty:kotlin-pretty:0.5.2" // Pretty printing diffs
+    api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
+    api "kparsec:kparsec:0.2.2" // Parser combinators to create toString-output parser
 
     testImplementation project(":arrow-check-kotlintest")
-    testImplementation("io.arrow-kt:arrow-test:$arrow_version") { // test helpers and laws
+    testImplementation("io.arrow-kt:arrow-core-test:$arrow_version") { // test helpers and laws
+        exclude group: "io.kotlintest"
+    }
+    testImplementation("io.arrow-kt:arrow-fx-test:$arrow_version") { // test helpers and laws
+        exclude group: "io.kotlintest"
+    }
+    testImplementation("io.arrow-kt:arrow-incubator-test:$arrow_version") { // test helpers and laws
         exclude group: "io.kotlintest"
     }
 }

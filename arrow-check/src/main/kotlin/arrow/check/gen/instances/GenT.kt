@@ -63,10 +63,6 @@ interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
         GenT.applicative(MM()).run { apTap(fb) }
 
     // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.lazyAp(ff: () -> Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(MM(), ff().fix())
-
-    // explicit overwrite so I do not use the monadic version here
     override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
         fix().genAp(MM(), ff.fix())
 

@@ -36,7 +36,7 @@ typealias TestTPartialOf<M> = arrow.Kind<ForTestT, M>
 inline fun <M, A> TestTOf<M, A>.fix(): TestT<M, A> =
     this as TestT<M, A>
 
-data class TestT<M, A>(val runTestT: EitherT<WriterTPartialOf<M, Log>, Failure, A>) : TestTOf<M, A> {
+data class TestT<M, A>(val runTestT: EitherT<Failure, WriterTPartialOf<Log, M>, A>) : TestTOf<M, A> {
 
     fun <B> map(MM: Monad<M>, f: (A) -> B): TestT<M, B> = TestT(runTestT.map(WriterT.monad(MM, Log.monoid()), f))
 

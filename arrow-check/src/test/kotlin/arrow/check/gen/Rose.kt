@@ -9,11 +9,11 @@ import arrow.core.extensions.either.monadError.monadError
 import arrow.core.extensions.eq
 import arrow.core.extensions.id.eqK.eqK
 import arrow.core.extensions.id.monad.monad
-import arrow.test.UnitSpec
-import arrow.test.generators.GenK
-import arrow.test.generators.genK
-import arrow.test.generators.throwable
-import arrow.test.laws.*
+import arrow.core.test.UnitSpec
+import arrow.core.test.generators.GenK
+import arrow.core.test.generators.genK
+import arrow.core.test.generators.throwable
+import arrow.core.test.laws.*
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Monad
 
