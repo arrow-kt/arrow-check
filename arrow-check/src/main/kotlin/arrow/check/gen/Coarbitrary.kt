@@ -1,6 +1,26 @@
 package arrow.check.gen
 
-import arrow.core.*
+import arrow.core.AndThen
+import arrow.core.Const
+import arrow.core.Either
+import arrow.core.Id
+import arrow.core.Ior
+import arrow.core.ListK
+import arrow.core.MapK
+import arrow.core.Nel
+import arrow.core.NonEmptyList
+import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.SetK
+import arrow.core.SortedMapK
+import arrow.core.Tuple2
+import arrow.core.Validated
+import arrow.core.k
+import arrow.core.left
+import arrow.core.right
+import arrow.core.toT
+import arrow.core.toTuple2
+import arrow.core.value
 
 // @higherkind boilerplate
 class ForCoarbitrary private constructor() {
@@ -35,64 +55,66 @@ interface Tuple2Coarbitrary<A, B> : Coarbitrary<Tuple2<A, B>> {
         }
 }
 
-fun <A, B> Tuple2.Companion.coarbitrary(CA: Coarbitrary<A>, CB: Coarbitrary<B>): Coarbitrary<Tuple2<A, B>> = object : Tuple2Coarbitrary<A, B> {
-    override fun CA(): Coarbitrary<A> = CA
-    override fun CB(): Coarbitrary<B> = CB
-}
+fun <A, B> Tuple2.Companion.coarbitrary(CA: Coarbitrary<A>, CB: Coarbitrary<B>): Coarbitrary<Tuple2<A, B>> =
+    object : Tuple2Coarbitrary<A, B> {
+        override fun CA(): Coarbitrary<A> = CA
+        override fun CB(): Coarbitrary<B> = CB
+    }
 
 fun unitCoarbitrary(): Coarbitrary<Unit> = object : Coarbitrary<Unit> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Unit): GenT<M, B> = this
 }
 
-interface BooleanCoarbitrary: Coarbitrary<Boolean> {
+interface BooleanCoarbitrary : Coarbitrary<Boolean> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Boolean): GenT<M, B> =
         Either.coarbitrary(unitCoarbitrary(), unitCoarbitrary()).run {
             coarbitrary(if (a) Unit.left() else Unit.right())
         }
 }
-fun Boolean.Companion.coarbitrary(): Coarbitrary<Boolean> = object: BooleanCoarbitrary {}
+
+fun Boolean.Companion.coarbitrary(): Coarbitrary<Boolean> = object : BooleanCoarbitrary {}
 
 interface LongCoarbitrary : Coarbitrary<Long> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Long): GenT<M, B> = variant(a)
 }
 
-fun Long.Companion.coarbitrary(): Coarbitrary<Long> = object: LongCoarbitrary {}
+fun Long.Companion.coarbitrary(): Coarbitrary<Long> = object : LongCoarbitrary {}
 
 interface IntCoarbitrary : Coarbitrary<Int> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Int): GenT<M, B> = variant(a.toLong())
 }
 
-fun Int.Companion.coarbitrary(): Coarbitrary<Int> = object: IntCoarbitrary {}
+fun Int.Companion.coarbitrary(): Coarbitrary<Int> = object : IntCoarbitrary {}
 
 interface ShortCoarbitrary : Coarbitrary<Short> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Short): GenT<M, B> = variant(a.toLong())
 }
 
-fun Short.Companion.coarbitrary(): Coarbitrary<Short> = object: ShortCoarbitrary {}
+fun Short.Companion.coarbitrary(): Coarbitrary<Short> = object : ShortCoarbitrary {}
 
 interface ByteCoarbitrary : Coarbitrary<Byte> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Byte): GenT<M, B> = variant(a.toLong())
 }
 
-fun Byte.Companion.coarbitrary(): Coarbitrary<Byte> = object: ByteCoarbitrary {}
+fun Byte.Companion.coarbitrary(): Coarbitrary<Byte> = object : ByteCoarbitrary {}
 
 interface FloatCoarbitrary : Coarbitrary<Float> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Float): GenT<M, B> = variant(a.toDouble().toRawBits())
 }
 
-fun Float.Companion.coarbitrary(): Coarbitrary<Float> = object: FloatCoarbitrary {}
+fun Float.Companion.coarbitrary(): Coarbitrary<Float> = object : FloatCoarbitrary {}
 
 interface DoubleCoarbitrary : Coarbitrary<Double> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Double): GenT<M, B> = variant(a.toRawBits())
 }
 
-fun Double.Companion.coarbitrary(): Coarbitrary<Double> = object: DoubleCoarbitrary {}
+fun Double.Companion.coarbitrary(): Coarbitrary<Double> = object : DoubleCoarbitrary {}
 
 interface CharCoarbitrary : Coarbitrary<Char> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: Char): GenT<M, B> = variant(a.toLong())
 }
 
-fun Char.Companion.coarbitrary(): Coarbitrary<Char> = object: CharCoarbitrary {}
+fun Char.Companion.coarbitrary(): Coarbitrary<Char> = object : CharCoarbitrary {}
 
 interface StringCoarbitrary : Coarbitrary<String> {
     override fun <M, B> GenT<M, B>.coarbitrary(a: String): GenT<M, B> =
@@ -101,7 +123,7 @@ interface StringCoarbitrary : Coarbitrary<String> {
         }
 }
 
-fun String.Companion.coarbitrary(): Coarbitrary<String> = object: StringCoarbitrary {}
+fun String.Companion.coarbitrary(): Coarbitrary<String> = object : StringCoarbitrary {}
 
 // @extension
 interface ListKCoarbitrary<A> : Coarbitrary<ListK<A>> {
@@ -127,9 +149,10 @@ interface NonEmptyListCoarbitrary<A> : Coarbitrary<NonEmptyList<A>> {
         }
 }
 
-fun <A> NonEmptyList.Companion.coarbitrary(CA: Coarbitrary<A>): Coarbitrary<NonEmptyList<A>> = object : NonEmptyListCoarbitrary<A> {
-    override fun AC(): Coarbitrary<A> = CA
-}
+fun <A> NonEmptyList.Companion.coarbitrary(CA: Coarbitrary<A>): Coarbitrary<NonEmptyList<A>> =
+    object : NonEmptyListCoarbitrary<A> {
+        override fun AC(): Coarbitrary<A> = CA
+    }
 
 // @extension
 interface OptionCoarbitrary<A> : Coarbitrary<Option<A>> {
@@ -158,10 +181,11 @@ interface EitherCoarbitrary<L, R> : Coarbitrary<Either<L, R>> {
         })
 }
 
-fun <L, R> Either.Companion.coarbitrary(LC: Coarbitrary<L>, RC: Coarbitrary<R>): Coarbitrary<Either<L, R>> = object : EitherCoarbitrary<L, R> {
-    override fun LC(): Coarbitrary<L> = LC
-    override fun RC(): Coarbitrary<R> = RC
-}
+fun <L, R> Either.Companion.coarbitrary(LC: Coarbitrary<L>, RC: Coarbitrary<R>): Coarbitrary<Either<L, R>> =
+    object : EitherCoarbitrary<L, R> {
+        override fun LC(): Coarbitrary<L> = LC
+        override fun RC(): Coarbitrary<R> = RC
+    }
 
 // @extension
 interface ConstCoarbitrary<A, T> : Coarbitrary<Const<A, T>> {
@@ -203,10 +227,11 @@ interface IorCoarbitrary<L, R> : Coarbitrary<Ior<L, R>> {
         })
 }
 
-fun <L, R> Ior.Companion.coarbitrary(LC: Coarbitrary<L>, RC: Coarbitrary<R>): Coarbitrary<Ior<L, R>> = object : IorCoarbitrary<L, R> {
-    override fun LC(): Coarbitrary<L> = LC
-    override fun RC(): Coarbitrary<R> = RC
-}
+fun <L, R> Ior.Companion.coarbitrary(LC: Coarbitrary<L>, RC: Coarbitrary<R>): Coarbitrary<Ior<L, R>> =
+    object : IorCoarbitrary<L, R> {
+        override fun LC(): Coarbitrary<L> = LC
+        override fun RC(): Coarbitrary<R> = RC
+    }
 
 // @extension
 interface MapKCoarbitrary<K, V> : Coarbitrary<MapK<K, V>> {
@@ -218,10 +243,11 @@ interface MapKCoarbitrary<K, V> : Coarbitrary<MapK<K, V>> {
         }
 }
 
-fun <K, V> MapK.Companion.coarbitrary(KC: Coarbitrary<K>, VC: Coarbitrary<V>): Coarbitrary<MapK<K, V>> = object : MapKCoarbitrary<K, V> {
-    override fun KC(): Coarbitrary<K> = KC
-    override fun VC(): Coarbitrary<V> = VC
-}
+fun <K, V> MapK.Companion.coarbitrary(KC: Coarbitrary<K>, VC: Coarbitrary<V>): Coarbitrary<MapK<K, V>> =
+    object : MapKCoarbitrary<K, V> {
+        override fun KC(): Coarbitrary<K> = KC
+        override fun VC(): Coarbitrary<V> = VC
+    }
 
 // @extension
 interface SetKCoarbitrary<V> : Coarbitrary<SetK<V>> {
@@ -245,11 +271,12 @@ interface SequenceKCoarbitrary<A> : Coarbitrary<SequenceK<A>> {
         }
 }
 
-fun <A> SequenceK.Companion.coarbitrary(AC: Coarbitrary<A>): Coarbitrary<SequenceK<A>> = object : SequenceKCoarbitrary<A> {
-    override fun AC(): Coarbitrary<A> = AC
-}
+fun <A> SequenceK.Companion.coarbitrary(AC: Coarbitrary<A>): Coarbitrary<SequenceK<A>> =
+    object : SequenceKCoarbitrary<A> {
+        override fun AC(): Coarbitrary<A> = AC
+    }
 
-interface SortedMapKCoarbitrary<K: Comparable<K>, V> : Coarbitrary<SortedMapK<K, V>> {
+interface SortedMapKCoarbitrary<K : Comparable<K>, V> : Coarbitrary<SortedMapK<K, V>> {
     fun KC(): Coarbitrary<K>
     fun VC(): Coarbitrary<V>
     override fun <M, B> GenT<M, B>.coarbitrary(a: SortedMapK<K, V>): GenT<M, B> =
@@ -258,8 +285,8 @@ interface SortedMapKCoarbitrary<K: Comparable<K>, V> : Coarbitrary<SortedMapK<K,
         }
 }
 
-fun <K: Comparable<K>, V> SortedMapK.Companion.coarbitrary(KC: Coarbitrary<K>, VC: Coarbitrary<V>) =
-    object: SortedMapKCoarbitrary<K, V> {
+fun <K : Comparable<K>, V> SortedMapK.Companion.coarbitrary(KC: Coarbitrary<K>, VC: Coarbitrary<V>) =
+    object : SortedMapKCoarbitrary<K, V> {
         override fun KC(): Coarbitrary<K> = KC
         override fun VC(): Coarbitrary<V> = VC
     }
@@ -280,7 +307,8 @@ interface ValidatedCoarbitrary<E, A> : Coarbitrary<Validated<E, A>> {
         })
 }
 
-fun <E, A> Validated.Companion.coarbitrary(EC: Coarbitrary<E>, AC: Coarbitrary<A>): Coarbitrary<Validated<E, A>> = object : ValidatedCoarbitrary<E, A> {
-    override fun AC(): Coarbitrary<A> = AC
-    override fun EC(): Coarbitrary<E> = EC
-}
+fun <E, A> Validated.Companion.coarbitrary(EC: Coarbitrary<E>, AC: Coarbitrary<A>): Coarbitrary<Validated<E, A>> =
+    object : ValidatedCoarbitrary<E, A> {
+        override fun AC(): Coarbitrary<A> = AC
+        override fun EC(): Coarbitrary<E> = EC
+    }

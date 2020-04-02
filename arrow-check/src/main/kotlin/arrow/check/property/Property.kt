@@ -1,8 +1,15 @@
 package arrow.check.property
 
-import arrow.check.gen.*
+import arrow.check.gen.Fun
+import arrow.check.gen.Gen
+import arrow.check.gen.GenT
+import arrow.check.gen.GenTPartialOf
+import arrow.check.gen.fix
+import arrow.check.gen.generalize
 import arrow.check.gen.instances.functor
 import arrow.check.gen.instances.monad
+import arrow.check.gen.monadGen
+import arrow.check.gen.show
 import arrow.check.pretty.showPretty
 import arrow.check.property.instances.monadTest
 import arrow.check.property.instances.monadTrans
@@ -18,7 +25,6 @@ import arrow.typeclasses.Show
 import pretty.Doc
 
 // -------------- Property
-
 data class Property(val config: PropertyConfig, val prop: PropertyT<IOPartialOf<Nothing>, Unit>) {
 
     fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =

@@ -1,9 +1,9 @@
 package arrow.check.gen
 
+import arrow.check.property.Size
 import arrow.core.Tuple2
 import arrow.core.andThen
 import arrow.core.toT
-import arrow.check.property.Size
 import java.math.BigDecimal
 import kotlin.math.max
 import kotlin.math.min
@@ -38,9 +38,11 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
             val ySized = scaleLinear(s, origin, end).clamp(start.toLong(), end.toLong()).toInt()
             xSized toT ySized
         }
+
         fun linear(start: Char, end: Char): Range<Char> = linearFrom(start, start, end)
         fun linearFrom(origin: Char, start: Char, end: Char): Range<Char> =
             linearFrom(origin.toInt(), start.toInt(), end.toInt()).map { it.toChar() }
+
         fun linear(start: Byte, end: Byte): Range<Byte> = linearFrom(start, start, end)
         fun linearFrom(origin: Byte, start: Byte, end: Byte): Range<Byte> =
             linearFrom(origin.toInt(), start.toInt(), end.toInt()).map { it.toByte() }
@@ -53,10 +55,10 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
             xSized toT ySized
         }
 
-
         fun linear(start: Float, end: Float): Range<Float> = linearFrom(start, start, end)
         fun linearFrom(origin: Float, start: Float, end: Float): Range<Float> =
             linearFrom(origin.toDouble(), start.toDouble(), end.toDouble()).map { it.toFloat() }
+
         fun linear(start: Double, end: Double): Range<Double> = linearFrom(start, start, end)
         // This needs extra work to prevent overflows, the above just convert to double to avoid those
         fun linearFrom(origin: Double, start: Double, end: Double): Range<Double> = Range(origin) { s ->
