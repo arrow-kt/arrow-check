@@ -3,24 +3,43 @@ package arrow.check.gen
 import arrow.Kind
 import arrow.check.gen.instances.alternative
 import arrow.check.gen.instances.applicative
+import arrow.check.gen.instances.birecursive
 import arrow.check.gen.instances.mFunctor
 import arrow.check.gen.instances.monad
 import arrow.check.gen.instances.monadFilter
+import arrow.check.gen.instances.monadTrans
 import arrow.check.property.Size
 import arrow.core.AndThen
+import arrow.core.Const
 import arrow.core.Either
+import arrow.core.Either.Left
+import arrow.core.Either.Right
 import arrow.core.Eval
 import arrow.core.ForId
 import arrow.core.FunctionK
 import arrow.core.Id
+import arrow.core.Ior
+import arrow.core.NonEmptyList
 import arrow.core.None
 import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.Some
 import arrow.core.Tuple2
+import arrow.core.Tuple3
+import arrow.core.Validated
+import arrow.core.extensions.fx
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.traverse.sequence
 import arrow.core.extensions.list.traverse.traverse
+import arrow.core.extensions.listk.functorFilter.filterMap
 import arrow.core.fix
+import arrow.core.identity
+import arrow.core.k
+import arrow.core.left
+import arrow.core.right
 import arrow.core.some
+import arrow.core.toMap
+import arrow.core.toOption
 import arrow.core.toT
 import arrow.core.value
 import arrow.mtl.OptionT
@@ -526,8 +545,8 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
     // arrow combinators
     fun <L, R> either(l: Kind<M, L>, r: Kind<M, R>): Kind<M, Either<L, R>> = sized { sz ->
         frequency(
-            2 toT l.map(::Left),
-            1 + sz.unSize toT r.map(::Right)
+            2 toT l.map { it.left() },
+            1 + sz.unSize toT r.map { it.right() }
         )
     }
 

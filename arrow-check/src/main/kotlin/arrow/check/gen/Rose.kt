@@ -3,7 +3,13 @@ package arrow.check.gen
 import arrow.Kind
 import arrow.check.gen.instances.birecursive
 import arrow.core.Eval
+import arrow.core.SequenceK
 import arrow.core.Tuple2
+import arrow.core.Tuple3
+import arrow.core.extensions.fx
+import arrow.core.k
+import arrow.core.toOption
+import arrow.core.toT
 import arrow.mtl.typeclasses.nest
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
