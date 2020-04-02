@@ -12,10 +12,12 @@ import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
 import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.fx.IO
+import arrow.fx.IO.Companion.effect
 import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.functor.unit
 import arrow.fx.extensions.io.monadDefer.monadDefer
 import arrow.fx.fix
+import arrow.fx.flatMap
 import arrow.fx.typeclasses.MonadDefer
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.typeclasses.Nested
@@ -31,15 +33,15 @@ import pretty.spaced
 import pretty.text
 import kotlin.random.Random
 
-fun checkGroup(groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> =
+fun checkGroup(groupName: String, props: List<Tuple2<String, Property>>): IO<Nothing, Boolean> =
     detectConfig().flatMap { checkGroup(it, groupName, props) }
 
-fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> = IO.fx {
+fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Property>>): IO<Nothing, Boolean> = IO.fx<Nothing, Boolean> {
     !effect { println("━━━ $groupName ━━━") }
 
     val summary =
         props.fold(IO { Summary.monoid().empty().copy(waiting = PropertyCount(props.size)) }) { acc, (n, prop) ->
-            IO.fx {
+            IO.fx<Nothing, Summary> {
                 val currSummary = acc.bind()
                 val res = checkReport(config, PropertyName(n).some(), prop).bind()
                 Summary.monoid().run {
@@ -56,22 +58,22 @@ fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Pro
     summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
 }
 
-fun check(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): IO<Boolean> =
+fun check(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): IO<Nothing, Boolean> =
     check(property(propertyConfig, c))
 
 fun check(
     config: Config,
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTestSyntax.() -> Unit
-): IO<Boolean> =
+): IO<Nothing, Boolean> =
     check(config, property(propertyConfig, c))
 
-fun check(prop: Property): IO<Boolean> =
+fun check(prop: Property): IO<Nothing, Boolean> =
     detectConfig().flatMap { check(it, prop) }
 
-fun check(config: Config, prop: Property): IO<Boolean> = check(config, None, prop)
+fun check(config: Config, prop: Property): IO<Nothing, Boolean> = check(config, None, prop)
 
-fun recheck(size: Size, seed: RandSeed, prop: Property): IO<Unit> =
+fun recheck(size: Size, seed: RandSeed, prop: Property): IO<Nothing, Unit> =
     detectConfig().flatMap { recheck(it, size, seed, prop) }
 
 fun recheck(
@@ -79,7 +81,7 @@ fun recheck(
     seed: RandSeed,
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTestSyntax.() -> Unit
-): IO<Unit> =
+): IO<Nothing, Unit> =
     recheck(size, seed, property(propertyConfig, c))
 
 fun recheck(
@@ -88,20 +90,20 @@ fun recheck(
     seed: RandSeed,
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTestSyntax.() -> Unit
-): IO<Unit> =
+): IO<Nothing, Unit> =
     recheck(config, size, seed, property(propertyConfig, c))
 
-fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property): IO<Unit> =
+fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property): IO<Nothing, Unit> =
     checkReport(seed, size, config, None, prop).unit()
 
 fun checkNamed(
     name: String,
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTestSyntax.() -> Unit
-): IO<Boolean> =
+): IO<Nothing, Boolean> =
     checkNamed(name, property(propertyConfig, c))
 
-fun checkNamed(name: String, prop: Property): IO<Boolean> =
+fun checkNamed(name: String, prop: Property): IO<Nothing, Boolean> =
     detectConfig().flatMap { check(it, PropertyName(name).some(), prop) }
 
 fun checkNamed(
@@ -109,24 +111,24 @@ fun checkNamed(
     name: String,
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTestSyntax.() -> Unit
-): IO<Boolean> =
+): IO<Nothing, Boolean> =
     check(config, PropertyName(name).some(), property(propertyConfig, c))
 
-fun checkNamed(config: Config, name: String, prop: Property): IO<Boolean> =
+fun checkNamed(config: Config, name: String, prop: Property): IO<Nothing, Boolean> =
     check(config, PropertyName(name).some(), prop)
 
 
-fun check(config: Config, name: Option<PropertyName>, prop: Property): IO<Boolean> =
+fun check(config: Config, name: Option<PropertyName>, prop: Property): IO<Nothing, Boolean> =
     checkReport(config, name, prop).map { it.status is Result.Success }
 
-fun checkReport(name: Option<PropertyName>, prop: Property): IO<Report<Result>> =
+fun checkReport(name: Option<PropertyName>, prop: Property): IO<Nothing, Report<Result>> =
     detectConfig().flatMap { c ->
         IO { RandSeed(Random.nextLong()) }.flatMap {
             checkReport(it, Size(0), c, name, prop)
         }
     }
 
-fun checkReport(config: Config, name: Option<PropertyName>, prop: Property): IO<Report<Result>> =
+fun checkReport(config: Config, name: Option<PropertyName>, prop: Property): IO<Nothing, Report<Result>> =
     IO { RandSeed(Random.nextLong()) }.flatMap {
         checkReport(it, Size(0), config, name, prop)
     }
@@ -137,8 +139,8 @@ internal fun checkReport(
     config: Config,
     name: Option<PropertyName>,
     prop: Property
-): IO<Report<Result>> =
-    IO.fx {
+): IO<Nothing, Report<Result>> =
+    IO.fx<Nothing, Report<Result>> {
         val report = !runProperty(IO.monadDefer(), size, seed, prop.config, prop.prop) {
             // TODO Live update will come back once I finish concurrent output
             IO.unit

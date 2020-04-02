@@ -6,6 +6,7 @@ import arrow.check.property.PropertyName
 import arrow.check.property.PropertyTestSyntax
 import arrow.check.property.property
 import arrow.core.Tuple2
+import arrow.core.identity
 import arrow.core.some
 import io.kotlintest.AbstractSpec
 import io.kotlintest.TestType
@@ -19,7 +20,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
             this,
             {
                 checkGroup(this@invoke, props)
-                    .unsafeRunSync()
+                    .unsafeRunSyncEither()
+                    .fold(::identity, ::identity)
                     .let {
                         if (it.not()) throw AssertionError("Some tests failed!")
                     }
@@ -36,7 +38,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
             this,
             {
                 checkReport(PropertyName(this@invoke).some(), property(propertyConfig, c))
-                    .unsafeRunSync()
+                    .unsafeRunSyncEither()
+                    .fold(::identity, ::identity)
                     .toException()
             },
             defaultTestCaseConfig,
@@ -56,7 +59,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
                     PropertyName(this@invoke).some(),
                     property(propertyConfig, c)
                 )
-                    .unsafeRunSync()
+                    .unsafeRunSyncEither()
+                    .fold(::identity, ::identity)
                     .toException()
             },
             defaultTestCaseConfig,
@@ -68,7 +72,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
             this,
             {
                 checkReport(PropertyName(this@invoke).some(), f)
-                    .unsafeRunSync()
+                    .unsafeRunSyncEither()
+                    .fold(::identity, ::identity)
                     .toException()
             },
             defaultTestCaseConfig,
@@ -80,7 +85,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
             this,
             {
                 checkReport(args, PropertyName(this@invoke).some(), f)
-                    .unsafeRunSync()
+                    .unsafeRunSyncEither()
+                    .fold(::identity, ::identity)
                     .toException()
             },
             defaultTestCaseConfig,

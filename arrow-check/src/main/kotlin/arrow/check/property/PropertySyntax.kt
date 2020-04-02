@@ -7,8 +7,8 @@ import arrow.check.property.instances.monad
 import arrow.check.property.instances.monadTrans
 import arrow.core.Either
 import arrow.core.ForId
-import arrow.fx.ForIO
 import arrow.fx.IO
+import arrow.fx.IOPartialOf
 import arrow.fx.extensions.io.monad.monad
 import arrow.typeclasses.Monad
 import arrow.typeclasses.MonadContinuation
@@ -19,7 +19,7 @@ import kotlin.coroutines.startCoroutine
 
 fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): Property {
     val continuation = PropertyTestContinuation<Unit>()
-    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<ForIO, Unit> = {
+    val wrapReturn: suspend PropertyTestContinuation<*>.() -> PropertyT<IOPartialOf<Nothing>, Unit> = {
         // Until https://github.com/arrow-kt/arrow/issues/1976 has a good fix
         unit().bind()
         just(c()).fix()
@@ -31,25 +31,25 @@ fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend Prope
     )
 }
 
-interface PropertyTestSyntax : MonadSyntax<PropertyTPartialOf<ForIO>>, PropertyTest<ForIO> {
-    override fun MM(): Monad<ForIO> = IO.monad()
+interface PropertyTestSyntax : MonadSyntax<PropertyTPartialOf<IOPartialOf<Nothing>>>, PropertyTest<IOPartialOf<Nothing>> {
+    override fun MM(): Monad<IOPartialOf<Nothing>> = IO.monad()
 
-    suspend fun <A> IO<A>.bind(): A = PropertyT.monadTrans().run { liftT(IO.monad()) }.bind()
+    suspend fun <A> IO<Nothing, A>.bind(): A = PropertyT.monadTrans().run { liftT(IO.monad()) }.bind()
 }
 
-class PropertyTestContinuation<A> : MonadContinuation<PropertyTPartialOf<ForIO>, A>(
+class PropertyTestContinuation<A> : MonadContinuation<PropertyTPartialOf<IOPartialOf<Nothing>>, A>(
     PropertyT.monad(IO.monad())
 ), PropertyTestSyntax {
-    override fun <A> just(a: A): Kind<PropertyTPartialOf<ForIO>, A> =
+    override fun <A> just(a: A): Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, A> =
         PropertyT.monad(MM()).just(a)
 
     override fun <A, B> tailRecM(
         a: A,
-        f: (A) -> Kind<PropertyTPartialOf<ForIO>, Either<A, B>>
-    ): Kind<PropertyTPartialOf<ForIO>, B> =
+        f: (A) -> Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, Either<A, B>>
+    ): Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, B> =
         PropertyT.monad(MM()).tailRecM(a, f)
 
-    override fun <A, B> Kind<PropertyTPartialOf<ForIO>, A>.flatMap(f: (A) -> Kind<PropertyTPartialOf<ForIO>, B>): Kind<PropertyTPartialOf<ForIO>, B> =
+    override fun <A, B> Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, A>.flatMap(f: (A) -> Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, B>): Kind<PropertyTPartialOf<IOPartialOf<Nothing>>, B> =
         PropertyT.monad(MM()).run { flatMap(f) }
 }
 
