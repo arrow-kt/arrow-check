@@ -20,8 +20,13 @@ import arrow.mtl.OptionT
 import arrow.mtl.extensions.optiont.alternative.alternative
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadError.monadError
+import arrow.mtl.extensions.optiont.monadReader.monadReader
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
+import arrow.mtl.extensions.optiont.monadWriter.monadWriter
+import arrow.mtl.typeclasses.MonadReader
+import arrow.mtl.typeclasses.MonadState
 import arrow.mtl.typeclasses.MonadTrans
+import arrow.mtl.typeclasses.MonadWriter
 import arrow.typeclasses.Alternative
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.ApplicativeError
@@ -212,3 +217,54 @@ fun <M, A> GenT.Companion.monoid(MM: Monad<M>, MA: Monoid<A>): Monoid<GenT<M, A>
     override fun MA(): Monoid<A> = MA
     override fun MM(): Monad<M> = MM
 }
+
+// @extension
+interface GenTMonadReader<M, D> : MonadReader<GenTPartialOf<M>, D>, GenTMonad<M> {
+    override fun MM(): Monad<M> = MD()
+    fun MD(): MonadReader<M, D>
+
+    override fun ask(): Kind<GenTPartialOf<M>, D> = GenT.monadTrans().run { MD().ask().liftT(MD()) }
+
+    override fun <A> Kind<GenTPartialOf<M>, A>.local(f: (D) -> D): Kind<GenTPartialOf<M>, A> =
+        GenT(AndThen(fix().runGen).andThen { Rose.monadReader(OptionT.monadReader(MD())).run { it.local(f) }.fix() })
+}
+
+fun <M, D> GenT.Companion.monadReader(MD: MonadReader<M, D>): MonadReader<GenTPartialOf<M>, D> =
+    object : GenTMonadReader<M, D> {
+        override fun MD(): MonadReader<M, D> = MD
+    }
+
+// @extension
+interface GenTMonadWriter<M, W> : MonadWriter<GenTPartialOf<M>, W>, GenTMonad<M> {
+    override fun MM(): Monad<M> = MW()
+    fun MW(): MonadWriter<M, W>
+
+    override fun <A> writer(aw: Tuple2<W, A>): Kind<GenTPartialOf<M>, A> =
+        GenT.monadTrans().run { MW().writer(aw).liftT(MW()) }
+
+    override fun <A> Kind<GenTPartialOf<M>, A>.listen(): Kind<GenTPartialOf<M>, Tuple2<W, A>> =
+        GenT(AndThen(fix().runGen).andThen { Rose.monadWriter(OptionT.monadWriter(MW())).run { it.listen() }.fix() })
+
+    override fun <A> Kind<GenTPartialOf<M>, Tuple2<(W) -> W, A>>.pass(): Kind<GenTPartialOf<M>, A> =
+        GenT(AndThen(fix().runGen).andThen { Rose.monadWriter(OptionT.monadWriter(MW())).run { it.pass() }.fix() })
+}
+
+fun <M, W> GenT.Companion.monadWriter(MW: MonadWriter<M, W>): MonadWriter<GenTPartialOf<M>, W> =
+    object : GenTMonadWriter<M, W> {
+        override fun MW(): MonadWriter<M, W> = MW
+    }
+
+// @extension
+interface GenTMonadState<M, S> : MonadState<GenTPartialOf<M>, S>, GenTMonad<M> {
+    override fun MM(): Monad<M> = MS()
+    fun MS(): MonadState<M, S>
+
+    override fun get(): Kind<GenTPartialOf<M>, S> = GenT.monadTrans().run { MS().get().liftT(MS()) }
+
+    override fun set(s: S): Kind<GenTPartialOf<M>, Unit> = GenT.monadTrans().run { MS().set(s).liftT(MS()) }
+}
+
+fun <M, S> GenT.Companion.monadState(MS: MonadState<M, S>): MonadState<GenTPartialOf<M>, S> =
+    object : GenTMonadState<M, S> {
+        override fun MS(): MonadState<M, S> = MS
+    }
