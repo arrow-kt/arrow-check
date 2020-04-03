@@ -1,0 +1,3 @@
+# Some KtLint rules
+[*.{kt,kts}]
+disabled_rules=import-ordering

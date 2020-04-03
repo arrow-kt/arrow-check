@@ -26,7 +26,7 @@ fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())
 
 fun <A> List<A>.removes(n: Int): Sequence<List<A>> = loopRemove(n, size)
 
-private fun <A>List<A>.loopRemove(k: Int, n: Int): Sequence<List<A>> =
+private fun <A> List<A>.loopRemove(k: Int, n: Int): Sequence<List<A>> =
     (take(k) toT drop(k)).let { (head, tail) ->
         when {
             k > n -> emptySequence()
@@ -41,4 +41,3 @@ fun <T : Any> iterate(start: T, f: (T) -> T) = generateSequence(start) { f(it) }
 
 fun halves(i: Long): Sequence<Long> =
     generateSequence(i) { it / 2 }.takeWhile { it != 0L }
-

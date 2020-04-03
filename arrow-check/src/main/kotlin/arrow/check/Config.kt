@@ -10,26 +10,24 @@ data class Config(
 )
 
 sealed class Verbose {
-    object Quiet: Verbose()
-    object Normal: Verbose()
+    object Quiet : Verbose()
+    object Normal : Verbose()
 }
 
 sealed class UseColor {
-    object EnableColor: UseColor()
-    object DisableColor: UseColor()
+    object EnableColor : UseColor()
+    object DisableColor : UseColor()
 }
 
 inline class TaskId(val id: Int)
 
 // look for env options and check terminal capabilities, env options have precedence
 // TODO
-fun detectColor(): IO<UseColor> = IO.just(UseColor.EnableColor)
+fun detectColor(): IO<Nothing, UseColor> = IO.just(UseColor.EnableColor)
 
-fun detectVerbosity(): IO<Verbose> = IO.just(Verbose.Quiet)
+fun detectVerbosity(): IO<Nothing, Verbose> = IO.just(Verbose.Quiet)
 
-fun detectConfig(): IO<Config> = IO.applicative().map(
+fun detectConfig(): IO<Nothing, Config> = IO.applicative<Nothing>().map(
     detectColor(),
     detectVerbosity()
 ) { (useColor, verbosity) -> Config(useColor, verbosity) }.fix()
-
-

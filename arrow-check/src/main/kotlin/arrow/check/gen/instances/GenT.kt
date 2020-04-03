@@ -2,9 +2,18 @@ package arrow.check.gen.instances
 
 import arrow.Kind
 import arrow.Kind2
-import arrow.check.gen.*
+import arrow.check.gen.ForGenT
+import arrow.check.gen.GenT
+import arrow.check.gen.GenTPartialOf
+import arrow.check.gen.RandSeed
+import arrow.check.gen.Rose
+import arrow.check.gen.fix
 import arrow.check.property.Size
-import arrow.core.*
+import arrow.core.AndThen
+import arrow.core.Either
+import arrow.core.Tuple2
+import arrow.core.andThen
+import arrow.core.toT
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.OptionT
@@ -13,7 +22,14 @@ import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadError.monadError
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
 import arrow.mtl.typeclasses.MonadTrans
-import arrow.typeclasses.*
+import arrow.typeclasses.Alternative
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.ApplicativeError
+import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
+import arrow.typeclasses.MonadError
+import arrow.typeclasses.Monoid
+import arrow.typeclasses.Semigroup
 
 // @extension
 interface GenTFunctor<M> : Functor<GenTPartialOf<M>> {
@@ -61,10 +77,6 @@ interface GenTMonad<M> : Monad<GenTPartialOf<M>> {
     // explicit overwrite so I do not use the monadic version here
     override fun <A, B> Kind<GenTPartialOf<M>, A>.apTap(fb: Kind<GenTPartialOf<M>, B>): Kind<GenTPartialOf<M>, A> =
         GenT.applicative(MM()).run { apTap(fb) }
-
-    // explicit overwrite so I do not use the monadic version here
-    override fun <A, B> Kind<GenTPartialOf<M>, A>.lazyAp(ff: () -> Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
-        fix().genAp(MM(), ff().fix())
 
     // explicit overwrite so I do not use the monadic version here
     override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
@@ -124,7 +136,7 @@ fun GenT.Companion.monadTrans(): MonadTrans<ForGenT> = object : GenTMonadTrans {
 interface GenTMonadIO<M> : MonadIO<GenTPartialOf<M>>, GenTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<A>.liftIO(): Kind<GenTPartialOf<M>, A> = MIO().run {
+    override fun <A> IO<Nothing, A>.liftIO(): Kind<GenTPartialOf<M>, A> = MIO().run {
         GenT.monadTrans().run {
             liftIO().liftT(MIO())
         }
@@ -154,9 +166,10 @@ interface GenTApplicativeError<M, E> : ApplicativeError<GenTPartialOf<M>, E>, Ge
     }
 }
 
-fun <M, E> GenT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<GenTPartialOf<M>, E> = object : GenTApplicativeError<M, E> {
-    override fun ME(): MonadError<M, E> = ME
-}
+fun <M, E> GenT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<GenTPartialOf<M>, E> =
+    object : GenTApplicativeError<M, E> {
+        override fun ME(): MonadError<M, E> = ME
+    }
 
 // @extension
 interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativeError<M, E>, GenTMonad<M> {
@@ -164,24 +177,28 @@ interface GenTMonadError<M, E> : MonadError<GenTPartialOf<M>, E>, GenTApplicativ
     override fun ME(): MonadError<M, E>
     override fun <A, B> Kind<GenTPartialOf<M>, A>.ap(ff: Kind<GenTPartialOf<M>, (A) -> B>): Kind<GenTPartialOf<M>, B> =
         fix().genAp(ME(), ff.fix())
+
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = GenT.just(ME(), a)
 }
 
-fun <M, E> GenT.Companion.monadError(ME: MonadError<M, E>): MonadError<GenTPartialOf<M>, E> = object : GenTMonadError<M, E> {
-    override fun ME(): MonadError<M, E> = ME
-}
+fun <M, E> GenT.Companion.monadError(ME: MonadError<M, E>): MonadError<GenTPartialOf<M>, E> =
+    object : GenTMonadError<M, E> {
+        override fun ME(): MonadError<M, E> = ME
+    }
 
 // @extension
 interface GenTSemigroup<M, A> : Semigroup<GenT<M, A>> {
     fun MM(): Monad<M>
     fun SA(): Semigroup<A>
-    override fun GenT<M, A>.combine(b: GenT<M, A>): GenT<M, A> = GenT.applicative(MM()).mapN(this, b) { (a, b) -> SA().run { a + b } }.fix()
+    override fun GenT<M, A>.combine(b: GenT<M, A>): GenT<M, A> =
+        GenT.applicative(MM()).mapN(this, b) { (a, b) -> SA().run { a + b } }.fix()
 }
 
-fun <M, A> GenT.Companion.semigroup(MM: Monad<M>, SA: Semigroup<A>): Semigroup<GenT<M, A>> = object : GenTSemigroup<M, A> {
-    override fun MM(): Monad<M> = MM
-    override fun SA(): Semigroup<A> = SA
-}
+fun <M, A> GenT.Companion.semigroup(MM: Monad<M>, SA: Semigroup<A>): Semigroup<GenT<M, A>> =
+    object : GenTSemigroup<M, A> {
+        override fun MM(): Monad<M> = MM
+        override fun SA(): Semigroup<A> = SA
+    }
 
 // @extension
 interface GenTMonoid<M, A> : Monoid<GenT<M, A>>, GenTSemigroup<M, A> {
