@@ -1,16 +1,47 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.*
-import arrow.check.property.*
-import arrow.core.*
-import arrow.core.extensions.eval.monad.monad
+import arrow.check.gen.instances.alternative
+import arrow.check.gen.instances.applicative
+import arrow.check.gen.instances.birecursive
+import arrow.check.gen.instances.mFunctor
+import arrow.check.gen.instances.monad
+import arrow.check.gen.instances.monadFilter
+import arrow.check.gen.instances.monadTrans
+import arrow.check.property.Size
+import arrow.core.AndThen
+import arrow.core.Const
+import arrow.core.Either
+import arrow.core.Either.Left
+import arrow.core.Either.Right
+import arrow.core.Eval
+import arrow.core.ForId
+import arrow.core.FunctionK
+import arrow.core.Id
+import arrow.core.Ior
+import arrow.core.NonEmptyList
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.Some
+import arrow.core.Tuple2
+import arrow.core.Tuple3
+import arrow.core.Validated
 import arrow.core.extensions.fx
-import arrow.core.extensions.id.functor.functor
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.traverse.sequence
 import arrow.core.extensions.list.traverse.traverse
 import arrow.core.extensions.listk.functorFilter.filterMap
+import arrow.core.fix
+import arrow.core.identity
+import arrow.core.k
+import arrow.core.left
+import arrow.core.right
+import arrow.core.some
+import arrow.core.toMap
+import arrow.core.toOption
+import arrow.core.toT
+import arrow.core.value
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.extensions.optiont.alternative.alternative
@@ -22,7 +53,13 @@ import arrow.mtl.fix
 import arrow.mtl.typeclasses.unnest
 import arrow.mtl.value
 import arrow.syntax.collections.tail
-import arrow.typeclasses.*
+import arrow.typeclasses.Alternative
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
+import arrow.typeclasses.MonadFilter
+import arrow.typeclasses.MonadSyntax
+import arrow.typeclasses.Show
 import kotlin.random.Random
 
 // @higherkind boilerplate
@@ -51,15 +88,20 @@ class GenT<M, A>(val runGen: (Tuple2<RandSeed, Size>) -> Rose<OptionTPartialOf<M
      *  is essential to good shrinking results. And tbh since we assume sameness by just size and same distribution in
      *  monad laws as well, we could consider this equal as well.
      */
-    fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
-        Rose.applicative(OptionT.applicative(MA)).run { res.zipTree(OptionT.monad(MA), Eval.later { ff.runGen(sizeAndSeed) }).map { (a, f) -> f(a) }.fix() }
-    })
+    fun <B> genAp(MA: Monad<M>, ff: GenT<M, (A) -> B>): GenT<M, B> =
+        GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
+            Rose.applicative(OptionT.applicative(MA)).run {
+                res.zipTree(OptionT.monad(MA), Eval.later { ff.runGen(sizeAndSeed) }).map { (a, f) -> f(a) }.fix()
+            }
+        })
 
-    fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> = GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
-        res.flatMap(OptionT.monad(MM)) { f(it).runGen(sizeAndSeed) }
-    })
+    fun <B> genFlatMap(MM: Monad<M>, f: (A) -> GenT<M, B>): GenT<M, B> =
+        GenT(AndThen(::runGWithSize).andThen { (res, sizeAndSeed) ->
+            res.flatMap(OptionT.monad(MM)) { f(it).runGen(sizeAndSeed) }
+        })
 
-    fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> = GenT(AndThen(runGen).andThen(f))
+    fun <B> mapTree(f: (Rose<OptionTPartialOf<M>, A>) -> Rose<OptionTPartialOf<M>, B>): GenT<M, B> =
+        GenT(AndThen(runGen).andThen(f))
 
     internal fun runGWithSize(sz: Tuple2<RandSeed, Size>): Tuple2<Rose<OptionTPartialOf<M>, A>, Tuple2<RandSeed, Size>> {
         val (l, r) = sz.a.split()
@@ -137,12 +179,14 @@ fun <A> GenT.Companion.monadGen(f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> G
 
 fun <M, A> Gen<A>.generalize(MM: Monad<M>): GenT<M, A> = GenT { (r, s) ->
     Rose.mFunctor().run {
-        runGen(r toT s).hoist(OptionT.monad(Id.monad()), object : FunctionK<OptionTPartialOf<ForId>, OptionTPartialOf<M>> {
-            override fun <A> invoke(fa: Kind<OptionTPartialOf<ForId>, A>): Kind<OptionTPartialOf<M>, A> =
-                OptionT(
-                    MM.just(fa.fix().value().value())
-                )
-        }).fix()
+        runGen(r toT s).hoist(
+            OptionT.monad(Id.monad()),
+            object : FunctionK<OptionTPartialOf<ForId>, OptionTPartialOf<M>> {
+                override fun <A> invoke(fa: Kind<OptionTPartialOf<ForId>, A>): Kind<OptionTPartialOf<M>, A> =
+                    OptionT(
+                        MM.just(fa.fix().value().value())
+                    )
+            }).fix()
     }
 }
 
@@ -381,7 +425,10 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 val (x, gen) = this@filterMap.scale { Size(2 * k + it.unSize) }.freeze().bind()
                 f(x).fold({ t(k + 1).bind() }, {
                     gen.toGenT()
-                        .mapTree { Rose.monadFilter(OptionT.alternative(BM()), OptionT.monad(BM())).run { it.filterMap(f) }.fix() }
+                        .mapTree {
+                            Rose.monadFilter(OptionT.alternative(BM()), OptionT.monad(BM())).run { it.filterMap(f) }
+                                .fix()
+                        }
                         .fromGenT().bind()
                 })
             }
@@ -498,8 +545,8 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
     // arrow combinators
     fun <L, R> either(l: Kind<M, L>, r: Kind<M, R>): Kind<M, Either<L, R>> = sized { sz ->
         frequency(
-            2 toT l.map(::Left),
-            1 + sz.unSize toT r.map(::Right)
+            2 toT l.map { it.left() },
+            1 + sz.unSize toT r.map { it.right() }
         )
     }
 

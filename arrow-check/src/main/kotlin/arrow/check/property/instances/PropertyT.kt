@@ -7,12 +7,25 @@ import arrow.check.gen.instances.alternative
 import arrow.check.gen.instances.monad
 import arrow.check.gen.instances.monadError
 import arrow.check.gen.instances.monadTrans
-import arrow.check.property.*
+import arrow.check.property.ForPropertyT
+import arrow.check.property.MonadTest
+import arrow.check.property.PropertyT
+import arrow.check.property.PropertyTPartialOf
+import arrow.check.property.Test
+import arrow.check.property.TestT
+import arrow.check.property.discard
+import arrow.check.property.fix
+import arrow.check.property.hoist
 import arrow.core.Either
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.typeclasses.MonadTrans
-import arrow.typeclasses.*
+import arrow.typeclasses.Alternative
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.ApplicativeError
+import arrow.typeclasses.Functor
+import arrow.typeclasses.Monad
+import arrow.typeclasses.MonadError
 
 // @extension
 interface PropertyTFunctor<M> : Functor<PropertyTPartialOf<M>> {
@@ -36,9 +49,10 @@ interface PropertyTApplicative<M> : Applicative<PropertyTPartialOf<M>> {
         fix().ap(MM(), ff.fix())
 }
 
-fun <M> PropertyT.Companion.applicative(MM: Monad<M>): Applicative<PropertyTPartialOf<M>> = object : PropertyTApplicative<M> {
-    override fun MM(): Monad<M> = MM
-}
+fun <M> PropertyT.Companion.applicative(MM: Monad<M>): Applicative<PropertyTPartialOf<M>> =
+    object : PropertyTApplicative<M> {
+        override fun MM(): Monad<M> = MM
+    }
 
 // @extension
 interface PropertyTMonad<M> : Monad<PropertyTPartialOf<M>> {
@@ -57,7 +71,8 @@ interface PropertyTMonad<M> : Monad<PropertyTPartialOf<M>> {
         }
 
     override fun <A, B> tailRecM(
-        a: A, f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
+        a: A,
+        f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
     ): Kind<PropertyTPartialOf<M>, B> =
         f(a).flatMap { it.fold({ tailRecM(it, f) }, { just(it) }) }
 }
@@ -73,12 +88,17 @@ interface PropertyTAlternative<M> : Alternative<PropertyTPartialOf<M>>, Property
     override fun <A> empty(): Kind<PropertyTPartialOf<M>, A> = discard(MM())
 
     override fun <A> Kind<PropertyTPartialOf<M>, A>.orElse(b: Kind<PropertyTPartialOf<M>, A>): Kind<PropertyTPartialOf<M>, A> =
-        PropertyT(TestT.alternative(GenT.monad(MM()), GenT.alternative(MM())).run { fix().unPropertyT.orElse(b.fix().unPropertyT).fix() })
+        PropertyT(
+            TestT.alternative(
+                GenT.monad(MM()),
+                GenT.alternative(MM())
+            ).run { fix().unPropertyT.orElse(b.fix().unPropertyT).fix() })
 }
 
-fun <M> PropertyT.Companion.alternative(MM: Monad<M>): Alternative<PropertyTPartialOf<M>> = object : PropertyTAlternative<M> {
-    override fun MM(): Monad<M> = MM
-}
+fun <M> PropertyT.Companion.alternative(MM: Monad<M>): Alternative<PropertyTPartialOf<M>> =
+    object : PropertyTAlternative<M> {
+        override fun MM(): Monad<M> = MM
+    }
 
 interface PropertyTMonadTest<M> : MonadTest<PropertyTPartialOf<M>>, PropertyTMonad<M> {
     override fun MM(): Monad<M>
@@ -105,7 +125,7 @@ fun PropertyT.Companion.monadTrans(): MonadTrans<ForPropertyT> = object : Proper
 interface PropertyTMonadIO<M> : MonadIO<PropertyTPartialOf<M>>, PropertyTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<A>.liftIO(): Kind<PropertyTPartialOf<M>, A> = MIO().run {
+    override fun <A> IO<Nothing, A>.liftIO(): Kind<PropertyTPartialOf<M>, A> = MIO().run {
         PropertyT.monadTrans().run {
             liftIO().liftT(MIO())
         }
@@ -124,16 +144,19 @@ interface PropertyTApplicativeError<M, E> : ApplicativeError<PropertyTPartialOf<
         TestT.monadError(GenT.monadError(ME())).run {
             PropertyT(fix().unPropertyT.handleErrorWith { f(it).fix().unPropertyT }.fix())
         }
+
     override fun <A> raiseError(e: E): Kind<PropertyTPartialOf<M>, A> =
         PropertyT(TestT.monadError(GenT.monadError(ME())).raiseError<A>(e).fix())
 }
 
-fun <M, E> PropertyT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<PropertyTPartialOf<M>, E> = object : PropertyTApplicativeError<M, E> {
-    override fun ME(): MonadError<M, E> = ME
-}
+fun <M, E> PropertyT.Companion.applicativeError(ME: MonadError<M, E>): ApplicativeError<PropertyTPartialOf<M>, E> =
+    object : PropertyTApplicativeError<M, E> {
+        override fun ME(): MonadError<M, E> = ME
+    }
 
 // @extension
-interface PropertyTMonadError<M, E> : MonadError<PropertyTPartialOf<M>, E>, PropertyTApplicativeError<M, E>, PropertyTMonad<M> {
+interface PropertyTMonadError<M, E> : MonadError<PropertyTPartialOf<M>, E>, PropertyTApplicativeError<M, E>,
+    PropertyTMonad<M> {
     override fun MM(): Monad<M> = ME()
     override fun ME(): MonadError<M, E>
     override fun <A> just(a: A): Kind<PropertyTPartialOf<M>, A> = PropertyT.monad(MM()).just(a)
@@ -141,8 +164,9 @@ interface PropertyTMonadError<M, E> : MonadError<PropertyTPartialOf<M>, E>, Prop
         fix().ap(MM(), ff.fix())
 }
 
-fun <M, E> PropertyT.Companion.monadError(ME: MonadError<M, E>): MonadError<PropertyTPartialOf<M>, E> = object : PropertyTMonadError<M, E> {
-    override fun ME(): MonadError<M, E> = ME
-}
+fun <M, E> PropertyT.Companion.monadError(ME: MonadError<M, E>): MonadError<PropertyTPartialOf<M>, E> =
+    object : PropertyTMonadError<M, E> {
+        override fun ME(): MonadError<M, E> = ME
+    }
 
 // Bracket when Rose has an instance

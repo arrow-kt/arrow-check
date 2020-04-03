@@ -2,7 +2,15 @@ package arrow.check.gen.instances
 
 import arrow.Kind
 import arrow.Kind2
-import arrow.check.gen.*
+import arrow.check.gen.ForGenT
+import arrow.check.gen.ForRose
+import arrow.check.gen.GenT
+import arrow.check.gen.GenTPartialOf
+import arrow.check.gen.MonadGen
+import arrow.check.gen.Rose
+import arrow.check.gen.RoseF
+import arrow.check.gen.RosePartialOf
+import arrow.check.gen.fix
 import arrow.core.AndThen
 import arrow.core.FunctionK
 import arrow.mtl.ForOptionT
@@ -33,25 +41,36 @@ interface OptionTMonadGen<M, B> : MonadGen<OptionTPartialOf<M>, OptionTPartialOf
     override fun BM(): Monad<OptionTPartialOf<B>> = OptionT.monad(MG().BM())
     override fun MM(): Monad<OptionTPartialOf<M>> = OptionT.monad(MG().MM())
 
-    override fun <A> GenT<OptionTPartialOf<B>, A>.fromGenT(): Kind<OptionTPartialOf<M>, A> = GenT.monadTransDistributive().run {
-        distributeT(OptionT.monadTrans(), OptionT.mFunctor(), MG().BM(), object : MonadTransDistributive.MonadFromMonadTrans<ForOptionT> {
-            override fun <M> monad(MM: Monad<M>): Monad<Kind<ForOptionT, M>> = OptionT.monad(MM)
-        }).fix().let {
-            OptionT.mFunctor().run {
-                it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
-                    override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> = MG().run { fa.fix().fromGenT() }
-                })
+    override fun <A> GenT<OptionTPartialOf<B>, A>.fromGenT(): Kind<OptionTPartialOf<M>, A> =
+        GenT.monadTransDistributive().run {
+            distributeT(
+                OptionT.monadTrans(),
+                OptionT.mFunctor(),
+                MG().BM(),
+                object : MonadTransDistributive.MonadFromMonadTrans<ForOptionT> {
+                    override fun <M> monad(MM: Monad<M>): Monad<Kind<ForOptionT, M>> = OptionT.monad(MM)
+                }).fix().let {
+                OptionT.mFunctor().run {
+                    it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
+                        override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> =
+                            MG().run { fa.fix().fromGenT() }
+                    })
+                }
             }
         }
-    }
+
     override fun <A> Kind<OptionTPartialOf<M>, A>.toGenT(): GenT<OptionTPartialOf<B>, A> = OptionT.mFunctor().run {
         hoist(MF(), object : FunctionK<M, GenTPartialOf<B>> {
             override fun <A> invoke(fa: Kind<M, A>): Kind<GenTPartialOf<B>, A> = MG().run { fa.toGenT() }
         }).let {
             OptionT.monadTransDistributive().run {
-                it.distributeT(GenT.monadTrans(), GenT.mFunctor(), MG().BM(), object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
-                    override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
-                }).fix()
+                it.distributeT(
+                    GenT.monadTrans(),
+                    GenT.mFunctor(),
+                    MG().BM(),
+                    object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
+                        override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
+                    }).fix()
             }
         }
     }
@@ -150,7 +169,8 @@ interface OptionTMonadTransDistributive : MonadTransDistributive<ForOptionT> {
         }
 }
 
-fun OptionT.Companion.monadTransDistributive(): MonadTransDistributive<ForOptionT> = object : OptionTMonadTransDistributive {}
+fun OptionT.Companion.monadTransDistributive(): MonadTransDistributive<ForOptionT> =
+    object : OptionTMonadTransDistributive {}
 
 // @extension
 interface RoseMonadTransDistributive : MonadTransDistributive<ForRose> {
@@ -200,9 +220,7 @@ interface GenTMonadTransDistributive : MonadTransDistributive<ForGenT> {
                             fa.distributeT(MTF, MFunc, MM, MT)
                         }
                 }).let {
-                it.fix().let {
-
-                }
+                it.fix()
                 Rose.monadTransDistributive().run {
                     it.distributeT(
                         MTF,

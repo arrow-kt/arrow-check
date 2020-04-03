@@ -7,7 +7,7 @@ import arrow.check.pretty.showPretty
 import arrow.check.property.property
 import arrow.check.PropertySpec
 
-class ShrinkingSpec : PropertySpec({
+class ShrinkingTest : PropertySpec({
     "Shrinking"(listOf(
         "Long.shrinkTowards should produce an ordered list of values approaching the target" toT property {
             val (l, target) = forAll {
