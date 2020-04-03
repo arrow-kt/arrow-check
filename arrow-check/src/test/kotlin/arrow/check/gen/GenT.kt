@@ -1,9 +1,18 @@
 package arrow.check.gen
 
 import arrow.Kind
-import arrow.check.gen.instances.*
+import arrow.check.gen.instances.alternative
+import arrow.check.gen.instances.eq
+import arrow.check.gen.instances.monad
+import arrow.check.gen.instances.monadError
+import arrow.check.gen.instances.monadTrans
+import arrow.check.gen.instances.monoid
 import arrow.check.property.Size
-import arrow.core.*
+import arrow.core.Either
+import arrow.core.EitherPartialOf
+import arrow.core.ForId
+import arrow.core.Id
+import arrow.core.Tuple2
 import arrow.core.extensions.either.eqK.eqK
 import arrow.core.extensions.either.monad.monad
 import arrow.core.extensions.either.monadError.monadError
@@ -21,6 +30,7 @@ import arrow.core.test.laws.AlternativeLaws
 import arrow.core.test.laws.MonadErrorLaws
 import arrow.mtl.test.laws.MonadTransLaws
 import arrow.core.test.laws.MonoidLaws
+import arrow.core.toT
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
 import arrow.typeclasses.Monad
