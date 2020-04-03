@@ -2,12 +2,11 @@ package arrow.check.pretty
 
 import arrow.Kind
 import arrow.core.extensions.eq
-import arrow.test.UnitSpec
-import arrow.test.generators.GenK
-import arrow.test.generators.tuple2
-import arrow.test.laws.BirecursiveLaws
-import arrow.test.laws.EqLaws
-import arrow.test.laws.FunctorLaws
+import arrow.core.test.UnitSpec
+import arrow.core.test.generators.GenK
+import arrow.core.test.generators.tuple2
+import arrow.core.test.laws.EqLaws
+import arrow.core.test.laws.FunctorLaws
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
 import io.kotlintest.properties.Gen

@@ -2,8 +2,14 @@ package arrow.check.gen
 
 import arrow.Kind
 import arrow.check.gen.instances.birecursive
-import arrow.core.*
+import arrow.core.Eval
+import arrow.core.SequenceK
+import arrow.core.Tuple2
+import arrow.core.Tuple3
 import arrow.core.extensions.fx
+import arrow.core.k
+import arrow.core.toOption
+import arrow.core.toT
 import arrow.mtl.typeclasses.nest
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Functor
@@ -47,18 +53,26 @@ data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
     /**
      * Parallel shrinking. This breaks monad-applicative consistency laws in GenT because it's used in place of ap there
      */
-    fun <B> zipTree(MA: Applicative<M>, ff: () -> Rose<M, B>): Rose<M, Tuple2<A, B>> = MA.run {
+    fun <B> zipTree(MM: Monad<M>, ff: Eval<Rose<M, B>>): Rose<M, Tuple2<A, B>> = MM.run {
         Rose(
-            this@Rose.runRose.lazyAp {
-                ff().let { ff ->
-                    ff.runRose.map { r ->
-                        { l: RoseF<A, Rose<M, A>> ->
-                            RoseF(
-                                l.res toT r.res,
-                                l.shrunk.k().map { it.zipTree(MA) { ff } } + r.shrunk.map { this@Rose.zipTree(MA) { it } })
+            // For stacksafety. Only works on stacksafe monads
+            unit().flatMap {
+                this@Rose.runRose.apEval(
+                    ff.map { ff ->
+                        ff.runRose.map { r ->
+                            { l: RoseF<A, Rose<M, A>> ->
+                                RoseF(
+                                    l.res toT r.res,
+                                    l.shrunk.k().map {
+                                        it.zipTree(
+                                            MM,
+                                            Eval.now(ff)
+                                        )
+                                    } + r.shrunk.map { this@Rose.zipTree(MM, Eval.now(it)) })
+                            }
                         }
                     }
-                }
+                ).value()
             }
         )
     }

@@ -2,7 +2,11 @@ package arrow.check.pretty
 
 import arrow.Kind
 import arrow.check.property.Markup
-import arrow.core.*
+import arrow.core.ListK
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Tuple2
+import arrow.core.andThen
 import arrow.core.extensions.eq
 import arrow.core.extensions.fx
 import arrow.core.extensions.list.foldable.foldLeft
@@ -11,14 +15,39 @@ import arrow.core.extensions.list.functor.tupleLeft
 import arrow.core.extensions.list.monadFilter.filterMap
 import arrow.core.extensions.listk.eq.eq
 import arrow.core.extensions.tuple2.eq.eq
-import arrow.extension
+import arrow.core.getOrElse
+import arrow.core.identity
+import arrow.core.k
+import arrow.core.none
+import arrow.core.some
+import arrow.core.toMap
+import arrow.core.toOption
+import arrow.core.toT
 import arrow.recursion.typeclasses.Birecursive
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Functor
 import kparsec.runParser
-import pretty.*
-import pretty.symbols.*
+import pretty.Doc
+import pretty.align
+import pretty.alterAnnotations
+import pretty.annotate
+import pretty.column
+import pretty.fill
+import pretty.hardLine
+import pretty.indent
+import pretty.lineBreak
+import pretty.nest
+import pretty.plus
+import pretty.spaced
+import pretty.symbols.comma
+import pretty.symbols.equals
+import pretty.symbols.lBracket
+import pretty.symbols.lParen
+import pretty.symbols.rBracket
+import pretty.symbols.rParen
+import pretty.symbols.space
+import pretty.text
 import kotlin.math.min
 
 class ForValueDiffF private constructor()

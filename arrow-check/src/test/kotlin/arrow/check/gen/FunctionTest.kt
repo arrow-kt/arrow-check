@@ -5,7 +5,10 @@ import arrow.core.extensions.eq
 import arrow.core.toT
 import arrow.typeclasses.Eq
 import arrow.check.PropertySpec
-import arrow.check.property.*
+import arrow.check.property.EarlyTermination
+import arrow.check.property.Property
+import arrow.check.property.PropertyConfig
+import arrow.check.property.property
 
 object FunctionTest {
     fun <A> test(G: Gen<A>, EQA: Eq<A>, AF: Func<A>, AC: Coarbitrary<A>): List<Tuple2<String, Property>> = listOf(

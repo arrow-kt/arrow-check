@@ -1,10 +1,7 @@
 package arrow.check.property
 
-import arrow.core.extensions.semigroup
-import arrow.test.UnitSpec
-import arrow.test.generators.option
-import arrow.test.laws.MonoidLaws
-import arrow.test.laws.SemigroupLaws
+import arrow.core.test.UnitSpec
+import arrow.core.test.laws.SemigroupLaws
 import arrow.typeclasses.Eq
 import io.kotlintest.properties.Gen
 

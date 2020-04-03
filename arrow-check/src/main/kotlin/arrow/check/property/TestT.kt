@@ -5,10 +5,20 @@ import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
-import arrow.core.*
+import arrow.core.Either
+import arrow.core.ForId
+import arrow.core.Id
+import arrow.core.ListK
+import arrow.core.None
+import arrow.core.Tuple2
 import arrow.core.extensions.id.applicative.applicative
 import arrow.core.extensions.id.eq.eq
 import arrow.core.extensions.list.foldable.combineAll
+import arrow.core.left
+import arrow.core.right
+import arrow.core.some
+import arrow.core.toT
+import arrow.core.value
 import arrow.mtl.EitherT
 import arrow.mtl.WriterT
 import arrow.mtl.WriterTPartialOf
@@ -20,7 +30,13 @@ import arrow.typeclasses.Applicative
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Show
-import pretty.*
+import pretty.Doc
+import pretty.annotate
+import pretty.doc
+import pretty.hardLine
+import pretty.nil
+import pretty.plus
+import pretty.text
 
 // ---------------------------- TestT
 typealias Test<A> = TestT<ForId, A>
@@ -36,7 +52,7 @@ typealias TestTPartialOf<M> = arrow.Kind<ForTestT, M>
 inline fun <M, A> TestTOf<M, A>.fix(): TestT<M, A> =
     this as TestT<M, A>
 
-data class TestT<M, A>(val runTestT: EitherT<WriterTPartialOf<M, Log>, Failure, A>) : TestTOf<M, A> {
+data class TestT<M, A>(val runTestT: EitherT<Failure, WriterTPartialOf<Log, M>, A>) : TestTOf<M, A> {
 
     fun <B> map(MM: Monad<M>, f: (A) -> B): TestT<M, B> = TestT(runTestT.map(WriterT.monad(MM, Log.monoid()), f))
 

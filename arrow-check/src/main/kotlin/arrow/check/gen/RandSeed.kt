@@ -11,7 +11,7 @@ import arrow.core.toT
  *
  * Why? Because all other random generators hide the seed in a private field and
  *  I don't want to rely on reflection to get it!
-*/
+ */
 class RandSeed private constructor(
     val seed: Long,
     val gamma: Long // Has to be odd!
@@ -24,11 +24,13 @@ class RandSeed private constructor(
         i >= 1 -> gammaF(i)(this.split().a)
         else -> gammaF(1 - i)(this.split().b)
     }
+
     private fun gammaF(i: Long): (RandSeed) -> RandSeed = {
         ilog2(i).let { k ->
             encode(i, k, zeroes(k, it))
         }
     }
+
     private fun encode(n: Long, k: Int, r: RandSeed): RandSeed = when (k) {
         -1 -> r
         else -> when {
@@ -36,10 +38,12 @@ class RandSeed private constructor(
             else -> encode(n, k - 1, r.split().b)
         }
     }
+
     private fun zeroes(n: Int, r: RandSeed): RandSeed = when (n) {
         0 -> r
         else -> zeroes(n - 1, r.split().a)
     }
+
     private fun ilog2(i: Long): Int = when (i) {
         1L -> 0
         else -> 1 + ilog2(i / 2)
@@ -110,6 +114,7 @@ class RandSeed private constructor(
     fun nextDouble(): Tuple2<Double, RandSeed> = nextSeed(seed, gamma).let {
         mix64(it).ushr(11) * DOUBLE_UNIT toT RandSeed(it, gamma)
     }
+
     fun nextDouble(origin: Double, bound: Double): Tuple2<Double, RandSeed> {
         val (l, s) = nextLong()
         var r = l.ushr(11) * DOUBLE_UNIT
@@ -117,7 +122,7 @@ class RandSeed private constructor(
             r = r * (bound - origin) + origin
             if (r >= bound)
             // correct for rounding
-            r = (bound.toLong() - 1).toDouble()
+                r = (bound.toLong() - 1).toDouble()
             // Not sure if the above is equal to this java code
             // r = java.lang.Double.longBitsToDouble(java.lang.Double.doubleToLongBits(bound) - 1)
         }
@@ -174,8 +179,8 @@ class RandSeed private constructor(
         private fun mixGamma(z: Long): Long {
             val z1 = (z xor z.ushr(33)) * -0xae502812aa7333L // MurmurHash3 mix constants
             val z2 = (z1 xor z1.ushr(33)) * -0x3b314601e57a13adL
-            val z3 = z2 xor z2.ushr(33) or 1L                  // force to be odd
-            val n = bitCount(z3 xor z3.ushr(1))       // ensure enough transitions
+            val z3 = z2 xor z2.ushr(33) or 1L // force to be odd
+            val n = bitCount(z3 xor z3.ushr(1)) // ensure enough transitions
             return if (n < 24) z3 xor -0x5555555555555556L else z3
         }
 

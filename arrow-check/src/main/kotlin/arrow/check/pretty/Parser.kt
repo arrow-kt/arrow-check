@@ -1,16 +1,48 @@
 package arrow.check.pretty
 
-import arrow.core.*
+import arrow.core.ForId
+import arrow.core.Id
+import arrow.core.ListK
+import arrow.core.Tuple2
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.listk.foldable.foldable
-import arrow.extension
+import arrow.core.identity
+import arrow.core.k
+import arrow.core.some
+import arrow.core.toT
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Show
 import arrow.typeclasses.altSum
-import kparsec.*
-import kparsec.string.*
-import pretty.*
-import pretty.symbols.*
+import kparsec.KParsecT
+import kparsec.fix
+import kparsec.runParser
+import kparsec.stream
+import kparsec.string.char
+import kparsec.string.decimal
+import kparsec.string.double
+import kparsec.string.signedDouble
+import kparsec.string.signedLong
+import kparsec.string.space
+import kparsec.takeRemaining
+import pretty.Doc
+import pretty.align
+import pretty.doc
+import pretty.encloseSep
+import pretty.fillBreak
+import pretty.flatAlt
+import pretty.group
+import pretty.lineBreak
+import pretty.nil
+import pretty.plus
+import pretty.softLineBreak
+import pretty.spaced
+import pretty.symbols.comma
+import pretty.symbols.lBracket
+import pretty.symbols.lParen
+import pretty.symbols.rBracket
+import pretty.symbols.rParen
+import pretty.symbols.space
+import pretty.text
 import kotlin.math.min
 
 sealed class KValue {
@@ -32,7 +64,7 @@ sealed class KValue {
             val max = min(10, kv.maxBy { it.a.length }?.a?.length ?: 0)
             name.text() +
                     (kv.map { (k, v) ->
-                        (k.text().fillBreak(max).flatAlt(k.text()) spaced equals() spaced v.doc().align()).align()
+                        (k.text().fillBreak(max).flatAlt(k.text()) spaced pretty.symbols.equals() spaced v.doc().align()).align()
                     }).newLineTupled().align()
         }
         is Cons -> name.text() softLineBreak
@@ -42,7 +74,7 @@ sealed class KValue {
     }
 
     private fun <A> List<Doc<A>>.newLineTupled() =
-    // Special case this because here the highest layout for () is actually (\n\n) and in the worst case that will get chosen
+        // Special case this because here the highest layout for () is actually (\n\n) and in the worst case that will get chosen
         if (isEmpty()) lParen() + rParen()
         else encloseSep(
             lParen() + lineBreak() + (space() + space()).flatAlt(nil()),
@@ -51,7 +83,7 @@ sealed class KValue {
         ).group()
 
     private fun <A> List<Doc<A>>.newLineList() =
-    // Special case this because here the highest layout for [] is actually [\n\n] and in the worst case that will get chosen
+        // Special case this because here the highest layout for [] is actually [\n\n] and in the worst case that will get chosen
         if (isEmpty()) lBracket() + rBracket()
         else encloseSep(
             lBracket() + lineBreak() + (space() + space()).flatAlt(nil()),

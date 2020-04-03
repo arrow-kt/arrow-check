@@ -1,9 +1,9 @@
 package arrow.check.property
 
 import arrow.core.k
-import arrow.test.UnitSpec
-import arrow.test.generators.option
-import arrow.test.laws.MonoidLaws
+import arrow.core.test.UnitSpec
+import arrow.core.test.generators.option
+import arrow.core.test.laws.MonoidLaws
 import arrow.typeclasses.Eq
 import io.kotlintest.properties.Gen
 import pretty.doc

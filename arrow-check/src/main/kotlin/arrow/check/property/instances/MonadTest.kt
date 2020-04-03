@@ -3,8 +3,21 @@ package arrow.check.property.instances
 import arrow.Kind
 import arrow.check.property.MonadTest
 import arrow.check.property.Test
-import arrow.mtl.*
-import arrow.mtl.extensions.*
+import arrow.mtl.EitherT
+import arrow.mtl.EitherTPartialOf
+import arrow.mtl.Kleisli
+import arrow.mtl.KleisliPartialOf
+import arrow.mtl.OptionT
+import arrow.mtl.OptionTPartialOf
+import arrow.mtl.StateT
+import arrow.mtl.StateTPartialOf
+import arrow.mtl.WriterT
+import arrow.mtl.WriterTPartialOf
+import arrow.mtl.extensions.EitherTMonad
+import arrow.mtl.extensions.KleisliMonad
+import arrow.mtl.extensions.OptionTMonad
+import arrow.mtl.extensions.StateTMonad
+import arrow.mtl.extensions.WriterTMonad
 import arrow.mtl.extensions.optiont.monadTrans.liftT
 import arrow.typeclasses.Monad
 import arrow.typeclasses.Monoid
@@ -21,55 +34,58 @@ interface OptionTMonadTest<M> : MonadTest<OptionTPartialOf<M>>, OptionTMonad<M> 
     }
 }
 
-fun <M, L> EitherT.Companion.monadTest(MT: MonadTest<M>): MonadTest<EitherTPartialOf<M, L>> = object : EitherTMonadTest<M, L> {
-    override fun MT(): MonadTest<M> = MT
-}
+fun <L, M> EitherT.Companion.monadTest(MT: MonadTest<M>): MonadTest<EitherTPartialOf<L, M>> =
+    object : EitherTMonadTest<L, M> {
+        override fun MT(): MonadTest<M> = MT
+    }
 
-interface EitherTMonadTest<M, L> : MonadTest<EitherTPartialOf<M, L>>, EitherTMonad<M, L> {
+interface EitherTMonadTest<L, M> : MonadTest<EitherTPartialOf<L, M>>, EitherTMonad<L, M> {
     override fun MF(): Monad<M> = MT()
     fun MT(): MonadTest<M>
-    override fun <A> Test<A>.liftTest(): Kind<EitherTPartialOf<M, L>, A> = MT().run {
+    override fun <A> Test<A>.liftTest(): Kind<EitherTPartialOf<L, M>, A> = MT().run {
         EitherT.liftF(this, liftTest())
     }
 }
 
-fun <M, D> Kleisli.Companion.monadTest(MT: MonadTest<M>): MonadTest<KleisliPartialOf<M, D>> = object : KleisliTMonadTest<M, D> {
-    override fun MT(): MonadTest<M> = MT
-}
+fun <D, M> Kleisli.Companion.monadTest(MT: MonadTest<M>): MonadTest<KleisliPartialOf<D, M>> =
+    object : KleisliTMonadTest<D, M> {
+        override fun MT(): MonadTest<M> = MT
+    }
 
-interface KleisliTMonadTest<M, D> : MonadTest<KleisliPartialOf<M, D>>, KleisliMonad<M, D> {
+interface KleisliTMonadTest<D, M> : MonadTest<KleisliPartialOf<D, M>>, KleisliMonad<D, M> {
     override fun MF(): Monad<M> = MT()
     fun MT(): MonadTest<M>
-    override fun <A> Test<A>.liftTest(): Kind<KleisliPartialOf<M, D>, A> = MT().run {
+    override fun <A> Test<A>.liftTest(): Kind<KleisliPartialOf<D, M>, A> = MT().run {
         Kleisli.liftF(liftTest())
     }
 }
 
-fun <M, W> WriterT.Companion.monadTest(MT: MonadTest<M>, MM: Monoid<W>): MonadTest<WriterTPartialOf<M, W>> = object : WriterTMonadTest<M, W> {
-    override fun MT(): MonadTest<M> = MT
-    override fun MM(): Monoid<W> = MM
-}
+fun <W, M> WriterT.Companion.monadTest(MT: MonadTest<M>, MM: Monoid<W>): MonadTest<WriterTPartialOf<W, M>> =
+    object : WriterTMonadTest<W, M> {
+        override fun MT(): MonadTest<M> = MT
+        override fun MM(): Monoid<W> = MM
+    }
 
-interface WriterTMonadTest<M, W> : MonadTest<WriterTPartialOf<M, W>>, WriterTMonad<M, W> {
+interface WriterTMonadTest<W, M> : MonadTest<WriterTPartialOf<W, M>>, WriterTMonad<W, M> {
     override fun MM(): Monoid<W>
     override fun MF(): Monad<M> = MT()
     fun MT(): MonadTest<M>
 
-    override fun <A> Test<A>.liftTest(): Kind<WriterTPartialOf<M, W>, A> = MT().run {
+    override fun <A> Test<A>.liftTest(): Kind<WriterTPartialOf<W, M>, A> = MT().run {
         WriterT.liftF(liftTest(), MM(), MT())
     }
 }
 
-fun <M, S> StateT.Companion.monadTest(MT: MonadTest<M>): MonadTest<StateTPartialOf<M, S>> = object : StateTMonadTest<M, S> {
-    override fun MT(): MonadTest<M> = MT
-}
+fun <S, M> StateT.Companion.monadTest(MT: MonadTest<M>): MonadTest<StateTPartialOf<S, M>> =
+    object : StateTMonadTest<S, M> {
+        override fun MT(): MonadTest<M> = MT
+    }
 
-interface StateTMonadTest<M, S> : MonadTest<StateTPartialOf<M, S>>, StateTMonad<M, S> {
+interface StateTMonadTest<S, M> : MonadTest<StateTPartialOf<S, M>>, StateTMonad<S, M> {
     override fun MF(): Monad<M> = MT()
     fun MT(): MonadTest<M>
-    override fun <A> Test<A>.liftTest(): Kind<StateTPartialOf<M, S>, A> =
+    override fun <A> Test<A>.liftTest(): Kind<StateTPartialOf<S, M>, A> =
         MT().run {
             StateT.liftF(MT(), liftTest())
         }
-
 }

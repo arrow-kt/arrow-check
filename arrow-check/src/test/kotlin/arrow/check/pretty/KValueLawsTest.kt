@@ -1,7 +1,7 @@
 package arrow.check.pretty
 
-import arrow.test.UnitSpec
-import arrow.test.laws.EqLaws
+import arrow.core.test.UnitSpec
+import arrow.core.test.laws.EqLaws
 import io.kotlintest.properties.Gen
 
 /**
