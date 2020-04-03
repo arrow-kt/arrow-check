@@ -14,8 +14,6 @@ import arrow.check.property.hoist
 import arrow.check.property.monoid
 import arrow.core.AndThen
 import arrow.core.Either
-import arrow.core.Tuple2
-import arrow.core.toT
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.EitherT
@@ -32,7 +30,6 @@ import arrow.mtl.fix
 import arrow.mtl.typeclasses.MonadReader
 import arrow.mtl.typeclasses.MonadState
 import arrow.mtl.typeclasses.MonadTrans
-import arrow.mtl.typeclasses.MonadWriter
 import arrow.mtl.value
 import arrow.syntax.function.andThen
 import arrow.typeclasses.Alternative
