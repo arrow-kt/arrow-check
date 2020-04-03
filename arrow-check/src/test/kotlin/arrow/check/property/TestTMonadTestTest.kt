@@ -9,6 +9,6 @@ import arrow.fx.IO
 import arrow.fx.extensions.io.monad.monad
 
 // TODO when https://github.com/arrow-kt/arrow/pull/1981 is merged
-class TestTTest : PropertySpec({
+class TestTMonadTestTest : PropertySpec({
     "MonadTest laws"(laws(TestT.monadTest(Id.monad()), TestT.genK(IO.monad(), Id.monad(), Id.genK(IO.monad())), TestT.eqK(Id.eqK())))
 })

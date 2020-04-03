@@ -12,17 +12,27 @@ import arrow.check.property.TestTPartialOf
 import arrow.check.property.fix
 import arrow.check.property.hoist
 import arrow.check.property.monoid
+import arrow.core.AndThen
 import arrow.core.Either
+import arrow.core.Tuple2
+import arrow.core.toT
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
 import arrow.mtl.EitherT
 import arrow.mtl.WriterT
 import arrow.mtl.WriterTPartialOf
+import arrow.mtl.extensions.eithert.monad.monad
+import arrow.mtl.extensions.eithert.monadReader.monadReader
 import arrow.mtl.extensions.writert.applicative.applicative
 import arrow.mtl.extensions.writert.functor.functor
 import arrow.mtl.extensions.writert.monad.monad
 import arrow.mtl.extensions.writert.monadError.monadError
+import arrow.mtl.extensions.writert.monadReader.monadReader
+import arrow.mtl.fix
+import arrow.mtl.typeclasses.MonadReader
+import arrow.mtl.typeclasses.MonadState
 import arrow.mtl.typeclasses.MonadTrans
+import arrow.mtl.typeclasses.MonadWriter
 import arrow.mtl.value
 import arrow.syntax.function.andThen
 import arrow.typeclasses.Alternative
@@ -69,13 +79,8 @@ interface TestTMonad<M> : Monad<TestTPartialOf<M>> {
         TestT(fix().runTestT.flatMap(WriterT.monad(MM(), Log.monoid()), f andThen { it.fix().runTestT }))
 
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<TestTPartialOf<M>, Either<A, B>>): Kind<TestTPartialOf<M>, B> =
-        f(a).flatMap {
-            it.fold({
-                tailRecM(it, f)
-            }, {
-                just(it)
-            })
-        }
+        EitherT.monad<Failure, WriterTPartialOf<Log, M>>(WriterT.monad(MM(), Log.monoid()))
+            .tailRecM(a, AndThen(f).andThen { it.fix().runTestT }).let(::TestT)
 }
 
 fun <M> TestT.Companion.monad(MM: Monad<M>): Monad<TestTPartialOf<M>> = object : TestTMonad<M> {
@@ -173,4 +178,35 @@ fun <M, E> TestT.Companion.monadError(ME: MonadError<M, E>): MonadError<TestTPar
         override fun ME(): MonadError<M, E> = ME
     }
 
-// TODO when https://github.com/arrow-kt/arrow/pull/1981 is merged add MonadState etc
+// @extension
+interface TestTMonadReader<M, D> : MonadReader<TestTPartialOf<M>, D>, TestTMonad<M> {
+    override fun MM(): Monad<M> = MD()
+    fun MD(): MonadReader<M, D>
+
+    override fun ask(): Kind<TestTPartialOf<M>, D> = TestT.monadTrans().run { MD().ask().liftT(MD()) }
+
+    override fun <A> Kind<TestTPartialOf<M>, A>.local(f: (D) -> D): Kind<TestTPartialOf<M>, A> =
+        TestT(EitherT.monadReader<Failure, WriterTPartialOf<Log, M>, D>(WriterT.monadReader(MD(), Log.monoid())).run {
+            fix().runTestT.local(f).fix()
+        })
+}
+
+fun <M, D> TestT.Companion.monadReader(MD: MonadReader<M, D>): MonadReader<TestTPartialOf<M>, D> =
+    object : TestTMonadReader<M, D> {
+        override fun MD(): MonadReader<M, D> = MD
+    }
+
+// @extension
+interface TestTMonadState<M, S> : MonadState<TestTPartialOf<M>, S>, TestTMonad<M> {
+    override fun MM(): Monad<M> = MS()
+    fun MS(): MonadState<M, S>
+
+    override fun get(): Kind<TestTPartialOf<M>, S> = TestT.monadTrans().run { MS().get().liftT(MS()) }
+
+    override fun set(s: S): Kind<TestTPartialOf<M>, Unit> = TestT.monadTrans().run { MS().set(s).liftT(MS()) }
+}
+
+fun <M, S> TestT.Companion.monadState(MS: MonadState<M, S>): MonadState<TestTPartialOf<M>, S> =
+    object : TestTMonadState<M, S> {
+        override fun MS(): MonadState<M, S> = MS
+    }
