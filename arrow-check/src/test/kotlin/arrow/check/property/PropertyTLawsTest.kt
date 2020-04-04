@@ -45,13 +45,13 @@ import arrow.typeclasses.EqK
 import arrow.typeclasses.Monad
 import io.kotlintest.properties.Gen
 
-fun <M> PropertyT.Companion.genK(genK: GenK<M>, MM: Monad<M>) : GenK<PropertyTPartialOf<M>> =
+fun <M> PropertyT.Companion.genK(genK: GenK<M>, MM: Monad<M>): GenK<PropertyTPartialOf<M>> =
     object : GenK<PropertyTPartialOf<M>> {
         override fun <A> genK(gen: Gen<A>): Gen<Kind<PropertyTPartialOf<M>, A>> =
             TestT.genK(GenT.genK(genK, MM)).genK(gen).map { PropertyT(it.fix()) }
     }
 
-fun <M> PropertyT.Companion.eqK(eqK: EqK<M>, seedSize: Tuple2<RandSeed, Size>) : EqK<PropertyTPartialOf<M>> =
+fun <M> PropertyT.Companion.eqK(eqK: EqK<M>, seedSize: Tuple2<RandSeed, Size>): EqK<PropertyTPartialOf<M>> =
     object : EqK<PropertyTPartialOf<M>> {
         override fun <A> Kind<PropertyTPartialOf<M>, A>.eqK(other: Kind<PropertyTPartialOf<M>, A>, EQ: Eq<A>): Boolean =
             TestT.eqK(GenT.eqK(eqK, seedSize)).liftEq(EQ).run { fix().unPropertyT.eqv(other.fix().unPropertyT) }
@@ -70,7 +70,10 @@ class PropertyTLawsTest : UnitSpec() {
             ),
             MonadStateLaws.laws(
                 PropertyT.monadState<StateTPartialOf<Int, ForId>, Int>(StateT.monadState(Id.monad())),
-                PropertyT.genK<StateTPartialOf<Int, ForId>>(StateT.genK(Id.genK(), Gen.int()), StateT.monad(Id.monad())),
+                PropertyT.genK<StateTPartialOf<Int, ForId>>(
+                    StateT.genK(Id.genK(), Gen.int()),
+                    StateT.monad(Id.monad())
+                ),
                 Gen.int(),
                 PropertyT.eqK(StateT.eqK(Id.eqK(), Int.eq(), 1), zeroSeed),
                 Int.eq()
