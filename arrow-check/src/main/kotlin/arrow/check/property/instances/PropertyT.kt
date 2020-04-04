@@ -6,6 +6,7 @@ import arrow.check.gen.GenT
 import arrow.check.gen.instances.alternative
 import arrow.check.gen.instances.monad
 import arrow.check.gen.instances.monadError
+import arrow.check.gen.instances.monadReader
 import arrow.check.gen.instances.monadTrans
 import arrow.check.property.ForPropertyT
 import arrow.check.property.MonadTest
@@ -16,9 +17,12 @@ import arrow.check.property.TestT
 import arrow.check.property.discard
 import arrow.check.property.fix
 import arrow.check.property.hoist
+import arrow.core.AndThen
 import arrow.core.Either
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
+import arrow.mtl.typeclasses.MonadReader
+import arrow.mtl.typeclasses.MonadState
 import arrow.mtl.typeclasses.MonadTrans
 import arrow.typeclasses.Alternative
 import arrow.typeclasses.Applicative
@@ -74,7 +78,7 @@ interface PropertyTMonad<M> : Monad<PropertyTPartialOf<M>> {
         a: A,
         f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
     ): Kind<PropertyTPartialOf<M>, B> =
-        f(a).flatMap { it.fold({ tailRecM(it, f) }, { just(it) }) }
+        PropertyT(TestT.monad(GenT.monad(MM())).tailRecM(a, AndThen(f).andThen { it.fix().unPropertyT }).fix())
 }
 
 fun <M> PropertyT.Companion.monad(MM: Monad<M>): Monad<PropertyTPartialOf<M>> = object : PropertyTMonad<M> {
@@ -167,6 +171,37 @@ interface PropertyTMonadError<M, E> : MonadError<PropertyTPartialOf<M>, E>, Prop
 fun <M, E> PropertyT.Companion.monadError(ME: MonadError<M, E>): MonadError<PropertyTPartialOf<M>, E> =
     object : PropertyTMonadError<M, E> {
         override fun ME(): MonadError<M, E> = ME
+    }
+
+// @extension
+interface PropertyTMonadReader<M, D> : MonadReader<PropertyTPartialOf<M>, D>, PropertyTMonad<M> {
+    override fun MM(): Monad<M> = MD()
+    fun MD(): MonadReader<M, D>
+
+    override fun ask(): Kind<PropertyTPartialOf<M>, D> = PropertyT.monadTrans().run { MD().ask().liftT(MD()) }
+
+    override fun <A> Kind<PropertyTPartialOf<M>, A>.local(f: (D) -> D): Kind<PropertyTPartialOf<M>, A> =
+        PropertyT(TestT.monadReader(GenT.monadReader(MD())).run { fix().unPropertyT.local(f) }.fix())
+}
+
+fun <M, D> PropertyT.Companion.monadReader(MD: MonadReader<M, D>): MonadReader<PropertyTPartialOf<M>, D> =
+    object : PropertyTMonadReader<M, D> {
+        override fun MD(): MonadReader<M, D> = MD
+    }
+
+// @extension
+interface PropertyTMonadState<M, S> : MonadState<PropertyTPartialOf<M>, S>, PropertyTMonad<M> {
+    override fun MM(): Monad<M> = MS()
+    fun MS(): MonadState<M, S>
+
+    override fun get(): Kind<PropertyTPartialOf<M>, S> = PropertyT.monadTrans().run { MS().get().liftT(MS()) }
+
+    override fun set(s: S): Kind<PropertyTPartialOf<M>, Unit> = PropertyT.monadTrans().run { MS().set(s).liftT(MS()) }
+}
+
+fun <M, S> PropertyT.Companion.monadState(MS: MonadState<M, S>): MonadState<PropertyTPartialOf<M>, S> =
+    object : PropertyTMonadState<M, S> {
+        override fun MS(): MonadState<M, S> = MS
     }
 
 // Bracket when Rose has an instance
