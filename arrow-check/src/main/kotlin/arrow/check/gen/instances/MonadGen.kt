@@ -12,19 +12,43 @@ import arrow.check.gen.RoseF
 import arrow.check.gen.RosePartialOf
 import arrow.check.gen.fix
 import arrow.core.AndThen
+import arrow.core.Either
 import arrow.core.FunctionK
+import arrow.mtl.EitherT
+import arrow.mtl.EitherTPartialOf
+import arrow.mtl.ForEitherT
+import arrow.mtl.ForKleisli
 import arrow.mtl.ForOptionT
+import arrow.mtl.ForStateT
+import arrow.mtl.ForWriterT
+import arrow.mtl.Kleisli
+import arrow.mtl.KleisliPartialOf
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
+import arrow.mtl.StateT
+import arrow.mtl.StateTPartialOf
+import arrow.mtl.WriterT
+import arrow.mtl.WriterTPartialOf
+import arrow.mtl.extensions.EitherTMonad
+import arrow.mtl.extensions.KleisliMonad
 import arrow.mtl.extensions.OptionTMonad
-import arrow.mtl.extensions.optiont.alternative.alternative
+import arrow.mtl.extensions.StateTMonad
+import arrow.mtl.extensions.eithert.monad.monad
+import arrow.mtl.extensions.eithert.monadTrans.monadTrans
+import arrow.mtl.extensions.kleisli.monad.monad
+import arrow.mtl.extensions.kleisli.monadTrans.monadTrans
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.extensions.optiont.monadTrans.monadTrans
+import arrow.mtl.extensions.statet.monad.monad
+import arrow.mtl.extensions.statet.monadTrans.monadTrans
+import arrow.mtl.extensions.writert.monad.monad
+import arrow.mtl.extensions.writert.monadTrans.monadTrans
 import arrow.mtl.fix
 import arrow.mtl.typeclasses.MonadTrans
 import arrow.typeclasses.Monad
+import arrow.typeclasses.Monoid
 
-// Pray for arrow meta to do those instance lookups in the future // this is a 4-5 lines per instance in haskell^^
+// Pray for arrow meta to do those instance lookups in the future // this is 4-5 lines per instance in haskell^^
 
 /**
  * Try doing this for a monad without all these helpers^^ As verbose as it is, this is actually quite the nice solution.
@@ -74,13 +98,217 @@ interface OptionTMonadGen<M, B> : MonadGen<OptionTPartialOf<M>, OptionTPartialOf
             }
         }
     }
-
-    override fun <A> empty(): Kind<OptionTPartialOf<M>, A> = OptionT.alternative(MF()).empty()
-    override fun <A> Kind<OptionTPartialOf<M>, A>.orElse(b: Kind<OptionTPartialOf<M>, A>): Kind<OptionTPartialOf<M>, A> =
-        OptionT.alternative(MF()).run { fix().orElse(b) }
 }
 
-// TODO StateT etc as soon as they have MonadTrans instances!
+fun <L, M, B> EitherT.Companion.monadGen(MG: MonadGen<M, B>): MonadGen<EitherTPartialOf<L, M>, EitherTPartialOf<L, B>> =
+    object : EitherTMonadGen<L, M, B> {
+        override fun MG(): MonadGen<M, B> = MG
+    }
+
+interface EitherTMonadGen<L, M, B> : MonadGen<EitherTPartialOf<L, M>, EitherTPartialOf<L, B>>, EitherTMonad<L, M> {
+    fun MG(): MonadGen<M, B>
+
+    override fun MF(): Monad<M> = MG().MM()
+    override fun BM(): Monad<EitherTPartialOf<L, B>> = EitherT.monad(MG().BM())
+    override fun MM(): Monad<EitherTPartialOf<L, M>> = EitherT.monad(MG().MM())
+
+    override fun <A> GenT<EitherTPartialOf<L, B>, A>.fromGenT(): Kind<EitherTPartialOf<L, M>, A> =
+        GenT.monadTransDistributive().run {
+            distributeT(
+                EitherT.monadTrans(),
+                EitherT.mFunctor(),
+                MG().BM(),
+                object : MonadTransDistributive.MonadFromMonadTrans<Kind<ForEitherT, L>> {
+                    override fun <M> monad(MM: Monad<M>): Monad<Kind<Kind<ForEitherT, L>, M>> = EitherT.monad(MM)
+                }
+            ).fix().let {
+                EitherT.mFunctor<L>().run {
+                    it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
+                        override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> =
+                            MG().run { fa.fix().fromGenT() }
+                    })
+                }
+            }
+        }
+
+    override fun <A> Kind<EitherTPartialOf<L, M>, A>.toGenT(): GenT<EitherTPartialOf<L, B>, A> = EitherT.mFunctor<L>().run {
+        hoist(MF(), object : FunctionK<M, GenTPartialOf<B>> {
+            override fun <A> invoke(fa: Kind<M, A>): Kind<GenTPartialOf<B>, A> = MG().run { fa.toGenT() }
+        }).let {
+            EitherT.monadTransDistributive<L>().run {
+                it.distributeT(
+                    GenT.monadTrans(),
+                    GenT.mFunctor(),
+                    MG().BM(),
+                    object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
+                        override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
+                    }
+                ).fix()
+            }
+        }
+    }
+}
+
+fun <W, M, B> WriterT.Companion.monadGen(MG: MonadGen<M, B>, MW: Monoid<W>): MonadGen<WriterTPartialOf<W, M>, WriterTPartialOf<W, B>> =
+    object : WriterTMonadGen<W, M, B> {
+        override fun MG(): MonadGen<M, B> = MG
+        override fun MW(): Monoid<W> = MW
+    }
+
+interface WriterTMonadGen<W, M, B> : MonadGen<WriterTPartialOf<W, M>, WriterTPartialOf<W, B>> {
+    fun MG(): MonadGen<M, B>
+    fun MW(): Monoid<W>
+
+    override fun BM(): Monad<WriterTPartialOf<W, B>> = WriterT.monad(MG().BM(), MW())
+    override fun MM(): Monad<WriterTPartialOf<W, M>> = WriterT.monad(MG().MM(), MW())
+
+    override fun <A> GenT<WriterTPartialOf<W, B>, A>.fromGenT(): Kind<WriterTPartialOf<W, M>, A> =
+        GenT.monadTransDistributive().run {
+            distributeT(
+                WriterT.monadTrans(MW()),
+                WriterT.mFunctor(),
+                MG().BM(),
+                object : MonadTransDistributive.MonadFromMonadTrans<Kind<ForWriterT, W>> {
+                    override fun <M> monad(MM: Monad<M>): Monad<Kind<Kind<ForWriterT, W>, M>> = WriterT.monad(MM, MW())
+                }
+            ).fix().let {
+                WriterT.mFunctor<W>().run {
+                    it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
+                        override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> =
+                            MG().run { fa.fix().fromGenT() }
+                    })
+                }
+            }
+        }
+
+    override fun <A> Kind<WriterTPartialOf<W, M>, A>.toGenT(): GenT<WriterTPartialOf<W, B>, A> =
+        WriterT.mFunctor<W>().run {
+            hoist(MG().MM(), object : FunctionK<M, GenTPartialOf<B>> {
+                override fun <A> invoke(fa: Kind<M, A>): Kind<GenTPartialOf<B>, A> = MG().run { fa.toGenT() }
+            })
+        }.let {
+            WriterT.monadTransDistributive(MW()).run {
+                it.distributeT(
+                    GenT.monadTrans(),
+                    GenT.mFunctor(),
+                    MG().BM(),
+                    object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
+                        override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
+                    }
+                ).fix()
+            }
+        }
+
+    override fun <A, B> Kind<WriterTPartialOf<W, M>, A>.flatMap(f: (A) -> Kind<WriterTPartialOf<W, M>, B>): Kind<WriterTPartialOf<W, M>, B> =
+        fix().flatMap(MG().MM(), MW(), f)
+
+    override fun <A> just(a: A): Kind<WriterTPartialOf<W, M>, A> = WriterT.just(MG().MM(), MW(), a)
+
+    override fun <A, B> tailRecM(
+        a: A,
+        f: (A) -> Kind<WriterTPartialOf<W, M>, Either<A, B>>
+    ): Kind<WriterTPartialOf<W, M>, B> = WriterT.tailRecM(MG().MM(), a, f)
+}
+
+fun <D, M, B> Kleisli.Companion.monadGen(MG: MonadGen<M, B>): MonadGen<KleisliPartialOf<D, M>, KleisliPartialOf<D, B>> =
+    object : KleisliMonadGen<D, M, B> {
+        override fun MG(): MonadGen<M, B> = MG
+    }
+
+interface KleisliMonadGen<D, M, B> : MonadGen<KleisliPartialOf<D, M>, KleisliPartialOf<D, B>>, KleisliMonad<D, M> {
+    fun MG(): MonadGen<M, B>
+
+    override fun MF(): Monad<M> = MG().MM()
+    override fun BM(): Monad<KleisliPartialOf<D, B>> = Kleisli.monad(MG().BM())
+    override fun MM(): Monad<KleisliPartialOf<D, M>> = Kleisli.monad(MG().MM())
+
+    override fun <A> GenT<KleisliPartialOf<D, B>, A>.fromGenT(): Kind<KleisliPartialOf<D, M>, A> =
+        GenT.monadTransDistributive().run {
+            distributeT(
+                Kleisli.monadTrans(),
+                Kleisli.mFunctor(),
+                MG().BM(),
+                object : MonadTransDistributive.MonadFromMonadTrans<Kind<ForKleisli, D>> {
+                    override fun <M> monad(MM: Monad<M>): Monad<Kind<Kind<ForKleisli, D>, M>> = Kleisli.monad(MM)
+                }
+            ).let {
+                Kleisli.mFunctor<D>().run {
+                    it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
+                        override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> =
+                            MG().run { fa.fix().fromGenT() }
+                    })
+                }
+            }
+        }
+
+    override fun <A> Kind<KleisliPartialOf<D, M>, A>.toGenT(): GenT<KleisliPartialOf<D, B>, A> =
+        Kleisli.mFunctor<D>().run {
+            hoist(MG().MM(), object : FunctionK<M, GenTPartialOf<B>> {
+                override fun <A> invoke(fa: Kind<M, A>): Kind<GenTPartialOf<B>, A> = MG().run { fa.toGenT() }
+            })
+        }.let {
+            Kleisli.monadTransDistributive<D>().run {
+                it.distributeT(
+                    GenT.monadTrans(),
+                    GenT.mFunctor(),
+                    MG().BM(),
+                    object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
+                        override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
+                    }
+                ).fix()
+            }
+        }
+}
+
+fun <S, M, B> StateT.Companion.monadBase(MG: MonadGen<M, B>): MonadGen<StateTPartialOf<S, M>, StateTPartialOf<S, B>> =
+    object : StateTMonadGen<S, M, B> {
+        override fun MG(): MonadGen<M, B> = MG
+    }
+
+interface StateTMonadGen<S, M, B> : MonadGen<StateTPartialOf<S, M>, StateTPartialOf<S, B>>, StateTMonad<S, M> {
+    fun MG(): MonadGen<M, B>
+
+    override fun MF(): Monad<M> = MG().MM()
+    override fun BM(): Monad<StateTPartialOf<S, B>> = StateT.monad(MG().BM())
+    override fun MM(): Monad<StateTPartialOf<S, M>> = StateT.monad(MG().MM())
+
+    override fun <A> GenT<StateTPartialOf<S, B>, A>.fromGenT(): Kind<StateTPartialOf<S, M>, A> =
+        GenT.monadTransDistributive().run {
+            distributeT(
+                StateT.monadTrans(),
+                StateT.mFunctor(),
+                MG().BM(),
+                object : MonadTransDistributive.MonadFromMonadTrans<Kind<ForStateT, S>> {
+                    override fun <M> monad(MM: Monad<M>): Monad<Kind<Kind<ForStateT, S>, M>> = StateT.monad(MM)
+                }
+            ).let {
+                StateT.mFunctor<S>().run {
+                    it.hoist(GenT.monad(MG().BM()), object : FunctionK<GenTPartialOf<B>, M> {
+                        override fun <A> invoke(fa: Kind<GenTPartialOf<B>, A>): Kind<M, A> =
+                            MG().run { fa.fix().fromGenT() }
+                    })
+                }
+            }
+        }
+
+    override fun <A> Kind<StateTPartialOf<S, M>, A>.toGenT(): GenT<StateTPartialOf<S, B>, A> =
+        StateT.mFunctor<S>().run {
+            hoist(MG().MM(), object : FunctionK<M, GenTPartialOf<B>> {
+                override fun <A> invoke(fa: Kind<M, A>): Kind<GenTPartialOf<B>, A> = MG().run { fa.toGenT() }
+            })
+        }.let {
+            StateT.monadTransDistributive<S>().run {
+                it.distributeT(
+                    GenT.monadTrans(),
+                    GenT.mFunctor(),
+                    MG().BM(),
+                    object : MonadTransDistributive.MonadFromMonadTrans<ForGenT> {
+                        override fun <M> monad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
+                    }
+                ).fix()
+            }
+        }
+}
 
 // --------------------------- Utilities for implementing MonadGen which is by no means trivial
 /**
@@ -99,6 +327,46 @@ interface OptionTMFunctor : MFunctor<ForOptionT> {
 }
 
 fun OptionT.Companion.mFunctor(): MFunctor<ForOptionT> = object : OptionTMFunctor {}
+
+// @extension
+interface KleisliMFunctor<D> : MFunctor<Kind<ForKleisli, D>> {
+    override fun <M, N, A> Kind2<Kind<ForKleisli, D>, M, A>.hoist(
+        MM: Monad<M>,
+        f: FunctionK<M, N>
+    ): Kind2<Kind<ForKleisli, D>, N, A> = Kleisli(AndThen(fix().run).andThen { f(it) })
+}
+
+fun <D> Kleisli.Companion.mFunctor(): MFunctor<Kind<ForKleisli, D>> = object : KleisliMFunctor<D> {}
+
+// @extension
+interface EitherTMFunctor<L> : MFunctor<Kind<ForEitherT, L>> {
+    override fun <M, N, A> Kind2<Kind<ForEitherT, L>, M, A>.hoist(
+        MM: Monad<M>,
+        f: FunctionK<M, N>
+    ): Kind2<Kind<ForEitherT, L>, N, A> = EitherT(f(fix().value()))
+}
+
+fun <L> EitherT.Companion.mFunctor(): MFunctor<Kind<ForEitherT, L>> = object : EitherTMFunctor<L> {}
+
+// @extension
+interface StateTMFunctor<S> : MFunctor<Kind<ForStateT, S>> {
+    override fun <M, N, A> Kind2<Kind<ForStateT, S>, M, A>.hoist(
+        MM: Monad<M>,
+        f: FunctionK<M, N>
+    ): Kind2<Kind<ForStateT, S>, N, A> = StateT(AndThen(fix().runF).andThen { f(it) })
+}
+
+fun <S> StateT.Companion.mFunctor(): MFunctor<Kind<ForStateT, S>> = object : StateTMFunctor<S> {}
+
+// @extension
+interface WriterTMFunctor<W> : MFunctor<Kind<ForWriterT, W>> {
+    override fun <M, N, A> Kind2<Kind<ForWriterT, W>, M, A>.hoist(
+        MM: Monad<M>,
+        f: FunctionK<M, N>
+    ): Kind2<Kind<ForWriterT, W>, N, A> = WriterT(f(fix().value()))
+}
+
+fun <W> WriterT.Companion.mFunctor(): MFunctor<Kind<ForWriterT, W>> = object : WriterTMFunctor<W> {}
 
 // @extension
 interface RoseMFunctor : MFunctor<ForRose> {
@@ -122,8 +390,6 @@ interface GenTMFunctor : MFunctor<ForGenT> {
 }
 
 fun GenT.Companion.mFunctor(): MFunctor<ForGenT> = object : GenTMFunctor {}
-
-// TODO add MFunctor instances for EitherT, WriterT, StateT, Kleisli, TestT, GenT as soon as the argument reorder is in
 
 /**
  * Distribute a monad transformer through another monad.
@@ -171,6 +437,105 @@ interface OptionTMonadTransDistributive : MonadTransDistributive<ForOptionT> {
 
 fun OptionT.Companion.monadTransDistributive(): MonadTransDistributive<ForOptionT> =
     object : OptionTMonadTransDistributive {}
+
+// @extension
+interface EitherTMonadTransDistributive<L> : MonadTransDistributive<Kind<ForEitherT, L>> {
+    override fun <F, M, A> Kind2<Kind<ForEitherT, L>, Kind<F, M>, A>.distributeT(
+        MTF: MonadTrans<F>,
+        MFunc: MFunctor<F>,
+        MM: Monad<M>,
+        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+    ): Kind2<F, Kind<Kind<ForEitherT, L>, M>, A> =
+        MFunc.run {
+            fix().value().hoist(MM, object : FunctionK<M, EitherTPartialOf<L, M>> {
+                override fun <A> invoke(fa: Kind<M, A>): Kind<EitherTPartialOf<L, M>, A> =
+                    EitherT.monadTrans<L>().run { fa.liftT(MM) }
+            }).let {
+                MT.monad(EitherT.monad<L, M>(MM)).run {
+                    it.flatMap { MTF.run { EitherT(MM.just(it)).liftT(EitherT.monad<L, M>(MM)) } }
+                }
+            }
+        }
+}
+
+fun <L> EitherT.Companion.monadTransDistributive(): MonadTransDistributive<Kind<ForEitherT, L>> =
+    object : EitherTMonadTransDistributive<L> {}
+
+// @extension
+interface WriterTMonadTransDistributive<W> : MonadTransDistributive<Kind<ForWriterT, W>> {
+    fun MW(): Monoid<W>
+
+    override fun <F, M, A> Kind2<Kind<ForWriterT, W>, Kind<F, M>, A>.distributeT(
+        MTF: MonadTrans<F>,
+        MFunc: MFunctor<F>,
+        MM: Monad<M>,
+        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+    ): Kind2<F, Kind<Kind<ForWriterT, W>, M>, A> =
+        MFunc.run {
+            fix().value().hoist(MM, object : FunctionK<M, WriterTPartialOf<W, M>> {
+                override fun <A> invoke(fa: Kind<M, A>): Kind<WriterTPartialOf<W, M>, A> =
+                    WriterT.monadTrans(MW()).run { fa.liftT(MM) }
+            }).let {
+                MT.monad(WriterT.monad(MM, MW())).run {
+                    it.flatMap { MTF.run { WriterT(MM.just(it)).liftT(WriterT.monad(MM, MW())) } }
+                }
+            }
+        }
+}
+
+fun <W> WriterT.Companion.monadTransDistributive(MW: Monoid<W>): MonadTransDistributive<Kind<ForWriterT, W>> =
+    object : WriterTMonadTransDistributive<W> {
+        override fun MW(): Monoid<W> = MW
+    }
+
+// @extension
+interface KleisliMonadTransDistributive<D> : MonadTransDistributive<Kind<ForKleisli, D>> {
+    override fun <F, M, A> Kind2<Kind<ForKleisli, D>, Kind<F, M>, A>.distributeT(
+        MTF: MonadTrans<F>,
+        MFunc: MFunctor<F>,
+        MM: Monad<M>,
+        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+    ): Kind2<F, Kind<Kind<ForKleisli, D>, M>, A> =
+        Kleisli(AndThen(fix().run).andThen {
+            MFunc.run {
+                it.hoist(MM, object : FunctionK<M, KleisliPartialOf<D, M>> {
+                    override fun <A> invoke(fa: Kind<M, A>): Kind<KleisliPartialOf<D, M>, A> =
+                        Kleisli.monadTrans<D>().run { fa.liftT(MM) }
+                }).let { MM.just(it) }
+            }
+        }).let {
+            MT.monad(Kleisli.monad<D, M>(MM)).run {
+                MTF.run { it.liftT(Kleisli.monad<D, M>(MM)) }.flatten()
+            }
+        }
+}
+
+fun <D> Kleisli.Companion.monadTransDistributive(): MonadTransDistributive<Kind<ForKleisli, D>> =
+    object : KleisliMonadTransDistributive<D> {}
+
+// @extension
+interface StateTMonadTransDistributive<S> : MonadTransDistributive<Kind<ForStateT, S>> {
+    override fun <F, M, A> Kind2<Kind<ForStateT, S>, Kind<F, M>, A>.distributeT(
+        MTF: MonadTrans<F>,
+        MFunc: MFunctor<F>,
+        MM: Monad<M>,
+        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+    ): Kind2<F, Kind<Kind<ForStateT, S>, M>, A> = MT.monad(StateT.monad<S, M>(MM)).fx.monad {
+        val s = MTF.run { StateT.get<S, M>(MM).liftT(StateT.monad<S, M>(MM)) }.bind()
+
+        val (sNew, a) = MFunc.run { fix().runF(s).hoist(MM, object : FunctionK<M, StateTPartialOf<S, M>> {
+            override fun <A> invoke(fa: Kind<M, A>): Kind<StateTPartialOf<S, M>, A> =
+                StateT.monadTrans<S>().run { fa.liftT(MM) }
+        }) }.bind()
+
+        MTF.run { StateT.set(MM, sNew).liftT(StateT.monad<S, M>(MM)) }.bind()
+
+        a
+    }
+}
+
+fun <S> StateT.Companion.monadTransDistributive(): MonadTransDistributive<Kind<ForStateT, S>> =
+    object : StateTMonadTransDistributive<S> {}
 
 // @extension
 interface RoseMonadTransDistributive : MonadTransDistributive<ForRose> {

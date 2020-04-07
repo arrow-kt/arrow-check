@@ -132,12 +132,6 @@ fun <M> GenT.Companion.monadGen(MM: Monad<M>): MonadGen<GenTPartialOf<M>, M> = o
     override fun <A> just(a: A): Kind<GenTPartialOf<M>, A> = MM().just(a)
     override fun <A, B> tailRecM(a: A, f: (A) -> Kind<GenTPartialOf<M>, Either<A, B>>): Kind<GenTPartialOf<M>, B> =
         MM().tailRecM(a, f)
-
-    override fun <A> empty(): Kind<GenTPartialOf<M>, A> = GenT.alternative(BM()).empty()
-    override fun <A> Kind<GenTPartialOf<M>, A>.orElse(b: Kind<GenTPartialOf<M>, A>): Kind<GenTPartialOf<M>, A> =
-        GenT.alternative(BM()).run {
-            orElse(b.fix())
-        }
 }
 
 // for convenience and to not throw on non-arrow users
@@ -161,12 +155,6 @@ fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object : 
         f: (A) -> Kind<GenTPartialOf<ForId>, Either<A, B>>
     ): Kind<GenTPartialOf<ForId>, B> =
         MM().tailRecM(a, f)
-
-    override fun <A> empty(): Kind<GenTPartialOf<ForId>, A> = GenT.alternative(BM()).empty()
-    override fun <A> Kind<GenTPartialOf<ForId>, A>.orElse(b: Kind<GenTPartialOf<ForId>, A>): Kind<GenTPartialOf<ForId>, A> =
-        GenT.alternative(BM()).run {
-            orElse(b.fix())
-        }
 }
 
 fun <M, A> GenT.Companion.monadGen(MM: Monad<M>, f: MonadGen<GenTPartialOf<M>, M>.() -> GenTOf<M, A>): GenT<M, A> =
@@ -193,6 +181,10 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
     fun BM(): Monad<B>
 
     fun optionTM() = OptionT.monad(BM())
+
+    override fun <A> empty(): Kind<M, A> = GenT.alternative(BM()).empty<A>().fix().fromGenT()
+    override fun <A> Kind<M, A>.orElse(b: Kind<M, A>): Kind<M, A> =
+        GenT.alternative(BM()).run { toGenT().orElse(b.toGenT()) }.fix().fromGenT()
 
     fun <A> GenT<B, A>.fromGenT(): Kind<M, A>
     fun <A> Kind<M, A>.toGenT(): GenT<B, A>
