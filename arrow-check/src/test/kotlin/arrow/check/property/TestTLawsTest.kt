@@ -1,6 +1,7 @@
 package arrow.check.property
 
 import arrow.Kind
+import arrow.check.laws.eqK
 import arrow.check.property.instances.alternative
 import arrow.check.property.instances.monadError
 import arrow.check.property.instances.monadReader

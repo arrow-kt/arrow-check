@@ -5,6 +5,7 @@ import arrow.check.gen.GenT
 import arrow.check.gen.RandSeed
 import arrow.check.gen.eqK
 import arrow.check.gen.genK
+import arrow.check.laws.eqK
 import arrow.check.property.instances.alternative
 import arrow.check.property.instances.monadError
 import arrow.check.property.instances.monadReader

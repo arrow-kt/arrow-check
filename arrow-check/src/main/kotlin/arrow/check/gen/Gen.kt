@@ -12,8 +12,6 @@ import arrow.check.property.Size
 import arrow.core.AndThen
 import arrow.core.Const
 import arrow.core.Either
-import arrow.core.Either.Left
-import arrow.core.Either.Right
 import arrow.core.Eval
 import arrow.core.ForId
 import arrow.core.FunctionK
@@ -194,25 +192,25 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
     fun MM(): Monad<M>
     fun BM(): Monad<B>
 
-    fun roseM() = OptionT.monad(BM())
+    fun optionTM() = OptionT.monad(BM())
 
     fun <A> GenT<B, A>.fromGenT(): Kind<M, A>
     fun <A> Kind<M, A>.toGenT(): GenT<B, A>
 
     // generate values without shrinking
     fun <A> generate(f: (RandSeed, Size) -> A): Kind<M, A> = GenT { (r, s) ->
-        Rose.just(roseM(), f(r, s))
+        Rose.just(optionTM(), f(r, s))
     }.fromGenT()
 
     // ------------ shrinking
     // add shrinking capabilities, retaining existing shrinks
     fun <A> Kind<M, A>.shrink(f: (A) -> Sequence<A>): Kind<M, A> = GenT { (r, s) ->
-        toGenT().runGen(r toT s).expand(roseM(), f)
+        toGenT().runGen(r toT s).expand(optionTM(), f)
     }.fromGenT()
 
     // throw away shrinking results
     fun <A> Kind<M, A>.prune(): Kind<M, A> = GenT { (r, s) ->
-        toGenT().runGen(r toT s).prune(roseM(), 0)
+        toGenT().runGen(r toT s).prune(optionTM(), 0)
     }.fromGenT()
 
     // ----------- Size
@@ -451,7 +449,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
                 }.fromGenT().replicateSafe(this@run, n)
             }.toGenT().mapTree { r ->
                 Rose(
-                    roseM().run {
+                    optionTM().run {
                         r.runRose.flatMap {
                             it.res
                                 .traverse(OptionT.monad(BM())) { it.runRose }
@@ -578,7 +576,7 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
     // subterms
     fun <A> Kind<M, A>.freeze(): Kind<M, Tuple2<A, Kind<M, A>>> =
         GenT { (r, s) ->
-            Rose.monad(roseM()).fx.monad {
+            Rose.monad(optionTM()).fx.monad {
                 val mx = !OptionT.monadTrans().run { toGenT().runGen(r toT s).runRose.fix().value().liftT(BM()) }.let {
                     Rose.monadTrans().run { it.liftT(OptionT.monad(BM())) }
                 }

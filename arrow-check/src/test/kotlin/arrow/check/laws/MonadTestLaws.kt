@@ -1,4 +1,4 @@
-package arrow.check.property
+package arrow.check.laws
 
 import arrow.Kind
 import arrow.check.UseColor
@@ -9,7 +9,20 @@ import arrow.check.gen.func
 import arrow.check.gen.generalize
 import arrow.check.gen.monadGen
 import arrow.check.gen.toFunction
+import arrow.check.property.Failure
+import arrow.check.property.ForTestT
+import arrow.check.property.JournalEntry
+import arrow.check.property.Label
+import arrow.check.property.LabelTable
+import arrow.check.property.Log
+import arrow.check.property.MonadTest
+import arrow.check.property.Property
+import arrow.check.property.TestT
+import arrow.check.property.TestTPartialOf
+import arrow.check.property.fix
 import arrow.check.property.instances.monad
+import arrow.check.property.monoid
+import arrow.check.property.property
 import arrow.check.render
 import arrow.core.ForId
 import arrow.core.Id
@@ -24,7 +37,6 @@ import arrow.core.k
 import arrow.core.left
 import arrow.core.right
 import arrow.core.toT
-import arrow.fx.IOPartialOf
 import arrow.mtl.EitherT
 import arrow.mtl.EitherTPartialOf
 import arrow.mtl.WriterT
@@ -76,7 +88,8 @@ fun <M, F, W> WriterT.Companion.genK(
             }
     }
 
-fun <M> Id.Companion.genK(MM: Monad<M>): GenK<M, ForId> = object : GenK<M, ForId> {
+fun <M> Id.Companion.genK(MM: Monad<M>): GenK<M, ForId> = object :
+    GenK<M, ForId> {
     override fun <A> genK(genA: GenT<M, A>): GenT<M, Kind<ForId, A>> = GenT.monadGen(MM) {
         genA.fromGenT().map(::Id)
     }
@@ -86,7 +99,11 @@ fun <M> Log.Companion.gen(MM: Monad<M>): GenT<M, Log> = GenT.monadGen(MM) {
     just(Log(emptyList()))
 }
 
-fun failureGen(): Gen<Failure> = Gen.monadGen { ascii().string(0..100).map { Failure(it.doc()) } }
+fun failureGen(): Gen<Failure> = Gen.monadGen { ascii().string(0..100).map {
+    Failure(
+        it.doc()
+    )
+} }
 
 fun <M, F> TestT.Companion.genK(MM: Monad<M>, MF: Monad<F>, genK: GenK<M, F>): GenK<M, Kind<ForTestT, F>> =
     object : GenK<M, Kind<ForTestT, F>> {
@@ -104,7 +121,8 @@ fun <M, F> TestT.Companion.genK(MM: Monad<M>, MF: Monad<F>, genK: GenK<M, F>): G
 
 // TODO move
 fun Log.Companion.eq(): Eq<Log> = object : Eq<Log> {
-    override fun Log.eqv(b: Log): Boolean = ListK.eq(JournalEntry.eq()).run {
+    override fun Log.eqv(b: Log): Boolean = ListK.eq(
+        JournalEntry.eq()).run {
         unLog.k().eqv(b.unLog.k())
     }
 }
@@ -112,9 +130,15 @@ fun Log.Companion.eq(): Eq<Log> = object : Eq<Log> {
 // TODO better instances?
 fun JournalEntry.Companion.eq(): Eq<JournalEntry> = Eq { a, b ->
     when (a) {
-        is JournalEntry.Input -> b is JournalEntry.Input && a.text().render(UseColor.DisableColor) == b.text().render(UseColor.DisableColor)
-        is JournalEntry.Annotate -> b is JournalEntry.Annotate && a.text().render(UseColor.DisableColor) == b.text().render(UseColor.DisableColor)
-        is JournalEntry.Footnote -> b is JournalEntry.Footnote && a.text().render(UseColor.DisableColor) == b.text().render(UseColor.DisableColor)
+        is JournalEntry.Input -> b is JournalEntry.Input && a.text().render(UseColor.DisableColor) == b.text().render(
+            UseColor.DisableColor
+        )
+        is JournalEntry.Annotate -> b is JournalEntry.Annotate && a.text().render(UseColor.DisableColor) == b.text().render(
+            UseColor.DisableColor
+        )
+        is JournalEntry.Footnote -> b is JournalEntry.Footnote && a.text().render(UseColor.DisableColor) == b.text().render(
+            UseColor.DisableColor
+        )
         is JournalEntry.JournalLabel -> b is JournalEntry.JournalLabel && Label.eq(Boolean.eq()).run { a.label.eqv(b.label) }
     }
 }
@@ -132,33 +156,42 @@ fun failureEq(): Eq<Failure> = Eq { a, b ->
 
 fun <F> TestT.Companion.eqK(eqK: EqK<F>): EqK<TestTPartialOf<F>> = object : EqK<TestTPartialOf<F>> {
     override fun <A> Kind<TestTPartialOf<F>, A>.eqK(other: Kind<TestTPartialOf<F>, A>, EQ: Eq<A>): Boolean =
-        EitherT.eqK(WriterT.eqK(eqK, Log.eq()), failureEq()).liftEq(EQ).run {
+        EitherT.eqK(WriterT.eqK(eqK, Log.eq()),
+            failureEq()
+        ).liftEq(EQ).run {
             fix().runTestT.eqv(other.fix().runTestT)
         }
 }
 
-fun <F> laws(
-    MT: MonadTest<F>,
-    genK: GenK<IOPartialOf<Nothing>, F>,
-    eqK: EqK<F>
-): List<Tuple2<String, Property>> = listOf(
-    "TestT.just(Id.monad(), x).liftTest() == just(x)" toT property {
-        val x = forAll { int(0..100) }.bind()
+object MonadTestLaws {
+    fun <F> laws(
+        MT: MonadTest<F>,
+        eqK: EqK<F>
+    ): List<Tuple2<String, Property>> = listOf(
+        "TestT.just(Id.monad(), x).liftTest() == just(x)" toT property {
+            val x = forAll { int(0..100) }.bind()
 
-        val lhs = MT.run { TestT.just(Id.monad(), x).liftTest() }
+            val lhs = MT.run { TestT.just(Id.monad(), x).liftTest() }
 
-        lhs.eqv(MT.just(x), eqK.liftEq(Int.eq())).bind()
-    },
-    "x.flatMap(f).liftTest() == x.liftTest().flatMap { f(it).liftTest() }" toT property {
-        val x = forAllT { TestT.genK(BM(), Id.monad(), Id.genK(BM())).genK(int(0..100).toGenT()) }.bind()
-        val f = forAllFn {
-            TestT.genK(BM(), Id.monad(), Id.genK(BM())).genK(int(0..100).toGenT())
-                .toFunction(Int.func(), Int.coarbitrary())
-        }.bind()
+            lhs.eqv(MT.just(x), eqK.liftEq(Int.eq())).bind()
+        },
+        "x.flatMap(f).liftTest() == x.liftTest().flatMap { f(it).liftTest() }" toT property {
+            val x = forAllT {
+                TestT.genK(BM(), Id.monad(), Id.genK(BM()))
+                    .genK(int(0..100).toGenT())
+            }.bind()
+            val f = forAllFn {
+                TestT.genK(BM(), Id.monad(), Id.genK(BM()))
+                    .genK(int(0..100).toGenT())
+                    .toFunction(Int.func(), Int.coarbitrary())
+            }.bind()
 
-        val lhs = MT.run { TestT.monad(Id.monad()).run { x.flatMap(f) }.fix().liftTest() }
-        val rhs = MT.run { x.fix().liftTest().flatMap { f(it).fix().liftTest() } }
+            val lhs = MT.run {
+                TestT.monad(Id.monad()).run { x.flatMap(f) }.fix().liftTest()
+            }
+            val rhs = MT.run { x.fix().liftTest().flatMap { f(it).fix().liftTest() } }
 
-        lhs.eqv(rhs, eqK.liftEq(Int.eq())).bind()
-    }
-)
+            lhs.eqv(rhs, eqK.liftEq(Int.eq())).bind()
+        }
+    )
+}

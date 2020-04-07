@@ -148,7 +148,7 @@ interface MonadTest<M> : Monad<M> {
                 is ValueDiffF.Same -> "━━━ Failed (no differences) ━━━".text() +
                         hardLine() + diff.toDoc()
                 else -> {
-                    // Not sure if this overloading of Markup.Result.Failed is good, but for now it works
+                    // Not sure if this overloading of Markup.DiffRemoved and Markup.DiffAdded is good, but for now it works
                     "━━━ Failed (".text() +
                             "- lhs".text().annotate(Markup.DiffRemoved(0)) +
                             " =/= ".text() +
