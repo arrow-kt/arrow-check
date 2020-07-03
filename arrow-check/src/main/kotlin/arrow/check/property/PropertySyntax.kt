@@ -42,7 +42,7 @@ interface PropertyTestSyntax : MonadSyntax<PropertyTPartialOf<ForIO>>,
     PropertyTest<ForIO> {
     override fun MM(): Monad<ForIO> = IO.monad()
 
-    suspend fun <A> IO<Nothing, A>.bind(): A = PropertyT.monadTrans().run { liftT(IO.monad()) }.bind()
+    suspend fun <A> IO<A>.bind(): A = PropertyT.monadTrans().run { liftT(IO.monad()) }.bind()
 }
 
 class PropertyTestContinuation<A> : MonadContinuation<PropertyTPartialOf<ForIO>, A>(
