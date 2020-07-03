@@ -23,11 +23,11 @@ inline class TaskId(val id: Int)
 
 // look for env options and check terminal capabilities, env options have precedence
 // TODO
-fun detectColor(): IO<Nothing, UseColor> = IO.just(UseColor.EnableColor)
+fun detectColor(): IO<UseColor> = IO.just(UseColor.EnableColor)
 
-fun detectVerbosity(): IO<Nothing, Verbose> = IO.just(Verbose.Quiet)
+fun detectVerbosity(): IO<Verbose> = IO.just(Verbose.Quiet)
 
-fun detectConfig(): IO<Nothing, Config> = IO.applicative<Nothing>().map(
+fun detectConfig(): IO<Config> = IO.applicative().map(
     detectColor(),
     detectVerbosity()
 ) { (useColor, verbosity) -> Config(useColor, verbosity) }.fix()

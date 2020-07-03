@@ -125,7 +125,7 @@ fun PropertyT.Companion.monadTrans(): MonadTrans<ForPropertyT> = object : Proper
 interface PropertyTMonadIO<M> : MonadIO<PropertyTPartialOf<M>>, PropertyTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<Nothing, A>.liftIO(): Kind<PropertyTPartialOf<M>, A> = MIO().run {
+    override fun <A> IO<A>.liftIO(): Kind<PropertyTPartialOf<M>, A> = MIO().run {
         PropertyT.monadTrans().run {
             liftIO().liftT(MIO())
         }

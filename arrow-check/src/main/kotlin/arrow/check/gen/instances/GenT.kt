@@ -136,7 +136,7 @@ fun GenT.Companion.monadTrans(): MonadTrans<ForGenT> = object : GenTMonadTrans {
 interface GenTMonadIO<M> : MonadIO<GenTPartialOf<M>>, GenTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<Nothing, A>.liftIO(): Kind<GenTPartialOf<M>, A> = MIO().run {
+    override fun <A> IO<A>.liftIO(): Kind<GenTPartialOf<M>, A> = MIO().run {
         GenT.monadTrans().run {
             liftIO().liftT(MIO())
         }

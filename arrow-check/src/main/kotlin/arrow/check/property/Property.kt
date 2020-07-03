@@ -15,7 +15,7 @@ import arrow.check.property.instances.monadTest
 import arrow.check.property.instances.monadTrans
 import arrow.core.Id
 import arrow.core.extensions.id.monad.monad
-import arrow.fx.IOPartialOf
+import arrow.fx.ForIO
 import arrow.mtl.EitherT
 import arrow.mtl.WriterT
 import arrow.mtl.WriterTPartialOf
@@ -25,7 +25,7 @@ import arrow.typeclasses.Show
 import pretty.Doc
 
 // -------------- Property
-data class Property(val config: PropertyConfig, val prop: PropertyT<IOPartialOf<Nothing>, Unit>) {
+data class Property(val config: PropertyConfig, val prop: PropertyT<ForIO, Unit>) {
 
     fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =
         copy(config = f(config))
