@@ -123,7 +123,7 @@ fun TestT.Companion.monadTrans(): MonadTrans<ForTestT> = object : TestTMonadTran
 interface TestTMonadIO<M> : MonadIO<TestTPartialOf<M>>, TestTMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<Nothing, A>.liftIO(): Kind<TestTPartialOf<M>, A> = MIO().run {
+    override fun <A> IO<A>.liftIO(): Kind<TestTPartialOf<M>, A> = MIO().run {
         TestT.monadTrans().run {
             liftIO().liftT(MIO())
         }

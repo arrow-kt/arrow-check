@@ -280,7 +280,7 @@ fun Rose.Companion.monadTrans(): MonadTrans<ForRose> = object : RoseMonadTrans {
 interface RoseMonadIO<M> : MonadIO<RosePartialOf<M>>, RoseMonad<M> {
     override fun MM(): Monad<M> = MIO()
     fun MIO(): MonadIO<M>
-    override fun <A> IO<Nothing, A>.liftIO(): Kind<RosePartialOf<M>, A> = MIO().run {
+    override fun <A> IO<A>.liftIO(): Kind<RosePartialOf<M>, A> = MIO().run {
         Rose.monadTrans().run {
             liftIO().liftT(MIO())
         }
