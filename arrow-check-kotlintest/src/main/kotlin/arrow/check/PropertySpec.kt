@@ -6,7 +6,6 @@ import arrow.check.property.PropertyName
 import arrow.check.property.PropertyTestSyntax
 import arrow.check.property.property
 import arrow.core.Tuple2
-import arrow.core.identity
 import arrow.core.some
 import io.kotlintest.AbstractSpec
 import io.kotlintest.TestType
