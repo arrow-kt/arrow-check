@@ -1,6 +1,10 @@
 package arrow.check
 
-import arrow.check.property.*
+import arrow.check.property.Property
+import arrow.check.property.PropertyConfig
+import arrow.check.property.PropertyName
+import arrow.check.property.PropertyTestSyntax
+import arrow.check.property.property
 import arrow.core.Tuple2
 import arrow.core.some
 import io.kotlintest.AbstractSpec
@@ -90,4 +94,4 @@ fun Report<Result>.toException(): Unit = when (status) {
     is Result.Failure -> throw AssertionError("Failed!")
 }
 
-abstract class PropertySpec(f: AbstractPropertySpec.() -> Unit = {}): AbstractPropertySpec(f), IntelliMarker
+abstract class PropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : AbstractPropertySpec(f), IntelliMarker

@@ -2,18 +2,51 @@ package arrow.check.gen.instances
 
 import arrow.Kind
 import arrow.Kind2
-import arrow.check.gen.*
+import arrow.check.gen.ForRose
+import arrow.check.gen.Rose
 import arrow.check.gen.Rose.Companion.liftF
-import arrow.core.*
+import arrow.check.gen.RoseF
+import arrow.check.gen.RoseFPartialOf
+import arrow.check.gen.RosePartialOf
+import arrow.check.gen.fix
+import arrow.core.Either
+import arrow.core.Eval
+import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.Tuple2
+import arrow.core.andThen
 import arrow.core.extensions.sequence.foldable.foldLeft
 import arrow.core.extensions.sequence.foldable.foldRight
 import arrow.core.extensions.sequence.traverse.traverse
 import arrow.core.extensions.sequencek.eq.eq
+import arrow.core.fix
+import arrow.core.k
+import arrow.core.left
+import arrow.core.right
+import arrow.core.toT
 import arrow.fx.IO
 import arrow.fx.typeclasses.MonadIO
-import arrow.mtl.typeclasses.*
+import arrow.mtl.typeclasses.ComposedFunctor
+import arrow.mtl.typeclasses.MonadReader
+import arrow.mtl.typeclasses.MonadState
+import arrow.mtl.typeclasses.MonadTrans
+import arrow.mtl.typeclasses.MonadWriter
+import arrow.mtl.typeclasses.Nested
+import arrow.mtl.typeclasses.nest
+import arrow.mtl.typeclasses.unnest
 import arrow.recursion.typeclasses.Birecursive
-import arrow.typeclasses.*
+import arrow.typeclasses.Alternative
+import arrow.typeclasses.Applicative
+import arrow.typeclasses.ApplicativeError
+import arrow.typeclasses.Eq
+import arrow.typeclasses.EqK
+import arrow.typeclasses.Foldable
+import arrow.typeclasses.Functor
+import arrow.typeclasses.FunctorFilter
+import arrow.typeclasses.Monad
+import arrow.typeclasses.MonadError
+import arrow.typeclasses.MonadFilter
+import arrow.typeclasses.Traverse
 
 // @extension
 interface RoseFFunctor<C> : Functor<RoseFPartialOf<C>> {
@@ -159,10 +192,11 @@ interface RoseAlternative<M> : Alternative<RosePartialOf<M>>,
         fix().orElse(y.fix())
 }
 
-fun <M> Rose.Companion.alternative(AM: Alternative<M>, MM: Monad<M>): Alternative<RosePartialOf<M>> = object : RoseAlternative<M> {
-    override fun AM(): Alternative<M> = AM
-    override fun MM(): Monad<M> = MM
-}
+fun <M> Rose.Companion.alternative(AM: Alternative<M>, MM: Monad<M>): Alternative<RosePartialOf<M>> =
+    object : RoseAlternative<M> {
+        override fun AM(): Alternative<M> = AM
+        override fun MM(): Monad<M> = MM
+    }
 
 // @extension
 interface RoseFunctorFilter<M> : FunctorFilter<RosePartialOf<M>>,
@@ -183,10 +217,11 @@ interface RoseFunctorFilter<M> : FunctorFilter<RosePartialOf<M>>,
         })
 }
 
-fun <M> Rose.Companion.functorFilter(MM: Monad<M>, AM: Alternative<M>): FunctorFilter<RosePartialOf<M>> = object : RoseFunctorFilter<M> {
-    override fun AM(): Alternative<M> = AM
-    override fun MM(): Monad<M> = MM
-}
+fun <M> Rose.Companion.functorFilter(MM: Monad<M>, AM: Alternative<M>): FunctorFilter<RosePartialOf<M>> =
+    object : RoseFunctorFilter<M> {
+        override fun AM(): Alternative<M> = AM
+        override fun MM(): Monad<M> = MM
+    }
 
 // @extension
 interface RoseMonadFilter<M> : MonadFilter<RosePartialOf<M>>,
@@ -210,13 +245,14 @@ interface RoseMonadFilter<M> : MonadFilter<RosePartialOf<M>>,
         })
 }
 
-fun <M> Rose.Companion.monadFilter(AM: Alternative<M>, MM: Monad<M>): MonadFilter<RosePartialOf<M>> = object : RoseMonadFilter<M> {
-    override fun AM(): Alternative<M> = AM
-    override fun MM(): Monad<M> = MM
-}
+fun <M> Rose.Companion.monadFilter(AM: Alternative<M>, MM: Monad<M>): MonadFilter<RosePartialOf<M>> =
+    object : RoseMonadFilter<M> {
+        override fun AM(): Alternative<M> = AM
+        override fun MM(): Monad<M> = MM
+    }
 
 // @extension
-interface RoseBirecursive<M, A>: Birecursive<Rose<M, A>, Nested<M, RoseFPartialOf<A>>> {
+interface RoseBirecursive<M, A> : Birecursive<Rose<M, A>, Nested<M, RoseFPartialOf<A>>> {
     fun MM(): Monad<M>
     override fun FF(): Functor<Nested<M, RoseFPartialOf<A>>> =
         ComposedFunctor(MM(), RoseF.functor())
@@ -228,9 +264,10 @@ interface RoseBirecursive<M, A>: Birecursive<Rose<M, A>, Nested<M, RoseFPartialO
         runRose.nest()
 }
 
-fun <M, A> Rose.Companion.birecursive(MM: Monad<M>): Birecursive<Rose<M, A>, Nested<M, RoseFPartialOf<A>>> = object : RoseBirecursive<M, A> {
-    override fun MM(): Monad<M> = MM
-}
+fun <M, A> Rose.Companion.birecursive(MM: Monad<M>): Birecursive<Rose<M, A>, Nested<M, RoseFPartialOf<A>>> =
+    object : RoseBirecursive<M, A> {
+        override fun MM(): Monad<M> = MM
+    }
 
 // @extension
 interface RoseMonadTrans : MonadTrans<ForRose> {
@@ -262,7 +299,8 @@ interface RoseApplicativeError<M, E> : ApplicativeError<RosePartialOf<M>, E>, Ro
     override fun <A> raiseError(e: E): Kind<RosePartialOf<M>, A> = liftF(AE(), AE().raiseError(e))
 
     override fun <A> Kind<RosePartialOf<M>, A>.handleErrorWith(f: (E) -> Kind<RosePartialOf<M>, A>): Kind<RosePartialOf<M>, A> {
-        fun RoseF<A, Rose<M, A>>.handleErrorRoseF(): RoseF<A, Rose<M, A>> = RoseF(res, shrunk.map { it.handleErrorWith(f).fix() })
+        fun RoseF<A, Rose<M, A>>.handleErrorRoseF(): RoseF<A, Rose<M, A>> =
+            RoseF(res, shrunk.map { it.handleErrorWith(f).fix() })
         return AE().run {
             Rose(fix().runRose.handleErrorWith(f.andThen { it.fix().runRose }).map {
                 it.handleErrorRoseF()
@@ -271,9 +309,10 @@ interface RoseApplicativeError<M, E> : ApplicativeError<RosePartialOf<M>, E>, Ro
     }
 }
 
-fun <M, E> Rose.Companion.applicativeError(AE: ApplicativeError<M, E>): ApplicativeError<RosePartialOf<M>, E> = object : RoseApplicativeError<M, E> {
-    override fun AE(): ApplicativeError<M, E> = AE
-}
+fun <M, E> Rose.Companion.applicativeError(AE: ApplicativeError<M, E>): ApplicativeError<RosePartialOf<M>, E> =
+    object : RoseApplicativeError<M, E> {
+        override fun AE(): ApplicativeError<M, E> = AE
+    }
 
 // @extension
 interface RoseMonadError<M, E> : MonadError<RosePartialOf<M>, E>, RoseApplicativeError<M, E>, RoseMonad<M> {
@@ -287,9 +326,10 @@ interface RoseMonadError<M, E> : MonadError<RosePartialOf<M>, E>, RoseApplicativ
     override fun <A> just(a: A): Kind<RosePartialOf<M>, A> = Rose.just(ME(), a)
 }
 
-fun <M, E> Rose.Companion.monadError(ME: MonadError<M, E>): MonadError<RosePartialOf<M>, E> = object : RoseMonadError<M, E> {
-    override fun ME(): MonadError<M, E> = ME
-}
+fun <M, E> Rose.Companion.monadError(ME: MonadError<M, E>): MonadError<RosePartialOf<M>, E> =
+    object : RoseMonadError<M, E> {
+        override fun ME(): MonadError<M, E> = ME
+    }
 
 // @extension
 interface RoseMonadReader<M, D> : MonadReader<RosePartialOf<M>, D>, RoseMonad<M> {
@@ -304,9 +344,10 @@ interface RoseMonadReader<M, D> : MonadReader<RosePartialOf<M>, D>, RoseMonad<M>
         }
 }
 
-fun <M, D> Rose.Companion.monadReader(MR: MonadReader<M, D>): MonadReader<RosePartialOf<M>, D> = object : RoseMonadReader<M, D> {
-    override fun MR(): MonadReader<M, D> = MR
-}
+fun <M, D> Rose.Companion.monadReader(MR: MonadReader<M, D>): MonadReader<RosePartialOf<M>, D> =
+    object : RoseMonadReader<M, D> {
+        override fun MR(): MonadReader<M, D> = MR
+    }
 
 // @extension
 interface RoseMonadWriter<M, W> : MonadWriter<RosePartialOf<M>, W>, RoseMonad<M> {
@@ -331,9 +372,10 @@ interface RoseMonadWriter<M, W> : MonadWriter<RosePartialOf<M>, W>, RoseMonad<M>
         MW().run { Rose(MW().writer(aw).map { RoseF(it, emptySequence<Rose<M, A>>()) }) }
 }
 
-fun <M, W> Rose.Companion.monadWriter(MW: MonadWriter<M, W>): MonadWriter<RosePartialOf<M>, W> = object : RoseMonadWriter<M, W> {
-    override fun MW(): MonadWriter<M, W> = MW
-}
+fun <M, W> Rose.Companion.monadWriter(MW: MonadWriter<M, W>): MonadWriter<RosePartialOf<M>, W> =
+    object : RoseMonadWriter<M, W> {
+        override fun MW(): MonadWriter<M, W> = MW
+    }
 
 // @extension
 interface RoseMonadState<M, S> : MonadState<RosePartialOf<M>, S>, RoseMonad<M> {
@@ -341,13 +383,15 @@ interface RoseMonadState<M, S> : MonadState<RosePartialOf<M>, S>, RoseMonad<M> {
     fun MS(): MonadState<M, S>
     override fun get(): Kind<RosePartialOf<M>, S> =
         MS().run { Rose(MS().get().map { RoseF(it, emptySequence<Rose<M, S>>()) }) }
+
     override fun set(s: S): Kind<RosePartialOf<M>, Unit> =
         MS().run { Rose(MS().set(s).map { RoseF(it, emptySequence<Rose<M, Unit>>()) }) }
 }
 
-fun <M, S> Rose.Companion.monadState(MS: MonadState<M, S>): MonadState<RosePartialOf<M>, S> = object : RoseMonadState<M, S> {
-    override fun MS(): MonadState<M, S> = MS
-}
+fun <M, S> Rose.Companion.monadState(MS: MonadState<M, S>): MonadState<RosePartialOf<M>, S> =
+    object : RoseMonadState<M, S> {
+        override fun MS(): MonadState<M, S> = MS
+    }
 
 // @extension
 interface RoseEq<M, A> : Eq<Rose<M, A>> {

@@ -2,17 +2,47 @@ package arrow.check.gen
 
 import arrow.Kind
 import arrow.check.gen.instances.applicative
-import arrow.core.*
+import arrow.core.AndThen
+import arrow.core.Const
+import arrow.core.Either
+import arrow.core.Eval
+import arrow.core.ForId
+import arrow.core.Id
+import arrow.core.Ior
+import arrow.core.ListK
+import arrow.core.MapK
+import arrow.core.Nel
+import arrow.core.NonEmptyList
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.SequenceK
+import arrow.core.SetK
+import arrow.core.SortedMapK
+import arrow.core.Tuple2
+import arrow.core.Validated
+import arrow.core.Validated.Invalid
+import arrow.core.Validated.Valid
+import arrow.core.andThen
 import arrow.core.extensions.eval.monad.flatten
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.list.functorFilter.filterMap
+import arrow.core.fix
+import arrow.core.k
+import arrow.core.left
+import arrow.core.leftIor
+import arrow.core.right
+import arrow.core.rightIor
+import arrow.core.some
+import arrow.core.toMap
+import arrow.core.toT
+import arrow.core.toTuple2
+import arrow.core.value
 import arrow.mtl.OptionT
 import arrow.mtl.OptionTPartialOf
 import arrow.mtl.extensions.optiont.applicative.applicative
 import arrow.mtl.extensions.optiont.monad.monad
 import arrow.mtl.value
 import arrow.recursion.pattern.ListF
-import arrow.recursion.pattern.NonEmptyListF
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Functor
 import arrow.typeclasses.Show
@@ -125,32 +155,34 @@ fun <A, B> GenTOf<ForId, B>.toFunction(AF: Func<A>, AC: Coarbitrary<A>): Gen<Fun
         Gen { (s, sz) ->
             Rose.unfold(
                 OptionT.monad(Id.monad()),
-                Fn.functor<A>().run { AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) } }.fix()
+                Fn.functor<A>().run {
+                    AF.function { a -> AC.run { this@toFunction.fix().coarbitrary(a) } }.map { it.runGen(s toT sz) }
+                }.fix()
             ) {
                 shrinkFun(it) { it.runRose.value().value().fold({ emptySequence() }, { it.shrunk }) }
             }
         }
     ) { (d, fn) -> Fun(d, fn) }.fix()
 
-fun <A, B> abstract(fn: Fn<A, B>, d: B): Function1<A, Eval<B>> = when (fn) {
-    is Fn.UnitFn -> Function1 { Eval.now(fn.b) }
-    is Fn.NilFn -> Function1 { Eval.now(d) }
-    is Fn.PairFn<*, *, B> -> Function1 { (x, y): Tuple2<Any?, Any?> ->
+fun <A, B> abstract(fn: Fn<A, B>, d: B): arrow.core.Function1<A, Eval<B>> = when (fn) {
+    is Fn.UnitFn -> arrow.core.Function1 { Eval.now(fn.b) }
+    is Fn.NilFn -> arrow.core.Function1 { Eval.now(d) }
+    is Fn.PairFn<*, *, B> -> arrow.core.Function1 { (x, y): Tuple2<Any?, Any?> ->
         Fn.functor<Any?>().run {
             abstract(fn.fn.map { (abstract(it, d).f as (Any?) -> Eval<B>)(y) }.fix(), Eval.now(d)).f(x).flatten().fix()
         }
-    } as Function1<A, Eval<B>>
-    is Fn.EitherFn<*, *, B> -> Function1 { e: Either<Any?, Any?> ->
+    } as arrow.core.Function1<A, Eval<B>>
+    is Fn.EitherFn<*, *, B> -> arrow.core.Function1 { e: Either<Any?, Any?> ->
         e.fold({
             (abstract(fn.l, d).f as (Any?) -> Eval<B>)(it)
         }, {
             (abstract(fn.r, d).f as (Any?) -> Eval<B>)(it)
         })
-    } as Function1<A, Eval<B>>
-    is Fn.MapFn<*, *, B> -> Function1 {
+    } as arrow.core.Function1<A, Eval<B>>
+    is Fn.MapFn<*, *, B> -> arrow.core.Function1 {
         (fn.f as (A) -> Eval<Any?>)(it).flatMap { (abstract(fn.g, d).f as (Any?) -> Eval<B>)(it) }
     }
-    is Fn.TableFn -> Function1 { fn.m.getOrDefault(it, Eval.now(d)) }
+    is Fn.TableFn -> arrow.core.Function1 { fn.m.getOrDefault(it, Eval.now(d)) }
 }
 
 fun <A, B> Fn<A, B>.table(): Map<A, B> = when (this) {
@@ -370,10 +402,12 @@ data class Stream<A>(val unStream: ListF<A, Eval<Stream<A>>>) {
         is ListF.NilF -> lb
         is ListF.ConsF -> f(unStream.a, unStream.tail.flatMap { it.foldRight(lb, f) })
     }
+
     companion object {
-        fun <A> func(AF: Func<A>): Func<Stream<A>> = object: StreamFunc<A> {
+        fun <A> func(AF: Func<A>): Func<Stream<A>> = object : StreamFunc<A> {
             override fun AF(): Func<A> = AF
         }
+
         fun <A> fromList(ls: List<A>): Stream<A> =
             if (ls.isEmpty()) Stream(ListF.NilF())
             else Stream<A>(ListF.ConsF(ls.first(), Eval.later { fromList(ls.tail()) }))
@@ -583,7 +617,6 @@ interface ValidatedFunc<E, A> : Func<Validated<E, A>> {
             it.fold(::Invalid, ::Valid)
         }, f)
 }
-
 
 fun <E, A> Validated.Companion.func(EF: Func<E>, AF: Func<A>): Func<Validated<E, A>> = object : ValidatedFunc<E, A> {
     override fun AF(): Func<A> = AF

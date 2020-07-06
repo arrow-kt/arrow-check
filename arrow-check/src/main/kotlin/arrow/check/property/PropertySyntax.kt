@@ -1,14 +1,21 @@
 package arrow.check.property
 
 import arrow.Kind
-import arrow.check.gen.*
+import arrow.check.gen.Fun
+import arrow.check.gen.Gen
+import arrow.check.gen.GenT
+import arrow.check.gen.GenTOf
+import arrow.check.gen.GenTPartialOf
+import arrow.check.gen.MonadGen
+import arrow.check.gen.fix
+import arrow.check.gen.monadGen
 import arrow.check.property.instances.PropertyTMonadTest
 import arrow.check.property.instances.monad
 import arrow.check.property.instances.monadTrans
 import arrow.core.Either
 import arrow.core.ForId
-import arrow.fx.ForIO
 import arrow.fx.IO
+import arrow.fx.ForIO
 import arrow.fx.extensions.io.monad.monad
 import arrow.typeclasses.Monad
 import arrow.typeclasses.MonadContinuation
@@ -31,7 +38,8 @@ fun property(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend Prope
     )
 }
 
-interface PropertyTestSyntax : MonadSyntax<PropertyTPartialOf<ForIO>>, PropertyTest<ForIO> {
+interface PropertyTestSyntax : MonadSyntax<PropertyTPartialOf<ForIO>>,
+    PropertyTest<ForIO> {
     override fun MM(): Monad<ForIO> = IO.monad()
 
     suspend fun <A> IO<A>.bind(): A = PropertyT.monadTrans().run { liftT(IO.monad()) }.bind()
@@ -53,7 +61,7 @@ class PropertyTestContinuation<A> : MonadContinuation<PropertyTPartialOf<ForIO>,
         PropertyT.monad(MM()).run { flatMap(f) }
 }
 
-fun <M> PropertyT.Companion.propertyTestM(MM: Monad<M>): PropertyTest<M> = object: PropertyTest<M> {
+fun <M> PropertyT.Companion.propertyTestM(MM: Monad<M>): PropertyTest<M> = object : PropertyTest<M> {
     override fun MM(): Monad<M> = MM
 }
 
@@ -74,7 +82,11 @@ interface PropertyTest<M> : PropertyTMonadTest<M> {
     fun <A> forAll(gen: Gen<A>, SA: Show<A> = Show.any()): PropertyT<M, A> =
         forAll(gen, MM(), SA)
 
-    fun <A, B> forAllFn(gen: Gen<Fun<A, B>>, SA: Show<A> = Show.any(), SB: Show<B> = Show.any()): PropertyT<M, (A) -> B> =
+    fun <A, B> forAllFn(
+        gen: Gen<Fun<A, B>>,
+        SA: Show<A> = Show.any(),
+        SB: Show<B> = Show.any()
+    ): PropertyT<M, (A) -> B> =
         forAllFn(gen, MM(), SA, SB)
 
     fun <A> forAllWithT(showA: (A) -> Doc<Markup>, f: MonadGen<GenTPartialOf<M>, M>.() -> GenTOf<M, A>) =
@@ -89,7 +101,11 @@ interface PropertyTest<M> : PropertyTMonadTest<M> {
     fun <A> forAll(SA: Show<A> = Show.any(), f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, A>) =
         forAll(GenT.monadGen().f().fix(), SA)
 
-    fun <A, B> forAllFn(SA: Show<A> = Show.any(), SB: Show<B> = Show.any(), f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, Fun<A, B>>) =
+    fun <A, B> forAllFn(
+        SA: Show<A> = Show.any(),
+        SB: Show<B> = Show.any(),
+        f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, Fun<A, B>>
+    ) =
         forAllFn(GenT.monadGen().f().fix(), SA, SB)
 
     fun <A> discard(): PropertyT<M, A> = discard(MM())

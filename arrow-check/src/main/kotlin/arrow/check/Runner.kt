@@ -1,17 +1,55 @@
 package arrow.check
 
 import arrow.Kind
-import arrow.check.gen.*
+import arrow.check.gen.RandSeed
+import arrow.check.gen.Rose
+import arrow.check.gen.RoseF
+import arrow.check.gen.RoseFPartialOf
+import arrow.check.gen.fix
 import arrow.check.gen.instances.birecursive
-import arrow.check.property.*
+import arrow.check.property.CoverCount
+import arrow.check.property.Coverage
+import arrow.check.property.DiscardCount
+import arrow.check.property.EarlyTermination
 import arrow.check.property.Failure
+import arrow.check.property.JournalEntry
+import arrow.check.property.Log
+import arrow.check.property.Markup
+import arrow.check.property.NoConfidenceTermination
+import arrow.check.property.NoEarlyTermination
+import arrow.check.property.Property
+import arrow.check.property.PropertyConfig
+import arrow.check.property.PropertyName
+import arrow.check.property.PropertyT
+import arrow.check.property.PropertyTestSyntax
+import arrow.check.property.ShrinkCount
+import arrow.check.property.Size
+import arrow.check.property.TestCount
+import arrow.check.property.coverage
+import arrow.check.property.coverageSuccess
+import arrow.check.property.defaultMinTests
+import arrow.check.property.failure
+import arrow.check.property.fix
 import arrow.check.property.instances.monadError
 import arrow.check.property.instances.monadTest
-import arrow.core.*
+import arrow.check.property.property
+import arrow.check.property.success
+import arrow.core.Either
+import arrow.core.Eval
+import arrow.core.Id
+import arrow.core.None
+import arrow.core.Option
+import arrow.core.Tuple2
 import arrow.core.extensions.id.traverse.traverse
 import arrow.core.extensions.list.functorFilter.filterMap
 import arrow.core.extensions.sequence.foldable.foldRight
+import arrow.core.left
+import arrow.core.right
+import arrow.core.some
+import arrow.core.toT
+import arrow.core.value
 import arrow.fx.IO
+import arrow.fx.IO.Companion.effect
 import arrow.fx.extensions.fx
 import arrow.fx.extensions.io.functor.unit
 import arrow.fx.extensions.io.monadDefer.monadDefer
@@ -34,29 +72,33 @@ import kotlin.random.Random
 fun checkGroup(groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> =
     detectConfig().flatMap { checkGroup(it, groupName, props) }
 
-fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> = IO.fx {
-    !effect { println("━━━ $groupName ━━━") }
+fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Property>>): IO<Boolean> =
+    IO.fx {
+        !effect { println("━━━ $groupName ━━━") }
 
-    val summary =
-        props.fold(IO { Summary.monoid().empty().copy(waiting = PropertyCount(props.size)) }) { acc, (n, prop) ->
-            IO.fx {
-                val currSummary = acc.bind()
-                val res = checkReport(config, PropertyName(n).some(), prop).bind()
-                Summary.monoid().run {
-                    currSummary + empty().copy(waiting = PropertyCount(-1)) +
-                            when (res.status) {
-                                is Result.Failure -> empty().copy(failed = PropertyCount(1))
-                                is Result.Success -> empty().copy(successful = PropertyCount(1))
-                                is Result.GivenUp -> empty().copy(gaveUp = PropertyCount(1))
-                            }
+        val summary =
+            props.fold(IO { Summary.monoid().empty().copy(waiting = PropertyCount(props.size)) }) { acc, (n, prop) ->
+                IO.fx {
+                    val currSummary = acc.bind()
+                    val res = checkReport(config, PropertyName(n).some(), prop).bind()
+                    Summary.monoid().run {
+                        currSummary + empty().copy(waiting = PropertyCount(-1)) +
+                                when (res.status) {
+                                    is Result.Failure -> empty().copy(failed = PropertyCount(1))
+                                    is Result.Success -> empty().copy(successful = PropertyCount(1))
+                                    is Result.GivenUp -> empty().copy(gaveUp = PropertyCount(1))
+                                }
+                    }
                 }
-            }
-        }.bind()
+            }.bind()
 
-    summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
-}
+        summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
+    }
 
-fun check(propertyConfig: PropertyConfig = PropertyConfig(), c: suspend PropertyTestSyntax.() -> Unit): IO<Boolean> =
+fun check(
+    propertyConfig: PropertyConfig = PropertyConfig(),
+    c: suspend PropertyTestSyntax.() -> Unit
+): IO<Boolean> =
     check(property(propertyConfig, c))
 
 fun check(
@@ -114,7 +156,6 @@ fun checkNamed(
 
 fun checkNamed(config: Config, name: String, prop: Property): IO<Boolean> =
     check(config, PropertyName(name).some(), prop)
-
 
 fun check(config: Config, name: Option<PropertyName>, prop: Property): IO<Boolean> =
     checkReport(config, name, prop).map { it.status is Result.Success }
@@ -319,53 +360,57 @@ fun <M> shrinkResult(
     node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>,
     hook: (FailureSummary) -> Kind<M, Unit>
 ): Kind<M, Result> = Rose.birecursive<M, Option<Tuple2<Log, Either<Failure, Unit>>>>(MM).run {
-    Rose(MM.just(node)).hylo<Nested<M, RoseFPartialOf<Option<Tuple2<Log, Either<Failure, Unit>>>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, (ShrinkCount) -> Kind<M, Result>>({
-        val curr = it.unnest()
-        curr.let {
-            { numShrinks: ShrinkCount ->
-                MM.fx.monad {
-                    val (res, shrinks) = it.bind().fix()
-                    res.fold({
-                        Result.GivenUp
-                    }, { (log, result) ->
-                        result.fold({
-                            val summary = FailureSummary(
-                                size, seed, numShrinks, it.unFailure,
-                                annotations = log.unLog.filterMap { entry ->
-                                    when (entry) {
-                                        is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text).some()
-                                        is JournalEntry.Input -> FailureAnnotation.Input(entry.text).some()
-                                        else -> None
-                                    }
-                                },
-                                footnotes = log.unLog.filterMap { entry ->
-                                    if (entry is JournalEntry.Footnote) entry.text.some()
-                                    else None
-                                }
-                            )
-
-                            hook(summary).bind()
-
-                            if (numShrinks.unShrinkCount >= shrinkLimit)
-                                Result.Failure(summary)
-                            else shrinks.map { it(ShrinkCount(numShrinks.unShrinkCount + 1)) }
-                                .foldRight(Eval.now(MM.just(Result.Failure(summary)))) { v, acc ->
-                                    Eval.now(
-                                        MM.fx.monad {
-                                            val test = !v
-                                            if (test is Result.Failure) test
-                                            else acc.value().bind()
+    Rose(MM.just(node)).hylo<Nested<M, RoseFPartialOf<Option<Tuple2<Log, Either<Failure, Unit>>>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, (ShrinkCount) -> Kind<M, Result>>(
+        {
+            val curr = it.unnest()
+            curr.let {
+                { numShrinks: ShrinkCount ->
+                    MM.fx.monad {
+                        val (res, shrinks) = it.bind().fix()
+                        res.fold({
+                            Result.GivenUp
+                        }, { (log, result) ->
+                            result.fold({
+                                val summary = FailureSummary(
+                                    size, seed, numShrinks, it.unFailure,
+                                    annotations = log.unLog.filterMap { entry ->
+                                        when (entry) {
+                                            is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text).some()
+                                            is JournalEntry.Input -> FailureAnnotation.Input(entry.text).some()
+                                            else -> None
                                         }
-                                    )
-                                }.value().bind()
-                        }, { Result.Success })
-                    })
+                                    },
+                                    footnotes = log.unLog.filterMap { entry ->
+                                        if (entry is JournalEntry.Footnote) entry.text.some()
+                                        else None
+                                    }
+                                )
+
+                                hook(summary).bind()
+
+                                if (numShrinks.unShrinkCount >= shrinkLimit)
+                                    Result.Failure(summary)
+                                else shrinks.map { it(ShrinkCount(numShrinks.unShrinkCount + 1)) }
+                                    .foldRight(Eval.now(MM.just(Result.Failure(summary)))) { v, acc ->
+                                        Eval.now(
+                                            MM.fx.monad {
+                                                val test = !v
+                                                if (test is Result.Failure) test
+                                                else acc.value().bind()
+                                            }
+                                        )
+                                    }.value().bind()
+                            }, { Result.Success })
+                        })
+                    }
                 }
             }
-        }
-    }, {
-        it.runTreeN(MM, shrinkRetries).nest()
-    }, FF()).invoke(ShrinkCount(0))
+        },
+        {
+            it.runTreeN(MM, shrinkRetries).nest()
+        },
+        FF()
+    ).invoke(ShrinkCount(0))
 }
 
 fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(

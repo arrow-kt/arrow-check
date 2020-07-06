@@ -10,13 +10,13 @@ data class Config(
 )
 
 sealed class Verbose {
-    object Quiet: Verbose()
-    object Normal: Verbose()
+    object Quiet : Verbose()
+    object Normal : Verbose()
 }
 
 sealed class UseColor {
-    object EnableColor: UseColor()
-    object DisableColor: UseColor()
+    object EnableColor : UseColor()
+    object DisableColor : UseColor()
 }
 
 inline class TaskId(val id: Int)
@@ -31,5 +31,3 @@ fun detectConfig(): IO<Config> = IO.applicative().map(
     detectColor(),
     detectVerbosity()
 ) { (useColor, verbosity) -> Config(useColor, verbosity) }.fix()
-
-

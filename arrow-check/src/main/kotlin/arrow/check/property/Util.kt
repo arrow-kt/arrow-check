@@ -5,7 +5,6 @@ import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.extensions.listk.monoid.monoid
 import arrow.core.toT
-import arrow.extension
 import arrow.optics.optics
 import arrow.typeclasses.Monoid
 import arrow.typeclasses.Semigroup
@@ -28,12 +27,14 @@ sealed class Markup {
         object Running : Progress()
         object Shrinking : Progress()
     }
+
     sealed class Result : Markup() {
         object Failed : Result()
         object GaveUp : Result()
         object Success : Result()
     }
-    data class Icon(val name: IconType): Markup()
+
+    data class Icon(val name: IconType) : Markup()
     sealed class Style : Markup() {
         object Failure : Style()
         object Success : Style()
@@ -57,10 +58,11 @@ inline class Log(val unLog: List<JournalEntry>) {
 }
 
 // @extension
-interface LogMonoid: Monoid<Log> {
+interface LogMonoid : Monoid<Log> {
     override fun Log.combine(b: Log): Log = Log(
         ListK.monoid<JournalEntry>().run { unLog + b.unLog }
     )
+
     override fun empty(): Log = Log(ListK.empty())
 }
 
@@ -69,12 +71,13 @@ fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
 sealed class JournalEntry {
     // inputs forAll adds those
     data class Input(val text: () -> Doc<Markup>) : JournalEntry()
+
     // user supplied information
     data class Annotate(val text: () -> Doc<Markup>) : JournalEntry()
 
     data class Footnote(val text: () -> Doc<Markup>) : JournalEntry()
     // labels, classes, tables
-    data class JournalLabel(val label: Label<Boolean>): JournalEntry()
+    data class JournalLabel(val label: Label<Boolean>) : JournalEntry()
 }
 
 data class Label<A>(
@@ -92,7 +95,7 @@ inline class LabelName(val unLabelName: String)
 
 data class Coverage<A>(val unCoverage: Map<Option<LabelTable>, Map<LabelName, Label<A>>>) {
     companion object {
-        fun <A> monoid(SA: Semigroup<A>) = object: CoverageMonoid<A> {
+        fun <A> monoid(SA: Semigroup<A>) = object : CoverageMonoid<A> {
             override fun SA(): Semigroup<A> = SA
         }
     }
@@ -113,7 +116,13 @@ interface CoverageMonoid<A> : Monoid<Coverage<A>> {
                 if (acc.containsKey(k))
                     acc + mapOf(k to v.toList().fold(acc.getValue(k)) { acc, (k2, v2) ->
                         if (acc.containsKey(k2))
-                            acc + mapOf(k2 to (Label(v2.table, v2.name, v2.min, SA().run { acc[k2]!!.annotation + v2.annotation })))
+                            acc + mapOf(
+                                k2 to (Label(
+                                    v2.table,
+                                    v2.name,
+                                    v2.min,
+                                    SA().run { acc[k2]!!.annotation + v2.annotation }))
+                            )
                         else acc + mapOf(k2 to v2)
                     })
                 else acc + mapOf(k to v)
@@ -153,9 +162,13 @@ val defaultMinTests = TestLimit(100)
 data class Confidence(val certainty: Long = 10.0.pow(9.0).toLong(), val tolerance: Double = 0.9)
 
 sealed class TerminationCriteria
-data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)): TerminationCriteria()
-data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)): TerminationCriteria()
-data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)): TerminationCriteria()
+data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
+    TerminationCriteria()
+
+data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
+    TerminationCriteria()
+
+data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)) : TerminationCriteria()
 
 inline class TestLimit(val unTestLimit: Int)
 inline class DiscardRatio(val unDiscardRatio: Double)
@@ -179,12 +192,20 @@ fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> 
 
 fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
     coverage.labelsToTotals().map { (total, l) ->
-        sufficientlyCovered(l.table.fold({ test.unTestCount }, { total }), l.annotation.unCoverCount, l.min.unCoverPercentage / 100.0)
+        sufficientlyCovered(
+            l.table.fold({ test.unTestCount }, { total }),
+            l.annotation.unCoverCount,
+            l.min.unCoverPercentage / 100.0
+        )
     }.fold(true) { acc, v -> acc && v }
 
 fun Confidence.failure(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
     coverage.labelsToTotals().map { (total, l) ->
-        insufficientlyCovered(l.table.fold({ test.unTestCount }, { total }), l.annotation.unCoverCount, l.min.unCoverPercentage / 100.0)
+        insufficientlyCovered(
+            l.table.fold({ test.unTestCount }, { total }),
+            l.annotation.unCoverCount,
+            l.min.unCoverPercentage / 100.0
+        )
     }.fold(false) { acc, v -> acc || v }
 
 fun Confidence.sufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
