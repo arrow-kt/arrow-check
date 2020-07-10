@@ -4,6 +4,10 @@ title: Why property based testing?
 permalink: /check/why-property-based-testing
 ---
 
+```kotlin:ank:silent
+import arrow.check.check
+```
+
 # Why property-based-testing?
 
 To understand this question lets look at a different model that is widely used: Example based testing.
@@ -14,7 +18,7 @@ An example based test is roughly structured like this:
 
 Most unit tests usually run an example based test for the success path of the function, one or more for the failure path and (if obvious) some for edge cases.
 
-Note the "if obvious", because edge cases usually are not. Sure we can all see where `x / y` can go wrong, but this behind several layers of function calls and other indirections will become quite the challange.
+Note the "if obvious", edge cases usually are not. Sure we can all see where `x / y` can go wrong, but this behind several layers of function calls and other indirections will become quite the challenge.
 
 The problem here is that we, the programmer, have to think of all cases manually and have to decide what to test and how.
 
@@ -28,8 +32,9 @@ The structure of a property test is quite similar to that of an example based te
 `val example = generateExample(); val result = toTest(example); verify(result)`
 
 Except that it is not obvious how those examples are generated! Lets have a look at how this is handled in arrow-check:
-```kotlin
-property {
+```kotlin:ank
+//sampleStart
+check {
     val example = forAllT { int(-100..100).list(0..100) }.bind() // 1
     // no property based testing intro is complete without a reverse property
     val result = example.reversed() // 2
@@ -37,6 +42,8 @@ property {
     // This is naive, but this is only for an example anyway.
     example.eqv(result.reversed()).bind() // 3
 }
+//sampleEnd
+    .unsafeRunSync()
 ```
 
 This will now go and produce a number of lists as inputs and verify that reversing the list twice will yield the original list back.
@@ -67,17 +74,28 @@ One good way of understanding properties is as requirements:
 Such requirements usually map one to one in code.
 
 A test for a site navigation that never should 404 might look like this:
-```kotlin
+```kotlin:ank
+import arrow.check.gen.Gen
+class Page {
+    fun navOptions(): Array<String> = TODO()
+    fun navigate(vararg target: String): Page = TODO()
+}
+fun pageGen(): Gen<Page> = TODO()
+val Page404: Page = Page()
+
+//sampleStart
+check {
     // Generate a random starting page
     val navStart = forAll(pageGen()).bind()
     // Generate a command given a set of possible options
     val navTarget = forAll { element(navStart.navOptions()) }.bind()
     // run test
-    val resultPage = navStart.navigate(navTarget)
+    val resultPage = navStart.navigate(*navTarget)
     // verify properties
-    <...>
     // no 404 (This is just one out of many possible properties)
     resultPage.neqv(Page404).bind()
+}
+//sampleEnd
 ```
 
 As an app grows larger more and more navigation options show up and verifying the correct behaviour with tests grows quickly.
@@ -88,14 +106,20 @@ However with this property based test, all navigation options are tested in just
 Now one objection one might have to property based testing is that random data is not readable. By definiton that is.
 
 To combat this property tests try to shrink the input on failure. What this means can be seen from this test:
-```kotlin
-property {
+```kotlin:ank:silent
+import arrow.core.toT
+
+//sampleStart
+check {
     val (a, b) = forAllT { tupled(int(0..100), int(0..100)) }.bind()
     // obviously going to fail, but with what error?
     (a toT (b + 1)).eqv(a toT b).bind()
 }
-// => prints
-🞬 test failed after 1 test 2 shrinks.
+//sampleEnd
+    .attempt().unsafeRunSync()
+```
+```
+🞬 <interactive> failed after 1 test 2 shrinks.
 forAll = (0, 0)
 ━━━ Failed (- lhs =/= + rhs) ━━━
  (
