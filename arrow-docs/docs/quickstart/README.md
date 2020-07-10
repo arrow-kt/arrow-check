@@ -10,14 +10,14 @@ Arrow-check works with and without the use of other arrow libraries, however it 
 
 Use the list below to learn about how to effectively use arrow-check to test your programs:
 
-- [Why property based testing?]: A (short) primer as to why property based testing can help improve your tests and why it is a great fit for fp.
-- [Getting started with arrow-check]: Introduction to the libraries main functionality and a few basic examples.
+- [Why property based testing?](/check/why-property-based-testing): A (short) primer as to why property based testing can help improve your tests and why it is a great fit for fp.
+- [Getting started with arrow-check](/check/getting-started): Introduction to the libraries main functionality and a few basic examples.
 - [Writing good generators]: A list of best practices when writing generators and pitfalls to avoid.
 - [Testing IO/suspend]: On testing functions that perform effects.
 - [Why another property based testing library?]: There are several other jvm libraries, why another one?
 <!---
 Stuff for later
-- [Testing the untestable]: Testing complex systems with stack machines
+- [Testing the untestable]: Testing complex systems with state machines
 -->
 
 ## Setup
