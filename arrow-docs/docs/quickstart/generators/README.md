@@ -153,7 +153,7 @@ While on the surface this looks more complex than the previous option this does 
 - The third and final argument is a function to a list of recursive generators. The function is used to defer creating the generators to avoid running into stackoverflows.
 
 When given a size larger than 0 `recursive` will pass both the recursive and terminal generators to the choice function, allowing recursion.
-It also decrements the size by multiplying it with the *golden ratio*. This offers good behavior in most cases.
+It also decrements the size by multiplying it with the *golden-ratio*. This offers good behavior in most cases.
 
 When the size approaches 0 the generator will terminate by only passing the terminal generators to the choice function.
 
