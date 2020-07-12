@@ -17,17 +17,41 @@ Table of contents:
 ## Avoiding monadic composition
 
 Suppose we want to generate two **independent** values, like two numbers:
-```kotlin:ank
+```kotlin:ank:silent
+import arrow.check.gen.Gen
+import arrow.check.gen.monadGen
+import arrow.check.gen.printTreeWith
+import arrow.check.property.Size
+import arrow.check.gen.RandSeed
+
 //sampleStart
 val gen = Gen.monadGen {
   fx {
-    val a = int(0..10).bind()
-    val b = int(0..10).bind()
+    val a = int(0..5).bind()
+    val b = int(0..5).bind()
     Pair(a, b)
   }
 }
+gen.printTreeWith(Size(30), RandSeed(0))
 //sampleEnd
-gen.print()
+```
+```
+(2, 2)
+|-> (0, 2)
+|   |-> (0, 0)
+|   --> (0, 1)
+|       --> (0, 0)
+|-> (1, 2)
+|   |-> (0, 2)
+|   |   |-> (0, 0)
+|   |   --> (0, 1)
+|   |       --> (0, 0)
+|   |-> (1, 0)
+|   --> (1, 1)
+|       --> (1, 0)
+|-> (2, 0)
+--> (2, 1)
+    --> (2, 0)
 ```
 This will indeed work perfectly fine. However as you can see in the output the shrunk values are not ideal.
 This has a very specific reason: The code above is equal to `int(range).flatMap { x -> int(range).map { y -> Pair(x, y) } }`.
@@ -36,16 +60,39 @@ This means a shrinker cannot go back to first value after it is done shrinking i
 
 However this is only a problem if the two values actually **depend** on each other (which can also be worked around).
 But this is not the case with the above, and not with most generators. If we instead use different combinators to compose them we get good results:
-```kotlin:ank
+```kotlin:ank:silent
 //sampleStart
 val gen = Gen.monadGen {
-  tupled(int(0..10), int(0..10))
+  tupled(int(0..5), int(0..5))
 }
 val gen2 = Gen.monadGen {
-  mapN(int(0..10), int(0..10)) { (a, b) -> Pair(a, b) }
+  mapN(int(0..5), int(0..5)) { (a, b) -> Pair(a, b) }
 }
+gen.printTreeWith(Size(30), RandSeed(0))
 //sampleEnd
-gen.print()
+```
+```
+(2, 4)
+|-> (0, 4)
+|   |-> (0, 0)
+|   |-> (0, 2)
+|   |   |-> (0, 0)
+|   |   --> (0, 1)
+|   |       --> (0, 0)
+|   --> (0, 3)
+|       |-> (0, 0)
+|       --> (0, 2)
+|           |-> (0, 0)
+|           --> (0, 1)
+|               --> (0, 0)
+|-> (1, 4)
+|   |-> (0, 4)
+|   |   |-> (0, 0)
+|   |   |-> (0, 2)
+|   |   |   |-> (0, 0)
+|   |   |   --> (0, 1)
+|   |   |       --> (0, 0)
+<...>
 ```
 By using `mapN` to combine the generators we can combine **independent** generators, this use case is sufficient for most if not all types of data classes.
 > If you are familiar with arrow you may see that the difference between `flatMap` and `mapN` is the difference between `Monad` and `Applicative`.
@@ -61,21 +108,19 @@ These two options produce similar, if not equal results:
 ```kotlin:ank
 //sampleStart
 val gen = Gen.monadGen {
-  int(0..100).flatMap { a -> if (a > 10) pure(a) else discard() }
+  int(0..100).flatMap { a -> if (a < 10) just(a) else discard() }
 }
 val gen1 = Gen.monadGen {
-  int(0..100).filter { a -> a > 10 }
+  int(0..100).filter { a -> a < 10 }
 }
 //sampleEnd
-gen.print()
-gen1.print()
 ```
 Both of these generators do roughly the same. However the first one will have a very high discard ratio.
 The filter method on the other hand recursively expands the search size of a generator and tries the value against the filter before discarding it.
 
 So in short: Always prefer filter, but also try to avoid it if you can.
 
-## Use `forAllT` when dealing with a large recursive generator
+## Use `forAllT` when dealing with large generators
 
 When writing a recursive generator for collections or recursive types a generator can quickly lead to stackoverflows.
 
@@ -98,6 +143,11 @@ But this will not add stacksafety, so you do actually need the method described 
 
 When defining a recursive generator it might be tempting to write:
 ```kotlin:ank
+import arrow.check.gen.GenT
+import arrow.fx.IO
+import arrow.fx.ForIO
+import arrow.fx.extensions.io.monad.monad
+
 data class IntTree(val v: Int, val nodes: List<IntTree>)
 //sampleStart
 fun gen(): GenT<ForIO, IntTree> = GenT.monadGen(IO.monad()) {
@@ -109,7 +159,6 @@ fun gen(): GenT<ForIO, IntTree> = GenT.monadGen(IO.monad()) {
   }
 }
 //sampleEnd
-gen.print()
 ```
 This generator is perfectly fine, however this may not actually terminate. A solution to this is tweaking the size of the recursive generator invocation, so that trees become smaller the deeper they are.
 
@@ -128,7 +177,6 @@ fun gen(): GenT<ForIO, IntTree> = GenT.monadGen(IO.monad()) {
   }
 }
 //sampleEnd
-gen.print()
 ```
 
 This will now generate trees that becomes smaller and smaller the deeper it becomes, so eventually it will be run with a size of 0 which forces an empty list and thus terminates.
@@ -145,7 +193,6 @@ fun gen(): GenT<ForIO, IntTree> = GenT.monadGen(IO.monad()) {
   )
 }
 //sampleEnd
-gen.print()
 ```
 While on the surface this looks more complex than the previous option this does solve a few common problems:
 - The first argument is a choice function. Given a list of generators you can freely choose between them. Here we use choice, which models unweighted choice between all entries.

@@ -29,9 +29,18 @@ Both of these things are simply not possible in *kotest*.
 *arrow-check* is similar to *kotest* as in it offers automatic shrinking of inputs generated. However the two differ substantially:
 
 In *arrow-check* shrinkers are recursive, whereas *kotest* shrinks only the top level. This is most notable when looking at collections:
-```kotlin
-val l = forAll { int(0..100).list(0..100) }.bind()
-attempt(l.size > 0).bind()
+```kotlin:ank:silent
+import arrow.check.check
+check {
+  //sampleStart
+  val l = forAll { int(0..100).list(0..100) }.bind()
+  assert(l.size == 0).bind()
+  //sampleEnd
+}.attempt().unsafeRunSync()
+```
+```
+🞬 <interactive> failed after 2 tests 12 shrinks.
+forAll = [0]
 ```
 Say this generates `[100, 5, 7]` and thus fails. *kotest* will shrink this to a smaller list, likely `[100]`.
 *arrow-check* on the other hand will shrink the inner generator as well so we get `[0]`.
@@ -39,14 +48,22 @@ Say this generates `[100, 5, 7]` and thus fails. *kotest* will shrink this to a 
 With integers this may not seem substantial, but any larger datatype and the benefits of recursive shrinking become much clearer.
 
 Also consider another case:
-```kotlin
-val l = forAll { int(0..100).list(0..100) }.bind()
-assert(l.size > 0 && l[1] > 10).bind()
+```kotlin:ank:silent
+check {
+  //sampleStart
+  val l = forAll { int(0..100).list(1..100) }.bind()
+  assert(l[0] <= 10).bind()
+  //sampleEnd
+}.attempt().unsafeRunSync()
+```
+```
+🞬 <interactive> failed after 8 tests 33 shrinks.
+forAll = [11]
 ```
 This will fail for any list larger than one where the first item is larger than 10.
 A recursive shrinker will shrink a value like `[100, 5, 7]` to `[11]` but less advanced shrinkers will produce `[100]` which makes it harder to parse failure.
 
-> Also another fairly subjective point: *arrow-check*s shrinking is much better.
+> Another fairly subjective point: *arrow-check*s shrinking is much better.
 > It can easily compose any number of generators and shrink them towards arbitrary origins.
 > On top of that it is extensible, one can easily interleave custom shrinking with existing shrinking of a generator, or even throw away generated shrinking for a better custom method.
 
@@ -102,15 +119,19 @@ These two combined make the console output of *arrow-check* very easy to parse a
 
 *arrow-check* offers a feature to generate arbitrary deterministic and non-constant functions.
 ```kotlin:ank
+import arrow.check.gen.*
+//sampleStart
 check {
   val f: (Int) -> String = forAllFn(
     Gen.monadGen {
       ascii().string(0..100)
-        .toFunction(Int.func(), Coarbitrary.func())
+        .toFunction(Int.func(), Int.coarbitrary())
     }
-  )
+  ).bind()
   val result = f(1)
 }
+//sampleEnd
+  .attempt().unsafeRunSync()
 ```
 
 This is **not** the same as `ascii().string(0..100).map { str -> { _ -> str } }`.
