@@ -32,18 +32,20 @@ The structure of a property test is quite similar to that of an example based te
 `val example = generateExample(); val result = toTest(example); verify(result)`
 
 Except that it is not obvious how those examples are generated! Lets have a look at how this is handled in arrow-check:
-```kotlin:ank
-//sampleStart
-check {
-    val example = forAllT { int(-100..100).list(0..100) }.bind() // 1
-    // no property based testing intro is complete without a reverse property
-    val result = example.reversed() // 2
-    // check if reversing again produces the same result
-    // This is naive, but this is only for an example anyway.
-    example.eqv(result.reversed()).bind() // 3
+```kotlin:ank:playground
+val p = check {
+  //sampleStart
+  val example = forAllT { int(-100..100).list(0..100) }.bind() // 1
+  // no property based testing intro is complete without a reverse property
+  val result = example.reversed() // 2
+  // check if reversing again produces the same result
+  // This is naive, but this is only for an example anyway.
+  example.eqv(result.reversed()).bind() // 3
+  //sampleEnd
 }
-//sampleEnd
-    .unsafeRunSync()
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 
 This will now go and produce a number of lists as inputs and verify that reversing the list twice will yield the original list back.
@@ -74,7 +76,7 @@ One good way of understanding properties is as requirements:
 Such requirements usually map one to one in code.
 
 A test for a site navigation that never should 404 might look like this:
-```kotlin:ank
+```kotlin:ank:playground
 import arrow.check.gen.Gen
 class Page {
     fun navOptions(): Array<String> = TODO()
@@ -83,19 +85,22 @@ class Page {
 fun pageGen(): Gen<Page> = TODO()
 val Page404: Page = Page()
 
-//sampleStart
-check {
-    // Generate a random starting page
-    val navStart = forAll(pageGen()).bind()
-    // Generate a command given a set of possible options
-    val navTarget = forAll { element(navStart.navOptions()) }.bind()
-    // run test
-    val resultPage = navStart.navigate(*navTarget)
-    // verify properties
-    // no 404 (This is just one out of many possible properties)
-    resultPage.neqv(Page404).bind()
+val p = check {
+  //sampleStart
+  // Generate a random starting page
+  val navStart = forAll(pageGen()).bind()
+  // Generate a command given a set of possible options
+  val navTarget = forAll { element(navStart.navOptions()) }.bind()
+  // run test
+  val resultPage = navStart.navigate(*navTarget)
+  // verify properties
+  // no 404 (This is just one out of many possible properties)
+  resultPage.neqv(Page404).bind()
+  //sampleEnd
 }
-//sampleEnd
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 
 As an app grows larger more and more navigation options show up and verifying the correct behaviour with tests grows quickly.
@@ -106,27 +111,19 @@ However with this property based test, all navigation options are tested in just
 Now one objection one might have to property based testing is that random data is not readable. By definiton that is.
 
 To combat this property tests try to shrink the input on failure. What this means can be seen from this test:
-```kotlin:ank:silent
+```kotlin:ank:playground
 import arrow.core.toT
 
-//sampleStart
-check {
-    val (a, b) = forAllT { tupled(int(0..100), int(0..100)) }.bind()
-    // obviously going to fail, but with what error?
-    (a toT (b + 1)).eqv(a toT b).bind()
+val p = check {
+  //sampleStart
+  val (a, b) = forAllT { tupled(int(0..100), int(0..100)) }.bind()
+  // obviously going to fail, but with what error?
+  (a toT (b + 1)).eqv(a toT b).bind()
+  //sampleEnd
 }
-//sampleEnd
-    .attempt().unsafeRunSync()
-```
-```
-🞬 <interactive> failed after 1 test 2 shrinks.
-forAll = (0, 0)
-━━━ Failed (- lhs =/= + rhs) ━━━
- (
-    0
-- , 1
-+ , 0
-  )
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 Arrow check shows the number of total tests, how many times it had to shrink the test failure, the inputs and lastly a diff of the output.
 

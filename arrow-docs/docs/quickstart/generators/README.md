@@ -17,7 +17,7 @@ Table of contents:
 ## Avoiding monadic composition
 
 Suppose we want to generate two **independent** values, like two numbers:
-```kotlin:ank:silent
+```kotlin:ank:playground
 import arrow.check.gen.Gen
 import arrow.check.gen.monadGen
 import arrow.check.gen.printTreeWith
@@ -32,26 +32,10 @@ val gen = Gen.monadGen {
     Pair(a, b)
   }
 }
-gen.printTreeWith(Size(30), RandSeed(0))
+fun main() {
+  gen.printTreeWith(Size(30), RandSeed(0))
+}
 //sampleEnd
-```
-```
-(2, 2)
-|-> (0, 2)
-|   |-> (0, 0)
-|   --> (0, 1)
-|       --> (0, 0)
-|-> (1, 2)
-|   |-> (0, 2)
-|   |   |-> (0, 0)
-|   |   --> (0, 1)
-|   |       --> (0, 0)
-|   |-> (1, 0)
-|   --> (1, 1)
-|       --> (1, 0)
-|-> (2, 0)
---> (2, 1)
-    --> (2, 0)
 ```
 This will indeed work perfectly fine. However as you can see in the output the shrunk values are not ideal.
 This has a very specific reason: The code above is equal to `int(range).flatMap { x -> int(range).map { y -> Pair(x, y) } }`.
@@ -60,7 +44,7 @@ This means a shrinker cannot go back to first value after it is done shrinking i
 
 However this is only a problem if the two values actually **depend** on each other (which can also be worked around).
 But this is not the case with the above, and not with most generators. If we instead use different combinators to compose them we get good results:
-```kotlin:ank:silent
+```kotlin:ank:playground
 //sampleStart
 val gen = Gen.monadGen {
   tupled(int(0..5), int(0..5))
@@ -68,31 +52,10 @@ val gen = Gen.monadGen {
 val gen2 = Gen.monadGen {
   mapN(int(0..5), int(0..5)) { (a, b) -> Pair(a, b) }
 }
-gen.printTreeWith(Size(30), RandSeed(0))
+fun main() {
+  gen.printTreeWith(Size(30), RandSeed(21))
+}
 //sampleEnd
-```
-```
-(2, 4)
-|-> (0, 4)
-|   |-> (0, 0)
-|   |-> (0, 2)
-|   |   |-> (0, 0)
-|   |   --> (0, 1)
-|   |       --> (0, 0)
-|   --> (0, 3)
-|       |-> (0, 0)
-|       --> (0, 2)
-|           |-> (0, 0)
-|           --> (0, 1)
-|               --> (0, 0)
-|-> (1, 4)
-|   |-> (0, 4)
-|   |   |-> (0, 0)
-|   |   |-> (0, 2)
-|   |   |   |-> (0, 0)
-|   |   |   --> (0, 1)
-|   |   |       --> (0, 0)
-<...>
 ```
 By using `mapN` to combine the generators we can combine **independent** generators, this use case is sufficient for most if not all types of data classes.
 > If you are familiar with arrow you may see that the difference between `flatMap` and `mapN` is the difference between `Monad` and `Applicative`.

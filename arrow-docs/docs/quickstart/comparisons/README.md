@@ -29,18 +29,17 @@ Both of these things are simply not possible in *kotest*.
 *arrow-check* is similar to *kotest* as in it offers automatic shrinking of inputs generated. However the two differ substantially:
 
 In *arrow-check* shrinkers are recursive, whereas *kotest* shrinks only the top level. This is most notable when looking at collections:
-```kotlin:ank:silent
+```kotlin:ank:playground
 import arrow.check.check
-check {
+val p = check {
   //sampleStart
   val l = forAll { int(0..100).list(0..100) }.bind()
   assert(l.size == 0).bind()
   //sampleEnd
-}.attempt().unsafeRunSync()
-```
-```
-🞬 <interactive> failed after 2 tests 12 shrinks.
-forAll = [0]
+}
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 Say this generates `[100, 5, 7]` and thus fails. *kotest* will shrink this to a smaller list, likely `[100]`.
 *arrow-check* on the other hand will shrink the inner generator as well so we get `[0]`.
@@ -48,17 +47,16 @@ Say this generates `[100, 5, 7]` and thus fails. *kotest* will shrink this to a 
 With integers this may not seem substantial, but any larger datatype and the benefits of recursive shrinking become much clearer.
 
 Also consider another case:
-```kotlin:ank:silent
-check {
+```kotlin:ank:playground
+val p = check {
   //sampleStart
   val l = forAll { int(0..100).list(1..100) }.bind()
   assert(l[0] <= 10).bind()
   //sampleEnd
-}.attempt().unsafeRunSync()
-```
-```
-🞬 <interactive> failed after 8 tests 33 shrinks.
-forAll = [11]
+}
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 This will fail for any list larger than one where the first item is larger than 10.
 A recursive shrinker will shrink a value like `[100, 5, 7]` to `[11]` but less advanced shrinkers will produce `[100]` which makes it harder to parse failure.
@@ -118,20 +116,26 @@ These two combined make the console output of *arrow-check* very easy to parse a
 ## Function generation
 
 *arrow-check* offers a feature to generate arbitrary deterministic and non-constant functions.
-```kotlin:ank
+```kotlin:ank:playground
 import arrow.check.gen.*
-//sampleStart
-check {
+import pretty.text
+val p = check {
+  //sampleStart
   val f: (Int) -> String = forAllFn(
     Gen.monadGen {
-      ascii().string(0..100)
+      alphaNum().string(0..100)
         .toFunction(Int.func(), Int.coarbitrary())
     }
   ).bind()
-  val result = f(1)
+  footnote { "First: ${f(1)}".text() }.bind()
+  footnote { "Second: ${f(2)}".text() }.bind()
+
+  assert(f(10).length <= 10).bind()
+  //sampleEnd
 }
-//sampleEnd
-  .attempt().unsafeRunSync()
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
 
 This is **not** the same as `ascii().string(0..100).map { str -> { _ -> str } }`.

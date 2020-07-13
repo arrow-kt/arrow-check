@@ -58,7 +58,7 @@ When a property test fails it can lead to a bit of noise as it outputs quite a f
 Let's have a look at what *arrow-check* outputs after a failed test.
 
 We will be testing a function that supposedly copies a `User`:
-```kotlin:ank:silent
+```kotlin:ank:playground
 import arrow.check.check
 import arrow.check.gen.Gen
 import arrow.check.gen.monadGen
@@ -71,7 +71,7 @@ data class User(val name: String, val age: Int, val email: String) {
 // Some sort of sophisticated email gen
 fun emailGen(): Gen<String> = Gen.monadGen { element("myEmail@provider.en") }
 
-check {
+val test = check {
   val user = forAll {
     mapN(
       ascii().string(2..100),
@@ -84,21 +84,10 @@ check {
   copy.eqv(user).bind()  
 }
 //sampleEnd
-    .attempt().unsafeRunSync()
+fun main() {
+  test.attempt().unsafeRunSync()
+}
 ``` 
-```
-🞬 <interactive> failed after 1 test 74 shrinks.
-forAll =
-  User(name = , age = 18, email = myEmail@provider.en)
-━━━ Failed (- lhs =/= + rhs) ━━━
- User(
-        name  = 
--     , age   = 19
-+               18
-      , email = myEmail@provider.en
-      )
-
-```
 The first thing *arrow-check* outputs is the number of tests it ran and the number of times it tried to shrink the value.
 
 After that we get every input that was generated, as with all values *arrow-check* tries to prettify any output that comes from `toString` methods.
@@ -117,27 +106,21 @@ Likewise had we encoded more invariants into our data, not just the ranges, our 
 The output of *arrow-check* is not limited to inputs and failure. Using the annotate function we can add any sort of output as well.
 
 This following test demonstrates this behavior:
-```kotlin:ank:silent
+```kotlin:ank:playground
 import pretty.text
 
-//sampleStart
-check {
+val p = check {
+  //sampleStart
   annotate { "Annotation 1".text() }.bind()
   footnote { "Footnote".text() }.bind()
   annotate { "Annotation 2".text() }.bind()
   failWith("Failure").bind()
+  //sampleEnd
 }
-//sampleEnd
-  .attempt().unsafeRunSync()
+fun main() {
+  p.attempt().unsafeRunSync()
+}
 ```
-```
-🞬 <interactive> failed after 1 test 0 shrinks.
-Annotation 1
-Annotation 2
-Footnote
-Failure
-```
-
 Both `annotate` and `footnote` take functions instead of values as arguments. The reason for that is because they are supposed to be lazy.
 You can construct annotations with almost no cost on every test and it will only be forced if the test actually fails and is printed out.
 
