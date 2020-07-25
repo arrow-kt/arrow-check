@@ -128,6 +128,7 @@ interface GenTMonadTrans : MonadTrans<ForGenT> {
             liftT(MF)
         }.let { Rose.monadTrans().run { it.liftT(OptionT.monad(MF)).fix() } }
     }
+    override fun <M> liftMonad(MM: Monad<M>): Monad<Kind<ForGenT, M>> = GenT.monad(MM)
 }
 
 fun GenT.Companion.monadTrans(): MonadTrans<ForGenT> = object : GenTMonadTrans {}

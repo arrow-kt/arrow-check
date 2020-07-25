@@ -117,6 +117,8 @@ interface PropertyTMonadTrans : MonadTrans<ForPropertyT> {
         GenT.monadTrans().run { liftT(MF) }.let {
             PropertyT(TestT.monadTrans().run { it.liftT(GenT.monad(MF)).fix() })
         }
+
+    override fun <M> liftMonad(MM: Monad<M>): Monad<Kind<ForPropertyT, M>> = PropertyT.monad(MM)
 }
 
 fun PropertyT.Companion.monadTrans(): MonadTrans<ForPropertyT> = object : PropertyTMonadTrans {}

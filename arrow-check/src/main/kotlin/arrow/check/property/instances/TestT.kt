@@ -115,6 +115,8 @@ interface TestTMonadTrans : MonadTrans<ForTestT> {
             WriterT.liftF(this, Log.monoid(), MF)
         )
     )
+
+    override fun <M> liftMonad(MM: Monad<M>): Monad<Kind<ForTestT, M>> = TestT.monad(MM)
 }
 
 fun TestT.Companion.monadTrans(): MonadTrans<ForTestT> = object : TestTMonadTrans {}

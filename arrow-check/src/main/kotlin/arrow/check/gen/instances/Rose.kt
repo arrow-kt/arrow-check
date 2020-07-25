@@ -272,6 +272,8 @@ fun <M, A> Rose.Companion.birecursive(MM: Monad<M>): Birecursive<Rose<M, A>, Nes
 // @extension
 interface RoseMonadTrans : MonadTrans<ForRose> {
     override fun <G, A> Kind<G, A>.liftT(MF: Monad<G>): Kind2<ForRose, G, A> = liftF(MF, this)
+
+    override fun <M> liftMonad(MM: Monad<M>): Monad<Kind<ForRose, M>> = Rose.monad(MM)
 }
 
 fun Rose.Companion.monadTrans(): MonadTrans<ForRose> = object : RoseMonadTrans {}
