@@ -30,6 +30,10 @@ import arrow.core.test.laws.MonadErrorLaws
 import arrow.core.test.laws.TraverseLaws
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Monad
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.bind
+import io.kotest.property.arbitrary.int
+import io.kotest.property.arbitrary.map
 
 class RoseLawsSpec : UnitSpec() {
     init {
@@ -39,12 +43,12 @@ class RoseLawsSpec : UnitSpec() {
                 Rose.functor(Either.monad<Throwable>()),
                 Rose.applicative(Either.monad<Throwable>()),
                 Rose.monad(Either.monad<Throwable>()),
-                Rose.genK(Either.genK(io.kotlintest.properties.Gen.throwable()), Either.monad()),
+                Rose.genK(Either.genK(Arb.throwable()), Either.monad()),
                 Rose.eqK(Either.eqK(Eq<Throwable> { a, b -> a::class == b::class }))
             ),
             EqLaws.laws(
                 Rose.eq(Id.eqK(), Int.eq()),
-                Rose.genK(Id.genK(), Id.monad()).genK(io.kotlintest.properties.Gen.int()) as io.kotlintest.properties.Gen<Rose<ForId, Int>>
+                Rose.genK(Id.genK(), Id.monad()).genK(Arb.int()) as Arb<Rose<ForId, Int>>
             ),
             EqKLaws.laws(
                 Rose.eqK(Id.eqK()),
@@ -59,28 +63,28 @@ class RoseFLawsSpec : UnitSpec() {
         testLaws(
             EqLaws.laws(
                 RoseF.eq(Int.eq(), Int.eq()),
-                RoseF.genK(io.kotlintest.properties.Gen.int()).genK(io.kotlintest.properties.Gen.int()) as io.kotlintest.properties.Gen<RoseF<Int, Int>>
+                RoseF.genK(Arb.int()).genK(Arb.int()) as Arb<RoseF<Int, Int>>
             ),
             EqKLaws.laws(
                 RoseF.eqK(Int.eq()),
-                RoseF.genK(io.kotlintest.properties.Gen.int())
+                RoseF.genK(Arb.int())
             ),
             TraverseLaws.laws(
                 RoseF.traverse(),
-                RoseF.genK(io.kotlintest.properties.Gen.int()),
+                RoseF.genK(Arb.int()),
                 RoseF.eqK(Int.eq())
             )
         )
     }
 }
 
-fun <B> RoseF.Companion.genK(bGen: io.kotlintest.properties.Gen<B>): GenK<RoseFPartialOf<B>> = object : GenK<RoseFPartialOf<B>> {
-    override fun <A> genK(gen: io.kotlintest.properties.Gen<A>): io.kotlintest.properties.Gen<Kind<RoseFPartialOf<B>, A>> =
-        io.kotlintest.properties.Gen.bind(bGen, SequenceK.genK().genK(gen)) { a, b -> RoseF(a, b.fix()) }
+fun <B> RoseF.Companion.genK(bGen: Arb<B>): GenK<RoseFPartialOf<B>> = object : GenK<RoseFPartialOf<B>> {
+    override fun <A> genK(gen: Arb<A>): Arb<Kind<RoseFPartialOf<B>, A>> =
+        Arb.bind(bGen, SequenceK.genK().genK(gen)) { a, b -> RoseF(a, b.fix()) }
 }
 
 // FIXME this should be a recusive gen, but with kotlintest that is not possible (with sufficient termination guarantees that is)
 fun <M> Rose.Companion.genK(genK: GenK<M>, MM: Monad<M>): GenK<RosePartialOf<M>> = object : GenK<RosePartialOf<M>> {
-    override fun <A> genK(gen: io.kotlintest.properties.Gen<A>): io.kotlintest.properties.Gen<Kind<RosePartialOf<M>, A>> =
+    override fun <A> genK(gen: Arb<A>): Arb<Kind<RosePartialOf<M>, A>> =
         genK.genK(gen).map { Rose.monadTrans().run { it.liftT(MM) } }
 }

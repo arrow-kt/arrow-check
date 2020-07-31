@@ -18,7 +18,8 @@ dependencies {
     implementation "io.arrow-kt:arrow-fx:$VERSION_NAME" // IO and arrow fx
     api project(":arrow-check")
 
-    api("io.kotlintest:kotlintest-runner-junit5:3.4.2") {
-        exclude group: "io.arrow-kt"
-    }
+    api "io.kotest:kotest-runner-junit5-jvm:$KOTEST_VERSION" // for kotest framework
+    api "io.kotest:kotest-assertions-core-jvm:$KOTEST_VERSION" // for kotest core jvm assertions
+    api "io.kotest:kotest-property-jvm:$KOTEST_VERSION" // for kotest property test
+    api "io.kotest:kotest-runner-console-jvm:$KOTEST_VERSION"
 }

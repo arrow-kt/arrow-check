@@ -34,7 +34,9 @@ import arrow.core.toT
 import arrow.typeclasses.Eq
 import arrow.typeclasses.EqK
 import arrow.typeclasses.Monad
-import io.kotlintest.properties.Gen
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.map
+import io.kotest.property.arbitrary.string
 
 class GenTLawsSpec : UnitSpec() {
     init {
@@ -42,7 +44,7 @@ class GenTLawsSpec : UnitSpec() {
         testLaws(
             MonadErrorLaws.laws<GenTPartialOf<EitherPartialOf<Throwable>>>(
                 GenT.monadError(Either.monadError()),
-                GenT.genK(Either.genK(Gen.throwable()), Either.monad()),
+                GenT.genK(Either.genK(Arb.throwable()), Either.monad()),
                 GenT.eqK(Either.eqK(Eq<Throwable> { a, b -> a::class == b::class }), zeroSeed)
             ),
             MonadTransLaws.laws(
@@ -59,7 +61,7 @@ class GenTLawsSpec : UnitSpec() {
             ),
             MonoidLaws.laws(
                 GenT.monoid(Id.monad(), String.monoid()),
-                GenT.genK(Id.genK(), Id.monad()).genK(Gen.string()) as Gen<GenT<ForId, String>>,
+                GenT.genK(Id.genK(), Id.monad()).genK(Arb.string()) as Arb<GenT<ForId, String>>,
                 GenT.eqK(Id.eqK(), zeroSeed).liftEq(String.eq()) as Eq<GenT<ForId, String>>
             )
         )
@@ -67,7 +69,7 @@ class GenTLawsSpec : UnitSpec() {
 }
 
 fun <M> GenT.Companion.genK(genKF: GenK<M>, MM: Monad<M>): GenK<GenTPartialOf<M>> = object : GenK<GenTPartialOf<M>> {
-    override fun <A> genK(gen: Gen<A>): Gen<Kind<GenTPartialOf<M>, A>> =
+    override fun <A> genK(gen: Arb<A>): Arb<Kind<GenTPartialOf<M>, A>> =
         genKF.genK(gen).map { GenT.monadTrans().run { it.liftT(MM) } }
 }
 

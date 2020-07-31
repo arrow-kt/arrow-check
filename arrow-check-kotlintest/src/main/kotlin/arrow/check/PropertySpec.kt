@@ -7,16 +7,26 @@ import arrow.check.property.PropertyTestSyntax
 import arrow.check.property.property
 import arrow.core.Tuple2
 import arrow.core.some
-import io.kotlintest.AbstractSpec
-import io.kotlintest.TestType
-import io.kotlintest.specs.IntelliMarker
+import io.kotest.core.spec.createTestCase
+import io.kotest.core.spec.style.StringSpec
+import io.kotest.core.test.TestCase
+import io.kotest.core.test.TestName
+import io.kotest.core.test.TestType
+import io.kotest.runner.junit.platform.IntelliMarker
 
-abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : AbstractSpec() {
-    init { f() }
+abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : StringSpec() {
+    private val lawTestCases = mutableListOf<TestCase>()
+
+    init {
+        f()
+    }
+
+    override fun materializeRootTests(): List<TestCase> =
+        super.materializeRootTests() + lawTestCases
 
     operator fun String.invoke(props: List<Tuple2<String, Property>>): Unit =
-        addTestCase(
-            this,
+        createTestCase(
+            TestName(name = this),
             {
                 checkGroup(this@invoke, props)
                     .unsafeRunSync()
@@ -24,32 +34,32 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
                         if (it.not()) throw AssertionError("Some tests failed!")
                     }
             },
-            defaultTestCaseConfig,
+            defaultConfig(),
             TestType.Test
-        )
+        ).let { lawTestCases.add(it); Unit }
 
     operator fun String.invoke(
         propertyConfig: PropertyConfig = PropertyConfig(),
         c: suspend PropertyTestSyntax.() -> Unit
     ): Unit =
-        addTestCase(
-            this,
+        createTestCase(
+            TestName(name = this),
             {
                 checkReport(PropertyName(this@invoke).some(), property(propertyConfig, c))
                     .unsafeRunSync()
                     .toException()
             },
-            defaultTestCaseConfig,
+            defaultConfig(),
             TestType.Test
-        )
+        ).let { lawTestCases.add(it); Unit }
 
     operator fun String.invoke(
         args: Config,
         propertyConfig: PropertyConfig = PropertyConfig(),
         c: suspend PropertyTestSyntax.() -> Unit
     ): Unit =
-        addTestCase(
-            this,
+        createTestCase(
+            TestName(name = this),
             {
                 checkReport(
                     args,
@@ -59,33 +69,33 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
                     .unsafeRunSync()
                     .toException()
             },
-            defaultTestCaseConfig,
+            defaultConfig(),
             TestType.Test
-        )
+        ).let { lawTestCases.add(it); Unit }
 
     operator fun String.invoke(f: Property): Unit =
-        addTestCase(
-            this,
+        createTestCase(
+            TestName(name = this),
             {
                 checkReport(PropertyName(this@invoke).some(), f)
                     .unsafeRunSync()
                     .toException()
             },
-            defaultTestCaseConfig,
+            defaultConfig(),
             TestType.Test
-        )
+        ).let { lawTestCases.add(it); Unit }
 
     operator fun String.invoke(args: Config, f: Property): Unit =
-        addTestCase(
-            this,
+        createTestCase(
+            TestName(name = this),
             {
                 checkReport(args, PropertyName(this@invoke).some(), f)
                     .unsafeRunSync()
                     .toException()
             },
-            defaultTestCaseConfig,
+            defaultConfig(),
             TestType.Test
-        )
+        ).let { lawTestCases.add(it); Unit }
 }
 
 fun Report<Result>.toException(): Unit = when (status) {
