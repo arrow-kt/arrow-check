@@ -31,16 +31,14 @@ dependencies {
     api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
     api "kparsec:kparsec:0.2.2" // Parser combinators to create toString-output parser
 
-    testImplementation project(":arrow-check-kotlintest")
-    testImplementation("io.arrow-kt:arrow-core-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation("io.arrow-kt:arrow-fx-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation("io.arrow-kt:arrow-incubator-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
+    testImplementation "io.kotest:kotest-runner-junit5-jvm:$KOTEST_VERSION" // for kotest framework
+    testImplementation "io.kotest:kotest-runner-console-jvm:$KOTEST_VERSION"
+    testImplementation project(":arrow-check-kotest")
+    testImplementation("io.arrow-kt:arrow-core-test:$VERSION_NAME")// test helpers and laws
+    testImplementation("io.arrow-kt:arrow-fx-test:$VERSION_NAME") // test helpers and laws
+    testImplementation("io.arrow-kt:arrow-incubator-test:$VERSION_NAME") // test helpers and laws
+    testImplementation("io.kotest:kotest-assertions-core-jvm:$KOTEST_VERSION") // for kotest core jvm assertions
+    testImplementation("io.kotest:kotest-property-jvm:$KOTEST_VERSION") // for kotest property test
 }
 
 compileKotlin {

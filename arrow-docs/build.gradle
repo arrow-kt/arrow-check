@@ -19,7 +19,7 @@ apply from: "$SUBPROJECT_CONF"
 
 dependencies {
     compile project(":arrow-check")
-    compile project(":arrow-check-kotlintest")
+    compile project(":arrow-check-kotest")
 }
 
 apply plugin: 'ank-gradle-plugin'
