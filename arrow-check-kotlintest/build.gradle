@@ -7,8 +7,6 @@ apply from: "$SUB_PROJECT"
 apply from: "$DOC_CREATION"
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-
     implementation "io.arrow-kt:arrow-fx:$VERSION_NAME" // IO and arrow fx
     api project(":arrow-check")
 
