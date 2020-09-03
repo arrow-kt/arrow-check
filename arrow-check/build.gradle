@@ -1,20 +1,13 @@
 plugins {
-    id "maven-publish"
-    id "base"
     id "org.jetbrains.kotlin.jvm"
     id "org.jetbrains.kotlin.kapt"
-    id "net.rdrei.android.buildtimetracker"
-    id "org.jetbrains.dokka"
     id "org.jlleitschuh.gradle.ktlint"
 }
 
-apply from: "$SUBPROJECT_CONF"
-apply from: "$DOC_CONF"
-apply from: "$PUBLISH_CONF"
+apply from: "$SUB_PROJECT"
+apply from: "$DOC_CREATION"
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-
     kapt "io.arrow-kt:arrow-meta:$VERSION_NAME" // auto generation for @extension and @higherkind
 
     // TODO do a pass on what is still needed and what not!
@@ -41,12 +34,5 @@ dependencies {
     testImplementation("io.arrow-kt:arrow-incubator-test:$VERSION_NAME") { // test helpers and laws
         exclude group: "io.kotlintest"
     }
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
+    testImplementation "org.jetbrains.kotlin:kotlin-reflect:$KOTLIN_VERSION"
 }
