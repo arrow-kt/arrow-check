@@ -1,4 +1,4 @@
-gname: "arrow-check: publish in OSS"
+name: "arrow-check: publish in OSS"
 
 on:
   push:
