@@ -1,218 +1,38 @@
 package arrow.check.gen
 
-import arrow.Kind
-import arrow.check.gen.instances.birecursive
-import arrow.core.Eval
-import arrow.core.SequenceK
 import arrow.core.Tuple2
-import arrow.core.Tuple3
-import arrow.core.extensions.fx
-import arrow.core.k
-import arrow.core.toOption
 import arrow.core.toT
-import arrow.mtl.typeclasses.nest
-import arrow.typeclasses.Applicative
-import arrow.typeclasses.Functor
-import arrow.typeclasses.Monad
+import kotlinx.coroutines.flow.*
 
-// @higherkind boilerplate
-class ForRose private constructor() {
-    companion object
+typealias Shrinks<A> = Flow<Rose<A>?>
+
+fun <A, B> Shrinks<A>.mapS(f: (A) -> B): Shrinks<B> = map { it?.map(f) }
+fun <A, B, C> Shrinks<A>.zipWith(other: Shrinks<B>, f: (A, B) -> C): Shrinks<C> = zip(other) { l, r ->
+    if (l === null || r === null) null
+    else l.zip(r, f)
 }
-typealias RoseOf<M, A> = arrow.Kind<RosePartialOf<M>, A>
-typealias RosePartialOf<M> = arrow.Kind<ForRose, M>
+fun <A, B> Shrinks<A>.mapRose(f: suspend (Rose<A>?) -> Rose<B>?): Shrinks<B> =
+    map { it?.let { f(it) } }
 
-@Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
-inline fun <M, A> RoseOf<M, A>.fix(): Rose<M, A> =
-    this as Rose<M, A>
+data class Rose<A>(val res: A, val shrinks: Shrinks<A> = emptyFlow()) {
+    fun <B> map(f: (A) -> B): Rose<B> = Rose(f(res), shrinks.mapS(f))
 
-data class Rose<M, A>(val runRose: Kind<M, RoseF<A, Rose<M, A>>>) :
-    RoseOf<M, A> {
+    fun <B, C> zip(other: Rose<B>, f: (A, B) -> C): Rose<C> =
+        Rose(f(res, other.res), shrinks.zipWith(other.shrinks) { a, b -> f(a, b) })
 
-    fun <B> map(MF: Functor<M>, f: (A) -> B): Rose<M, B> = MF.run {
-        Rose(runRose.map {
-            RoseF(
-                f(it.res),
-                it.shrunk.map { it.map(MF, f) })
-        })
+    suspend fun <B> flatMap(f: suspend (A) -> Rose<B>?): Rose<B>? = f(res)?.let { roseB ->
+        Rose(roseB.res, shrinks.mapRose { it?.flatMap(f) }.onCompletion { emitAll(roseB.shrinks) })
     }
 
-    fun <B> ap(MA: Applicative<M>, ff: Rose<M, (A) -> B>): Rose<M, B> = MA.run {
-        Rose(
-            MA.mapN(runRose, ff.runRose) { (a, f) ->
-                RoseF(
-                    f.res(a.res),
-                    f.shrunk.map { it.map(MA) { it(a.res) } } +
-                            a.shrunk.map { it.ap(MA, ff) }
+    fun expand(f: (A) -> Sequence<A>): Rose<A> =
+        Rose(res, shrinks.onCompletion { emitAll(f(res).asFlow().map { Rose(it).expand(f) } as Shrinks<A>) })
 
-                )
-            }
-        )
-    }
+    fun prune(n: Int): Rose<A> =
+        if (n <= 0) Rose(res)
+        else Rose(res, shrinks.mapRose { it?.prune(n - 1) })
 
-    /**
-     * Parallel shrinking. This breaks monad-applicative consistency laws in GenT because it's used in place of ap there
-     */
-    fun <B> zipTree(MM: Monad<M>, ff: Eval<Rose<M, B>>): Rose<M, Tuple2<A, B>> = MM.run {
-        Rose(
-            // For stacksafety. Only works on stacksafe monads
-            unit().flatMap {
-                this@Rose.runRose.apEval(
-                    ff.map { ff ->
-                        ff.runRose.map { r ->
-                            { l: RoseF<A, Rose<M, A>> ->
-                                RoseF(
-                                    l.res toT r.res,
-                                    l.shrunk.k().map {
-                                        it.zipTree(
-                                            MM,
-                                            Eval.now(ff)
-                                        )
-                                    } + r.shrunk.map { this@Rose.zipTree(MM, Eval.now(it)) })
-                            }
-                        }
-                    }
-                ).value()
-            }
-        )
-    }
-
-    fun <B> flatMap(MM: Monad<M>, f: (A) -> Rose<M, B>): Rose<M, B> =
-        Rose(
-            MM.fx.monad {
-                val rose1 = !runRose
-                val rose2 = !f(rose1.res).runRose
-                RoseF(
-                    rose2.res,
-                    rose1.shrunk.map { it.flatMap(MM, f) } + rose2.shrunk
-                )
-            }
-        )
-
-    fun expand(MM: Monad<M>, f: (A) -> Sequence<A>): Rose<M, A> = MM.run {
-        Rose(
-            runRose.flatMap { r ->
-                just(
-                    RoseF(
-                        r.res,
-                        r.shrunk.map { it.expand(MM, f) } +
-                                unfoldForest(MM, r.res, f)
-                    )
-                )
-            }
-        )
-    }
-
-    fun prune(MM: Monad<M>, n: Int): Rose<M, A> =
-        if (n <= 0) Rose(
-            MM.run {
-                runRose.map {
-                    RoseF(
-                        it.res,
-                        emptySequence<Rose<M, A>>()
-                    )
-                }
-            }
-        )
-        else Rose(
-            MM.run {
-                runRose.map {
-                    RoseF(
-                        it.res,
-                        it.shrunk.map { it.prune(MM, n - 1) })
-                }
-            }
-        )
-
-    companion object {
-        fun <M, A> just(AM: Applicative<M>, a: A): Rose<M, A> =
-            Rose(
-                AM.just(
-                    RoseF(
-                        a,
-                        emptySequence()
-                    )
-                )
-            )
-
-        fun <M, A> unfold(MM: Monad<M>, a: A, f: (A) -> Sequence<A>): Rose<M, A> =
-            Rose.birecursive<M, A>(MM).run {
-                a.ana {
-                    MM.just(RoseF(it, f(it))).nest()
-                }
-            }
-        /*
-        Rose(
-            MM.just(
-                RoseF(
-                    a,
-                    unfoldForest(MM, a, f)
-                )
-            )
-        )*/
-
-        fun <M, A> unfoldForest(MM: Monad<M>, a: A, f: (A) -> Sequence<A>): Sequence<Rose<M, A>> =
-            f(a).map { unfold(MM, it, f) }
-
-        fun <M, A> liftF(FF: Functor<M>, fa: Kind<M, A>): Rose<M, A> = FF.run {
-            Rose(fa.map { RoseF(it, emptySequence<Rose<M, A>>()) })
-        }
-    }
+    fun <B> filterMap(f: (A) -> B?): Rose<B>? =
+        f(res)?.let { Rose(it, shrinks.mapRose { it?.filterMap(f) }) }
 }
 
-fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<A>>> =
-    firstOrNull().toOption().fold({
-        emptySequence()
-    }, { x ->
-        sequenceOf(Tuple3(emptySequence<A>(), x, drop(1)))
-            // flatMap for added laziness
-            .flatMap {
-                sequenceOf(it) + drop(1).splits().map { (a, b, c) ->
-                    Tuple3(sequenceOf(x) + a, b, c)
-                }
-            }
-    })
-
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.dropOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
-    SequenceK.fx {
-        val (xs, _, zs) = !splits().k()
-        Rose(MM.just((xs + zs).interleave(MM)))
-    }
-
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.shrinkOne(MM: Monad<M>): Sequence<Rose<M, Sequence<A>>> =
-    SequenceK.fx {
-        val (xs, y, zs) = !splits().k()
-        val y1 = !y.shrunk.k()
-        Rose(
-            MM.run {
-                y1.runRose.map { (xs + sequenceOf(it) + zs).interleave(MM) }
-            }
-        )
-    }
-
-fun <M, A> Sequence<RoseF<A, Rose<M, A>>>.interleave(MM: Monad<M>): RoseF<Sequence<A>, Rose<M, Sequence<A>>> =
-    RoseF(
-        this.map { it.res },
-        dropOne(MM) + shrinkOne(MM)
-    )
-
-// -------- RoseF
-
-class ForRoseF private constructor()
-typealias RoseFOf<A, F> = arrow.Kind<RoseFPartialOf<A>, F>
-typealias RoseFPartialOf<A> = arrow.Kind<ForRoseF, A>
-
-@Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
-inline fun <A, F> RoseFOf<A, F>.fix(): RoseF<A, F> =
-    this as RoseF<A, F>
-
-/**
- * Recursive data structure.
- * At every level keeps both the current tested value and (lazily) the shrunk values
- */
-data class RoseF<A, F>(val res: A, val shrunk: Sequence<F>) : RoseFOf<A, F> {
-    fun <B> map(f: (F) -> B): RoseF<A, B> =
-        RoseF(res, shrunk.map(f))
-
-    companion object
-}
+internal fun <A> List<A>.uncons(): Tuple2<A, List<A>> = this[0] toT drop(1)

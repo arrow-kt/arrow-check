@@ -142,11 +142,10 @@ data class ColumnWidth(
 }
 
 // ------- Pretty printing
-fun Option<PropertyName>.doc(): Doc<Markup> = fold({
-    "<interactive>".text()
-}, { s -> s.unPropertyName.doc() })
+fun PropertyName?.doc(): Doc<Markup> =
+    this?.let { unPropertyName.doc() } ?: "<interactive>".text()
 
-fun Report<Progress>.prettyProgress(name: Option<PropertyName>): Doc<Markup> = when (status) {
+fun Report<Progress>.prettyProgress(name: PropertyName?): Doc<Markup> = when (status) {
     is Progress.Running -> (bullet().annotate(Markup.Icon(IconType.Running)) spaced
             name.doc() spaced
             "passed".text() spaced
@@ -162,7 +161,7 @@ fun Report<Progress>.prettyProgress(name: Option<PropertyName>): Doc<Markup> = w
             "(shrinking)".text()).annotate(Markup.Progress.Shrinking)
 }
 
-fun Report<Result>.prettyResult(name: Option<PropertyName>): Doc<Markup> = when (status) {
+fun Report<Result>.prettyResult(name: PropertyName?): Doc<Markup> = when (status) {
     is Result.Success -> ("✓".text().annotate(Markup.Icon(IconType.Success)) spaced
             name.doc() spaced
             "passed".text() spaced
@@ -341,10 +340,10 @@ fun Doc<Markup>.render(useColor: UseColor): String = alterAnnotations {
     .layoutPretty(PageWidth.Available(120, 0.5F))
     .renderMarkup()
 
-fun Report<Progress>.renderProgress(useColor: UseColor, name: Option<PropertyName>): String =
+fun Report<Progress>.renderProgress(useColor: UseColor, name: PropertyName?): String =
     prettyProgress(name).render(useColor)
 
-fun Report<Result>.renderResult(useColor: UseColor, name: Option<PropertyName>): String =
+fun Report<Result>.renderResult(useColor: UseColor, name: PropertyName?): String =
     prettyResult(name).render(useColor)
 
 sealed class Style {

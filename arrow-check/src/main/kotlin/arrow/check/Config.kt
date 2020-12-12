@@ -1,9 +1,5 @@
 package arrow.check
 
-import arrow.fx.IO
-import arrow.fx.extensions.io.applicative.applicative
-import arrow.fx.fix
-
 data class Config(
   val useColor: UseColor,
   val verbose: Verbose
@@ -23,11 +19,12 @@ inline class TaskId(val id: Int)
 
 // look for env options and check terminal capabilities, env options have precedence
 // TODO
-fun detectColor(): IO<UseColor> = IO.just(UseColor.EnableColor)
+suspend fun detectColor(): UseColor = UseColor.EnableColor
 
-fun detectVerbosity(): IO<Verbose> = IO.just(Verbose.Quiet)
+suspend fun detectVerbosity(): Verbose = Verbose.Quiet
 
-fun detectConfig(): IO<Config> = IO.applicative().map(
-    detectColor(),
-    detectVerbosity()
-) { (useColor, verbosity) -> Config(useColor, verbosity) }.fix()
+suspend fun detectConfig(): Config =
+    Config(
+        detectColor(),
+        detectVerbosity()
+    )

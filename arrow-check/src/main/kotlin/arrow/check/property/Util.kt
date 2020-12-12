@@ -9,6 +9,7 @@ import arrow.optics.optics
 import arrow.typeclasses.Monoid
 import arrow.typeclasses.Semigroup
 import pretty.Doc
+import kotlin.coroutines.Continuation
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -52,7 +53,7 @@ sealed class IconType {
 // TODO if possible (might be hard within the jvm, but maybe gradle has options) later on we can extend this with source pos info to print text at specific points in test source
 inline class Failure(val unFailure: Doc<Markup>)
 
-inline class Log(val unLog: List<JournalEntry>) {
+/* inline */ class Log(val unLog: List<JournalEntry>) {
     companion object
 }
 
@@ -148,10 +149,9 @@ fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
 
 @optics
 data class PropertyConfig(
-  val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
-  val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
-  val shrinkLimit: ShrinkLimit = ShrinkLimit(1000),
-  val shrinkRetries: ShrinkRetries = ShrinkRetries(0)
+    val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
+    val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
+    val shrinkLimit: ShrinkLimit = ShrinkLimit(1000)
 ) {
     companion object
 }
@@ -172,7 +172,6 @@ data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)) : Term
 inline class TestLimit(val unTestLimit: Int)
 inline class DiscardRatio(val unDiscardRatio: Double)
 inline class ShrinkLimit(val unShrinkLimit: Int)
-inline class ShrinkRetries(val unShrinkRetries: Int)
 
 inline class TestCount(val unTestCount: Int)
 inline class ShrinkCount(val unShrinkCount: Int)
@@ -181,7 +180,7 @@ inline class DiscardCount(val unDiscardCount: Int)
 inline class PropertyName(val unPropertyName: String)
 inline class GroupName(val unGroupName: String)
 
-inline class Size(val unSize: Int)
+/* inline */class Size(val unSize: Int)
 
 fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> =
     unCoverage.values.flatMap {
@@ -279,3 +278,39 @@ fun invnormcdf(d: Double): Double = when {
         }
     }
 }
+
+// Continuation stuff
+private val coroutineImplClass by lazy { Class.forName("kotlin.coroutines.jvm.internal.BaseContinuationImpl") }
+
+private val completionField by lazy { coroutineImplClass.getDeclaredField("completion").apply { isAccessible = true } }
+
+private val coroutineImplClass2 by lazy { Class.forName("kotlin.coroutines.jvm.internal.ContinuationImpl") }
+
+internal val intercepted by lazy { coroutineImplClass2.getDeclaredField("intercepted").apply { isAccessible = true } }
+
+
+private var <T> Continuation<T>.completion: Continuation<*>?
+    get() = completionField.get(this) as Continuation<*>
+    set(value) = completionField.set(this@completion, value)
+
+var <T> Continuation<T>.stateStack: List<Map<String, *>>
+    get() {
+        if (!coroutineImplClass.isInstance(this)) return emptyList()
+        val resultForThis = (this.javaClass.declaredFields)
+            .associate { it.isAccessible = true; it.name to it.get(this@stateStack) }
+            .let(::listOf)
+        val resultForCompletion = completion?.stateStack
+        return resultForCompletion?.let { resultForThis + it } ?: resultForThis
+    }
+    set(value) {
+        if (!coroutineImplClass.isInstance(this)) return
+        val mapForThis = value.first()
+        (this.javaClass.declaredFields).forEach {
+            if (it.name in mapForThis) {
+                it.isAccessible = true
+                val fieldValue = mapForThis[it.name]
+                it.set(this@stateStack, fieldValue)
+            }
+        }
+        completion?.stateStack = value.subList(1, value.size)
+    }
