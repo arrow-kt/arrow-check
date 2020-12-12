@@ -1,7 +1,6 @@
 package arrow.check.property
 
 import arrow.core.ListK
-import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.extensions.listk.monoid.monoid
 import arrow.core.toT
@@ -9,7 +8,6 @@ import arrow.optics.optics
 import arrow.typeclasses.Monoid
 import arrow.typeclasses.Semigroup
 import pretty.Doc
-import kotlin.coroutines.Continuation
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
@@ -81,10 +79,10 @@ sealed class JournalEntry {
 }
 
 data class Label<A>(
-  val table: Option<LabelTable>,
-  val name: LabelName,
-  val min: CoverPercentage,
-  val annotation: A
+    val table: LabelTable?,
+    val name: LabelName,
+    val min: CoverPercentage,
+    val annotation: A
 )
 
 inline class CoverPercentage(val unCoverPercentage: Double)
@@ -93,7 +91,7 @@ inline class LabelTable(val unLabelTable: String)
 
 inline class LabelName(val unLabelName: String)
 
-data class Coverage<A>(val unCoverage: Map<Option<LabelTable>, Map<LabelName, Label<A>>>) {
+data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>>) {
     companion object {
         fun <A> monoid(SA: Semigroup<A>) = object : CoverageMonoid<A> {
             override fun SA(): Semigroup<A> = SA
@@ -191,7 +189,7 @@ fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> 
 fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
     coverage.labelsToTotals().map { (total, l) ->
         sufficientlyCovered(
-            l.table.fold({ test.unTestCount }, { total }),
+            l.table?.let { test.unTestCount } ?: total,
             l.annotation.unCoverCount,
             l.min.unCoverPercentage / 100.0
         )
@@ -200,7 +198,7 @@ fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean
 fun Confidence.failure(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
     coverage.labelsToTotals().map { (total, l) ->
         insufficientlyCovered(
-            l.table.fold({ test.unTestCount }, { total }),
+            l.table?.let { test.unTestCount } ?: total,
             l.annotation.unCoverCount,
             l.min.unCoverPercentage / 100.0
         )
@@ -278,39 +276,3 @@ fun invnormcdf(d: Double): Double = when {
         }
     }
 }
-
-// Continuation stuff
-private val coroutineImplClass by lazy { Class.forName("kotlin.coroutines.jvm.internal.BaseContinuationImpl") }
-
-private val completionField by lazy { coroutineImplClass.getDeclaredField("completion").apply { isAccessible = true } }
-
-private val coroutineImplClass2 by lazy { Class.forName("kotlin.coroutines.jvm.internal.ContinuationImpl") }
-
-internal val intercepted by lazy { coroutineImplClass2.getDeclaredField("intercepted").apply { isAccessible = true } }
-
-
-private var <T> Continuation<T>.completion: Continuation<*>?
-    get() = completionField.get(this) as Continuation<*>
-    set(value) = completionField.set(this@completion, value)
-
-var <T> Continuation<T>.stateStack: List<Map<String, *>>
-    get() {
-        if (!coroutineImplClass.isInstance(this)) return emptyList()
-        val resultForThis = (this.javaClass.declaredFields)
-            .associate { it.isAccessible = true; it.name to it.get(this@stateStack) }
-            .let(::listOf)
-        val resultForCompletion = completion?.stateStack
-        return resultForCompletion?.let { resultForThis + it } ?: resultForThis
-    }
-    set(value) {
-        if (!coroutineImplClass.isInstance(this)) return
-        val mapForThis = value.first()
-        (this.javaClass.declaredFields).forEach {
-            if (it.name in mapForThis) {
-                it.isAccessible = true
-                val fieldValue = mapForThis[it.name]
-                it.set(this@stateStack, fieldValue)
-            }
-        }
-        completion?.stateStack = value.subList(1, value.size)
-    }

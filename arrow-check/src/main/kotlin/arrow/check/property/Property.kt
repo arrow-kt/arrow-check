@@ -55,9 +55,6 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
     fun withShrinkLimit(i: ShrinkLimit): Property =
         mapConfig { PropertyConfig.shrinkLimit.set(it, i) }
 
-    fun withShrinkRetries(i: ShrinkRetries): Property =
-        mapConfig { PropertyConfig.shrinkRetries.set(it, i) }
-
     companion object
 }
 

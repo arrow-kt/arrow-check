@@ -1,55 +1,19 @@
 package arrow.check
 
 import arrow.check.gen.RandSeed
-import arrow.check.property.CoverCount
-import arrow.check.property.CoverPercentage
-import arrow.check.property.Coverage
-import arrow.check.property.DiscardCount
-import arrow.check.property.IconType
-import arrow.check.property.Label
-import arrow.check.property.Markup
-import arrow.check.property.PropertyName
-import arrow.check.property.ShrinkCount
-import arrow.check.property.Size
-import arrow.check.property.TestCount
-import arrow.check.property.coverPercentage
-import arrow.check.property.labelCovered
+import arrow.check.property.*
 import arrow.core.AndThen
-import arrow.core.Option
 import arrow.core.extensions.list.foldable.foldMap
 import arrow.core.identity
 import arrow.core.toOption
 import arrow.core.toT
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Monoid
-import pretty.AnsiStyle
-import pretty.Color
-import pretty.Doc
-import pretty.PageWidth
-import pretty.SimpleDoc
-import pretty.SimpleDocF
-import pretty.alterAnnotations
-import pretty.annotate
+import pretty.*
 import pretty.ansistyle.monoid.monoid
-import pretty.color
-import pretty.colorDull
-import pretty.doc
-import pretty.fill
-import pretty.group
-import pretty.hCat
-import pretty.layoutPretty
-import pretty.line
-import pretty.nest
-import pretty.nil
-import pretty.plus
-import pretty.spaced
-import pretty.spaces
 import pretty.symbols.bullet
 import pretty.symbols.comma
 import pretty.symbols.dot
-import pretty.text
-import pretty.toRawString
-import pretty.vSep
 import kotlin.math.floor
 import kotlin.math.max
 
@@ -190,13 +154,13 @@ fun <A> Coverage<A>.ifNotEmpty(f: Coverage<A>.() -> Doc<Markup>): Doc<Markup> =
 
 fun Coverage<CoverCount>.prettyPrint(tests: TestCount): Doc<Markup> =
     unCoverage.toList().let {
-        if (it.size == 1 && it.first().first.isEmpty()) it.first().second.let { v ->
+        if (it.size == 1 && it.first().first === null) it.first().second.let { v ->
             v.values.map { l ->
                 l.pretty(tests, v.values.toList().width(tests))
             }.vSep()
         }
         else it.map { (k, v) ->
-            "┏━━".text() spaced k.fold({ "<top>".text() }, { it.unLabelTable.text() }) line
+            "┏━━".text() spaced (k?.let { it.unLabelTable.text() } ?: "<top>".text()) line
                     v.values.map { l ->
                         "┃".text() spaced l.pretty(tests, v.values.toList().width(tests))
                     }.vSep()

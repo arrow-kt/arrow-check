@@ -2,7 +2,6 @@ package arrow.check.gen
 
 import arrow.check.property.Size
 import arrow.core.*
-import arrow.core.extensions.sequence.monadLogic.interleave
 import arrow.syntax.collections.tail
 import kotlinx.coroutines.flow.*
 import kotlin.random.Random
@@ -33,7 +32,7 @@ fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
         }
     }
 
-fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1: R =
+fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
     Gen { (seed, size, env) ->
         val (l, r) = seed.split()
         this@flatMap.runGen(Tuple3(l, size, env))?.flatMap { a ->
@@ -217,11 +216,11 @@ fun <R, A> Gen.Companion.recursive(
 fun <R, A> Gen.Companion.discard(): Gen<R, A> = Gen { null }
 
 fun <R, A> Gen<R, A>.ensure(predicate: Predicate<A>): Gen<R, A> =
-    flatMap { (if (predicate(it)) Gen.just(it) else Gen.discard<R, A>()) as Gen<R, A> }
+    flatMap { (if (predicate(it)) Gen.just(it) else Gen.discard()) }
 
 fun <R, A, B> Gen<R, A>.filterMap(f: (A) -> B?): Gen<R, B> {
     fun t(k: Int): Gen<R, B> =
-        if (k > 100) Gen.discard<R, B>()
+        if (k > 100) Gen.discard()
         else scale { Size(2 * k + it.unSize) }.freeze().flatMap { (fst, gen) ->
             f(fst)?.let { gen.mapRose { it.filterMap(f) } } ?: t(k + 1)
         }
@@ -239,7 +238,6 @@ fun <R, A> Gen<R, A>.orNull(): Gen<R, A?> = Gen.sized { sz ->
     )
 }
 
-
 fun <R, A> Gen<R, A>.list(range: Range<Int>): Gen<R, List<A>> = Gen.sized { s ->
     Gen.int_(range).flatMap { n ->
         this@list.mapRose { Rose(it) }.replicate(n)
@@ -256,7 +254,7 @@ fun <R, A> Gen<R, A>.list(range: IntRange): Gen<R, List<A>> =
     list(Range.constant(range))
 
 internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
-    if (n <= 0) Gen.just(emptyList<A>()) as Gen<R, List<A>>
+    if (n <= 0) Gen.just(emptyList())
     else (0..n).toList().fold(Gen.just(emptyList<A>()) as Gen<R, List<A>>) { acc, _ ->
         acc.map2(this@replicate) { a, b -> a + b }
     }
@@ -299,7 +297,7 @@ fun <R, K, A> Gen<R, Tuple2<K, A>>.hashMap(range: Range<Int>): Gen<R, Map<K, A>>
 }
 
 internal fun <R, A> List<Gen<R, A>>.sequence(): Gen<R, List<A>> =
-    if (isEmpty()) Gen.just(emptyList<A>()) as Gen<R, List<A>>
+    if (isEmpty()) Gen.just(emptyList())
     else {
         val (fst, tail) = uncons()
         fst.map2(tail.sequence()) { a, xs -> listOf(a) + xs }
@@ -310,7 +308,7 @@ internal fun <R, K, A> Gen<R, Tuple2<K, A>>.uniqueByKey(n: Int): Gen<R, List<Gen
         if (k > 100) Gen.discard()
         else freeze().replicate(n).flatMap {
             val res = (map + it.map { it.bimap({ it.a }, ::identity) }.toMap())
-            if (res.size >= n) Gen.just(res.values.toList()) as Gen<R, List<Gen<R, Tuple2<K, A>>>>
+            if (res.size >= n) Gen.just(res.values.toList())
             else go(k + 1, res)
         }
     return go(0, emptyMap())
@@ -349,7 +347,7 @@ fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
 fun <R, A> Gen<R, A>.freeze(): Gen<R, Tuple2<A, Gen<R, A>>> =
     Gen {
         runGen(it)?.let { mx ->
-            Rose(mx.res toT Gen<R, A> { mx })
+            Rose(mx.res toT Gen { mx })
         }
     }
 
@@ -374,18 +372,17 @@ fun <R, A> Gen<R, A>.subtermGen(f: (A) -> Gen<R, A>): Gen<R, A> =
     listOf(this).subtermList { f(it.first()) }
 
 fun <R, A> Gen<R, A>.subterm(f: (A) -> A): Gen<R, A> =
-    subtermGen { Gen.just(f(it)) as Gen<R, A> }
+    subtermGen { Gen.just(f(it)) }
 
 // TODO Add others
 
 // permutation
-/*
 fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
     map { a -> Gen.bool_().map { if (it) a else null } }
         .sequence()
-        .map { it.mapNotNull(::identity) }
+        .map { it.mapNotNull(::identity) as List<A> }
         .shrink { it.shrink() }
-*/
+
 sealed class Subterms<A> {
     data class One<A>(val a: A) : Subterms<A>()
     data class All<A>(val l: List<A>) : Subterms<A>()

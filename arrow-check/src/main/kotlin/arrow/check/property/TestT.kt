@@ -81,7 +81,7 @@ fun Test.footnote(msg: () -> Doc<Markup>): Unit =
     writeLog(JournalEntry.Footnote(msg))
 
 fun Test.cover(p: Double, name: String, bool: Boolean): Unit =
-    writeLog(JournalEntry.JournalLabel(Label(None, LabelName(name), CoverPercentage(p), bool)))
+    writeLog(JournalEntry.JournalLabel(Label(null, LabelName(name), CoverPercentage(p), bool)))
 
 fun Test.classify(name: String, bool: Boolean): Unit =
     cover(0.0, name, bool)
@@ -93,7 +93,7 @@ fun <A> Test.collect(a: A, SA: Show<A> = Show.any()): Unit =
     cover(0.0, SA.run { a.show() }, true)
 
 fun Test.coverTable(table: String, p: Double, name: String, bool: Boolean): Unit =
-    writeLog(JournalEntry.JournalLabel(Label(LabelTable(table).some(), LabelName(name), CoverPercentage(p), bool)))
+    writeLog(JournalEntry.JournalLabel(Label(LabelTable(table), LabelName(name), CoverPercentage(p), bool)))
 
 fun Test.tabulate(table: String, name: String): Unit =
     coverTable(table, 0.0, name, true)

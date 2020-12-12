@@ -1,12 +1,7 @@
 package arrow.check
 
-import arrow.check.property.Property
-import arrow.check.property.PropertyConfig
-import arrow.check.property.PropertyName
-import arrow.check.property.PropertyTestSyntax
-import arrow.check.property.property
+import arrow.check.property.*
 import arrow.core.Tuple2
-import arrow.core.some
 import io.kotlintest.AbstractSpec
 import io.kotlintest.TestType
 import io.kotlintest.specs.IntelliMarker
@@ -19,7 +14,6 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
             this,
             {
                 checkGroup(this@invoke, props)
-                    .unsafeRunSync()
                     .let {
                         if (it.not()) throw AssertionError("Some tests failed!")
                     }
@@ -29,14 +23,13 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         )
 
     operator fun String.invoke(
-      propertyConfig: PropertyConfig = PropertyConfig(),
-      c: suspend PropertyTestSyntax.() -> Unit
+        propertyConfig: PropertyConfig = PropertyConfig(),
+        c: suspend PropertyTest.() -> Unit
     ): Unit =
         addTestCase(
             this,
             {
-                checkReport(PropertyName(this@invoke).some(), property(propertyConfig, c))
-                    .unsafeRunSync()
+                checkReport(PropertyName(this@invoke), property(propertyConfig, c))
                     .toException()
             },
             defaultTestCaseConfig,
@@ -44,19 +37,18 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         )
 
     operator fun String.invoke(
-      args: Config,
-      propertyConfig: PropertyConfig = PropertyConfig(),
-      c: suspend PropertyTestSyntax.() -> Unit
+        args: Config,
+        propertyConfig: PropertyConfig = PropertyConfig(),
+        c: suspend PropertyTest.() -> Unit
     ): Unit =
         addTestCase(
             this,
             {
                 checkReport(
                     args,
-                    PropertyName(this@invoke).some(),
+                    PropertyName(this@invoke),
                     property(propertyConfig, c)
                 )
-                    .unsafeRunSync()
                     .toException()
             },
             defaultTestCaseConfig,
@@ -67,8 +59,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         addTestCase(
             this,
             {
-                checkReport(PropertyName(this@invoke).some(), f)
-                    .unsafeRunSync()
+                checkReport(PropertyName(this@invoke), f)
                     .toException()
             },
             defaultTestCaseConfig,
@@ -79,8 +70,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         addTestCase(
             this,
             {
-                checkReport(args, PropertyName(this@invoke).some(), f)
-                    .unsafeRunSync()
+                checkReport(args, PropertyName(this@invoke), f)
                     .toException()
             },
             defaultTestCaseConfig,

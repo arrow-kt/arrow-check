@@ -240,8 +240,8 @@ sealed class DiffType {
 
 /**
  * This is quite the hack: In order to get proper prefixes and colors I am abusing some facts about
- *  ValueDiffs. The catamorphism returns an annotation to add to the document + the prefix where the
- *  newline (there has to be one for diffs) is added. This means the annotation includes both the newline
+ *  ValueDiffs. The catamorphism returns an annotation which spans to add to the document + the prefix where the
+ *  newline (there has to be one for diffs) is added. This means the annotation spans both the newline
  *  and the doc with the changes. This is later used by the custom renderMarkup method to remove a space
  *  from the SimpleDoc.Line and insert a + or -. Because the resulting diff can be placed at any nested level
  *  itself we must also add a Markup.Diff annotation that has the current column offset around the entire diff.

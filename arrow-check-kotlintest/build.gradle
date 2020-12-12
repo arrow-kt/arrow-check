@@ -7,7 +7,6 @@ apply from: "$SUB_PROJECT"
 apply from: "$DOC_CREATION"
 
 dependencies {
-    implementation "io.arrow-kt:arrow-fx:$VERSION_NAME" // IO and arrow fx
     api project(":arrow-check")
 
     api("io.kotlintest:kotlintest-runner-junit5:3.4.2") {
