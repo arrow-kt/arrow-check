@@ -41,12 +41,14 @@ internal class PropertyTestImpl : PropertyTest {
     override suspend fun <R, A> forAllWith(showA: (A) -> Doc<Markup>, env: R, gen: Gen<R, A>): A =
         suspendCoroutineUninterceptedOrReturn { c ->
             val labelHere = c.stateStack // save the whole coroutine stack labels
+            val interceptedC = intercepted.get(c)
+            var first = false
             gen.runEnv(env).flatMap { x: A ->
                 c.stateStack = labelHere
-                // BOOOOO
-                val interceptedCont = intercepted.get(c)
-                if (interceptedCont !== null && interceptedCont.toString() == "This continuation is already complete")
-                    intercepted.set(c, null) // Maybe call intercept here?
+                // BOOOO
+                if (first) intercepted.set(c, interceptedC)
+                first = true
+
                 c.resume(x)
                 Gen.deferred()
                     .flatMap { it.map { it.prependLog(Log(listOf(JournalEntry.Input { showA(x) }))) } }
