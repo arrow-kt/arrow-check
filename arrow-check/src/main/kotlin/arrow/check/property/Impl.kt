@@ -1,12 +1,10 @@
 package arrow.check.property
 
 import arrow.check.*
-import arrow.check.State
 import arrow.check.gen.*
 import arrow.core.None
 import arrow.core.Tuple3
 import arrow.core.extensions.list.monadFilter.filterMap
-import arrow.core.identity
 import arrow.core.some
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
@@ -26,7 +24,11 @@ internal class PropertyTestImpl : PropertyTest {
     suspend fun waitFor(): Gen<Any?, TestResult<*>> = promise.await()
         .also { promise = Promise() }
 
-    fun complete(gen: Gen<Any?, TestResult<*>>): Unit = promise.complete(gen).let { }
+    fun completeOrFlatMap(gen: Gen<Any?, TestResult<*>>): Unit = promise.complete(gen) { new, curr ->
+        curr.flatMap { currRes ->
+            new.map { newRes -> newRes.prependLog(currRes.log) }
+        }
+    }.let { }
 
     override suspend fun <R, A> forAllWith(showA: (A) -> Doc<Markup>, env: R, gen: Gen<R, A>): A =
         suspendCoroutineUninterceptedOrReturn { c ->
@@ -38,34 +40,19 @@ internal class PropertyTestImpl : PropertyTest {
                 if (interceptedCont !== null && interceptedCont.toString() == "This continuation is already complete")
                     intercepted.set(c, null) // Maybe call intercept here?
                 c.resume(x)
-                Gen<Any?, Gen<Any?, TestResult<*>>> { Rose(waitFor()) }
-                    .flatMap(::identity)
-                    .map {
-                        val log = JournalEntry.Input { showA(x) }
-                        when (it) {
-                            is TestResult.Success<*> -> it.copy(log = Log.monoid().run { Log(listOf(log)) + it.log })
-                            is TestResult.Failed -> it.copy(log = Log.monoid().run { Log(listOf(log)) + it.log })
-                        }
-                    }
-            }.also(::complete)
+                Gen.deferred()
+                    .flatMap { it.map { it.prependLog(Log(listOf(JournalEntry.Input { showA(x) }))) } }
+            }.also(::completeOrFlatMap)
             COROUTINE_SUSPENDED
         }
 
     override suspend fun discard(): Nothing = forAll(Gen.discard())
 
     override fun writeLog(log: JournalEntry) {
-        complete(
-            Gen<Any?, Gen<Any?, TestResult<*>>> { Rose(waitFor()) }
-                .flatMap {
-                    it.map {
-                        when (it) {
-                            is TestResult.Success<*> -> it.copy(log = Log.monoid().run { it.log + Log(listOf(log)) })
-                            is TestResult.Failed -> TODO("Should not be possible")
-                        }
-                    }
-                }
-        )
+        completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log(listOf(log)))))
     }
+
+    fun Gen.Companion.deferred(): Gen<Any?, Gen<Any?, TestResult<*>>> = Gen { Rose(waitFor()) }
 
     override fun failWith(msg: Doc<Markup>): Nothing {
         throw ShortCircuit.Failure(Failure(msg))
@@ -83,6 +70,11 @@ internal sealed class TestResult<out A> {
     data class Failed(val failure: Failure, override val log: Log) : TestResult<Nothing>()
 }
 
+internal fun <A> TestResult<A>.prependLog(oldLog: Log): TestResult<A> = when (this) {
+    is TestResult.Success -> copy(log = Log.monoid().run { oldLog + log })
+    is TestResult.Failed -> copy(log = Log.monoid().run { oldLog + log })
+}
+
 internal suspend inline fun execPropertyTest(
     prop: suspend PropertyTest.() -> Unit,
     seed: RandSeed,
@@ -90,22 +82,22 @@ internal suspend inline fun execPropertyTest(
 ): Rose<TestResult<Unit>>? {
     val impl = PropertyTestImpl()
     prop.startCoroutineUninterceptedOrReturn(impl, Continuation(coroutineContext) {
-        if (it.isSuccess) impl.complete(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
+        if (it.isSuccess) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
         else {
             when (val exception = it.exceptionOrNull()!!) {
                 is PropertyTestImpl.ShortCircuit.Failure -> {
-                    impl.complete(Gen.just(TestResult.Failed(exception.fail, Log.monoid().empty())))
+                    impl.completeOrFlatMap(Gen.just(TestResult.Failed(exception.fail, Log.monoid().empty())))
                 }
                 else -> {
                     // Deduplicate...
                     val doc =
                         ("━━━ Failed: (Exception) ━━━".text() + hardLine() + it.exceptionOrNull()!!.toString().doc())
-                    impl.complete(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
+                    impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
                 }
             }
         }
     }).let {
-        if (it !== COROUTINE_SUSPENDED) impl.complete(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
+        if (it !== COROUTINE_SUSPENDED) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
     }
     return impl.waitFor().runGen(Tuple3(seed, size, Unit)) as Rose<TestResult<Unit>>?
 }
@@ -312,14 +304,14 @@ internal class Promise<A> {
             else -> curr as A
         }
 
-    fun complete(a: A): Unit =
+    inline fun complete(a: A, f: (A, A) -> A): Unit =
         when (val curr = state.value) {
             EMPTY -> state.compareAndSet(EMPTY, a).let { }
             is Waiting<*> -> {
                 state.compareAndSet(curr, a)
                 (curr.cont as Continuation<A>).resume(a)
             }
-            else -> Unit
+            else -> state.compareAndSet(curr, f(a, curr as A)).let {  }
         }
 
     object EMPTY

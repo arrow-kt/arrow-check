@@ -1,63 +1,76 @@
 package arrow.check.gen
 
+import arrow.check.internal.AndThenS
+import arrow.check.internal.flatMap
 import arrow.check.property.Size
 import arrow.core.*
 import arrow.syntax.collections.tail
 import kotlinx.coroutines.flow.*
 import kotlin.random.Random
 
-class Gen<in R, A>(internal val runGen: suspend (Tuple3<RandSeed, Size, R>) -> Rose<A>?) {
+class Gen<in R, A>(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
     companion object {
+        internal operator fun <R, A> invoke(f: suspend (Tuple3<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
+            Gen(AndThenS.Single(f))
+
         fun <A> just(a: A): Gen<Any?, A> = Gen { Rose(a) }
     }
 }
 
-fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen { (seed, size, _) -> runGen(Tuple3(seed, size, r)) }
+fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen(runGen.compose { (seed, size, _) -> Tuple3(seed, size, r) })
 
 fun <R> Gen.Companion.ask(): Gen<R, R> = Gen { (_, _, env) -> Rose(env) }
 
-fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> = Gen { (seed, size, env) -> runGen(Tuple3(seed, size, f(env))) }
+fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> =
+    Gen(runGen.compose { (seed, size, env) -> Tuple3(seed, size, f(env)) })
 
-fun <R, A, B> Gen<R, A>.map(f: (A) -> B): Gen<R, B> = Gen { runGen(it)?.map(f) }
+fun <R, A, B> Gen<R, A>.map(f: (A) -> B): Gen<R, B> = Gen(runGen.andThen { it?.map(f) })
 
-fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = Gen { runGen(it)?.let { f(it) } }
+fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = Gen(runGen.andThen { it?.let { f(it) } })
 
 fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
-    Gen { (seed, size, env) ->
-        val (l, r) = seed.split()
-        runGen(Tuple3(l, size, env))?.let { roseA ->
-            other.runGen(Tuple3(r, size, env))?.let { roseB ->
-                roseA.zip(roseB) { a, b -> f(a, b) }
+    Gen(
+        AndThenS<Tuple3<RandSeed, Size, R>, Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (seed, size, env) ->
+            Tuple3(seed.split(), size, env)
+        }.andThenF(
+            this@map2.runGen.compose<Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (lr, sz, env) ->
+                Tuple3(lr.a, sz, env)
+            }.flatMap { roseA ->
+                other.runGen.compose<Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (lr, size, env) ->
+                    Tuple3(lr.b, size, env)
+                }.andThen { roseB ->
+                    if (roseA == null || roseB == null) null
+                    else roseA.zip(roseB, f)
+                }
             }
-        }
-    }
+        )
+    )
 
 fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
     Gen { (seed, size, env) ->
         val (l, r) = seed.split()
-        this@flatMap.runGen(Tuple3(l, size, env))?.flatMap { a ->
-            f(a).let { genB ->
-                genB.runGen(Tuple3(r, size, env))
-            }
+        runGen(Tuple3(l, size, env))?.flatMap { a ->
+            f(a).runGen(Tuple3(r, size, env))
         }
     }
 
 fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
     Gen { (seed, size) -> Rose(f(seed, size)) }
 
-fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> = Gen { runGen(it)?.expand { it?.let(f) ?: emptySequence() } }
+fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> = Gen(runGen.andThen { it?.expand(f) })
 
-fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen { runGen(it)?.prune(n) }
+fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.prune(n) })
 
 // size
 fun <R, A> Gen.Companion.sized(f: suspend (Size) -> Gen<R, A>): Gen<R, A> =
     generate { _, size -> f(size) }.flatMap { it }
 
-fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> = Gen { (seed, size, env) ->
-    val newSz = f(size)
-    if (newSz.unSize < 0) throw IllegalArgumentException("Gen.scale Negative size")
-    else runGen(Tuple3(seed, size, env))
-}
+fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
+    Gen(runGen.compose { (seed, size, env) ->
+        val newSz = f(size)
+        if (newSz.unSize < 0) throw IllegalArgumentException("Gen.scale Negative size")
+        else Tuple3(seed, newSz, env)
+    })
 
 fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
 
@@ -260,9 +273,7 @@ internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
     }
 
 internal fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<A>>> =
-    firstOrNull().toOption().fold({
-        emptySequence()
-    }, { x ->
+    firstOrNull()?.let { x ->
         sequenceOf(Tuple3(emptySequence<A>(), x, drop(1)))
             // flatMap for added laziness
             .flatMap {
@@ -270,10 +281,13 @@ internal fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<
                     Tuple3(sequenceOf(x) + a, b, c)
                 }
             }
-    })
+    } ?: emptySequence()
 
-internal fun <A> Sequence<Rose<A>>.dropOne(): Sequence<Rose<Sequence<A>>> =
-    splits().map { (xs, _, zs) -> (xs + zs).interleave() }
+internal fun <A> Sequence<Rose<A>>.dropSome(): Sequence<Rose<Sequence<A>>> =
+    toList().let { xs ->
+        if (xs.isEmpty()) emptySequence()
+        else iterate(xs.size) { it / 2 }.takeWhile { it > 0 }.flatMap { n -> xs.removes(n) }
+    }.map { it.asSequence().interleave() }
 
 internal fun <A> Sequence<Rose<A>>.shrinkOne(): Flow<Rose<Sequence<A>>> =
     splits().map { (xs, y, zs) -> // TODO Test with discarded ones
@@ -283,7 +297,7 @@ internal fun <A> Sequence<Rose<A>>.shrinkOne(): Flow<Rose<Sequence<A>>> =
 internal fun <A> Sequence<Rose<A>>.interleave(): Rose<Sequence<A>> =
     Rose(
         this.map { it.res },
-        dropOne().asFlow().onCompletion { emitAll(shrinkOne()) }
+        dropSome().asFlow().onCompletion { emitAll(shrinkOne()) }
     )
 
 fun <R, K, A> Gen<R, Tuple2<K, A>>.hashMap(range: Range<Int>): Gen<R, Map<K, A>> = Gen.sized { s ->
@@ -345,11 +359,7 @@ fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
 
 // Subterms. Overcoming the limits of flatMap
 fun <R, A> Gen<R, A>.freeze(): Gen<R, Tuple2<A, Gen<R, A>>> =
-    Gen {
-        runGen(it)?.let { mx ->
-            Rose(mx.res toT Gen { mx })
-        }
-    }
+    Gen(runGen.andThen { it?.let { mx -> Rose(mx.res toT Gen { mx }) } })
 
 // Invariant: List size does not change
 internal fun <R, A> List<Gen<R, A>>.genSubterms(): Gen<R, Subterms<A>> =
