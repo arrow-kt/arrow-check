@@ -16,6 +16,14 @@ import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.coroutines.resume
 
+internal data class State(
+    val numTests: TestCount,
+    val numDiscards: DiscardCount,
+    val size: Size,
+    val seed: RandSeed,
+    val coverage: Coverage<CoverCount>
+)
+
 // ---------------- Running a single property
 internal class PropertyTestImpl : PropertyTest {
 

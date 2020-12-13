@@ -13,6 +13,7 @@ dependencies {
 
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$KOTLINX_COROUTINES_VERSION"
 
+    api "io.arrow-kt:arrow-core:$VERSION_NAME"
     implementation "io.arrow-kt:arrow-fx-coroutines:$VERSION_NAME"
     implementation "io.arrow-kt:arrow-optics:$VERSION_NAME" // lenses and @optics
     implementation "io.arrow-kt:arrow-syntax:$VERSION_NAME" // helper functions like curried...
@@ -21,15 +22,5 @@ dependencies {
     api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
     api "kparsec:kparsec:0.2.2" // Parser combinators to create toString-output parser
 
-    testImplementation project(":arrow-check-kotlintest")
-    testImplementation("io.arrow-kt:arrow-core-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation("io.arrow-kt:arrow-fx-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation("io.arrow-kt:arrow-incubator-test:$VERSION_NAME") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation "org.jetbrains.kotlin:kotlin-reflect:$KOTLIN_VERSION"
+    testImplementation project(":arrow-check-kotest")
 }

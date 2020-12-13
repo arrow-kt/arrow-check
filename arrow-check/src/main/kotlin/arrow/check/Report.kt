@@ -5,7 +5,6 @@ import arrow.check.property.*
 import arrow.core.AndThen
 import arrow.core.extensions.list.foldable.foldMap
 import arrow.core.identity
-import arrow.core.toOption
 import arrow.core.toT
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Monoid
@@ -160,7 +159,7 @@ fun Coverage<CoverCount>.prettyPrint(tests: TestCount): Doc<Markup> =
             }.vSep()
         }
         else it.map { (k, v) ->
-            "┏━━".text() spaced (k?.let { it.unLabelTable.text() } ?: "<top>".text()) line
+            "┏━━".text() spaced (k?.unLabelTable?.text() ?: "<top>".text()) line
                     v.values.map { l ->
                         "┃".text() spaced l.pretty(tests, v.values.toList().width(tests))
                     }.vSep()
@@ -316,6 +315,7 @@ sealed class Style {
 }
 
 // TODO this could be implemented with renderDecorated if that had nicer types
+// This could probably be a suspend dsl
 fun SimpleDoc<Style>.renderMarkup(): String {
     tailrec fun SimpleDoc<Style>.go(
       xs: List<Style>,
@@ -326,12 +326,10 @@ fun SimpleDoc<Style>.renderMarkup(): String {
         is SimpleDocF.Line -> dF.doc.go(xs, AndThen(cont).compose { str ->
             // This is quite the hack, but it works ^^
             // Maybe implement it as filter and get all Style.Prefix if in the future there can be more than one
-            xs.firstOrNull { it is Style.Prefix }.toOption().fold({
-                "\n${spaces(dF.i)}$str"
-            }, {
+            xs.firstOrNull { it is Style.Prefix }?.let {
                 (it as Style.Prefix)
                 "\n${spaces(it.col)}${it.pre}${spaces(dF.i - it.col - 1)}$str"
-            })
+            } ?: "\n${spaces(dF.i)}$str"
         })
         is SimpleDocF.Text -> dF.doc.go(xs, AndThen(cont).compose { dF.str + it })
         is SimpleDocF.AddAnnotation -> when (val a = dF.ann) {

@@ -78,6 +78,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         )
 }
 
+// TODO add summary here
 fun Report<Result>.toException(): Unit = when (status) {
     is Result.Success -> Unit
     is Result.GivenUp -> throw AssertionError("GaveUp!")
