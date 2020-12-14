@@ -13,13 +13,14 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
     fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =
         copy(config = f(config))
 
-    fun withTests(i: TestLimit): Property =
+    fun withTests(i: Int): Property =
         mapConfig {
             PropertyConfig.terminationCriteria.modify(it) {
+                val tl = TestLimit(i)
                 when (it) {
-                    is EarlyTermination -> EarlyTermination(it.confidence, i)
-                    is NoEarlyTermination -> NoEarlyTermination(it.confidence, i)
-                    is NoConfidenceTermination -> NoConfidenceTermination(i)
+                    is EarlyTermination -> EarlyTermination(it.confidence, tl)
+                    is NoEarlyTermination -> NoEarlyTermination(it.confidence, tl)
+                    is NoConfidenceTermination -> NoConfidenceTermination(tl)
                 }
             }
         }
@@ -49,11 +50,13 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
     fun withTerminationCriteria(i: TerminationCriteria): Property =
         mapConfig { PropertyConfig.terminationCriteria.set(it, i) }
 
-    fun withDiscardLimit(i: DiscardRatio): Property =
-        mapConfig { PropertyConfig.maxDiscardRatio.set(it, i) }
+    fun withDiscardLimit(i: Double): Property =
+        mapConfig { PropertyConfig.maxDiscardRatio.set(it, DiscardRatio(i)) }
 
-    fun withShrinkLimit(i: ShrinkLimit): Property =
-        mapConfig { PropertyConfig.shrinkLimit.set(it, i) }
+    fun withShrinkLimit(i: Int): Property =
+        mapConfig { PropertyConfig.shrinkLimit.set(it, ShrinkLimit(i)) }
+
+    fun once(): Property = withTests(1)
 
     companion object
 }

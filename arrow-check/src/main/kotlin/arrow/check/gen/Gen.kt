@@ -83,6 +83,7 @@ fun golden(s: Size): Size = Size((s.unSize * 0.61803398875).toInt())
 fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
     long_(range).shrink { it.shrinkTowards(range.origin) }
 
+// TODO Should the range be inclusive or exclusive?
 fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
     generate { randSeed, size ->
         val (min, max) = range.bounds(size)
@@ -268,7 +269,7 @@ fun <R, A> Gen<R, A>.list(range: IntRange): Gen<R, List<A>> =
 
 internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
     if (n <= 0) Gen.just(emptyList())
-    else (0..n).toList().fold(Gen.just(emptyList<A>()) as Gen<R, List<A>>) { acc, _ ->
+    else (0 until n).toList().fold(Gen.just(emptyList<A>()) as Gen<R, List<A>>) { acc, _ ->
         acc.map2(this@replicate) { a, b -> a + b }
     }
 

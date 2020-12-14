@@ -50,8 +50,8 @@ internal class PropertyTestImpl : PropertyTest {
                 first = true
 
                 c.resume(x)
-                Gen.deferred()
-                    .flatMap { it.map { it.prependLog(Log(listOf(JournalEntry.Input { showA(x) }))) } }
+
+                Gen.deferred().flatMap { it.map { it.prependLog(Log(listOf(JournalEntry.Input { showA(x) }))) } }
             }.also(::completeOrFlatMap)
             COROUTINE_SUSPENDED
         }
@@ -91,23 +91,40 @@ internal suspend inline fun execPropertyTest(
     size: Size
 ): Rose<TestResult<Unit>>? {
     val impl = PropertyTestImpl()
-    prop.startCoroutineUninterceptedOrReturn(impl, Continuation(coroutineContext) {
-        if (it.isSuccess) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
-        else {
-            when (val exception = it.exceptionOrNull()!!) {
-                is PropertyTestImpl.ShortCircuit.Failure -> {
-                    impl.completeOrFlatMap(Gen.just(TestResult.Failed(exception.fail, Log.monoid().empty())))
-                }
-                else -> {
-                    // Deduplicate...
-                    val doc =
-                        ("━━━ Failed: (Exception) ━━━".text() + hardLine() + it.exceptionOrNull()!!.toString().doc())
-                    impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
+    try {
+        prop.startCoroutineUninterceptedOrReturn(impl, Continuation(coroutineContext) {
+            if (it.isSuccess) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
+            else {
+                when (val exception = it.exceptionOrNull()!!) {
+                    is PropertyTestImpl.ShortCircuit.Failure -> {
+                        impl.completeOrFlatMap(Gen.just(TestResult.Failed(exception.fail, Log.monoid().empty())))
+                    }
+                    else -> {
+                        // Deduplicate...
+                        val doc =
+                            ("━━━ Failed: (Exception) ━━━".text() + hardLine() + it.exceptionOrNull()!!.toString()
+                                .doc())
+                        impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
+                    }
                 }
             }
+        }).let {
+            if (it !== COROUTINE_SUSPENDED) impl.completeOrFlatMap(
+                Gen.just(
+                    TestResult.Success(
+                        Unit,
+                        Log.monoid().empty()
+                    )
+                )
+            )
         }
-    }).let {
-        if (it !== COROUTINE_SUSPENDED) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
+    } catch (exc: PropertyTestImpl.ShortCircuit.Failure) {
+        impl.completeOrFlatMap(Gen.just(TestResult.Failed(exc.fail, Log.monoid().empty())))
+    } catch (exc: Throwable) {
+        // Deduplicate...
+        val doc =
+            ("━━━ Failed: (Exception) ━━━".text() + hardLine() + exc.toString().doc())
+        impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
     }
     return impl.waitFor().runGen(Tuple3(seed, size, Unit)) as Rose<TestResult<Unit>>?
 }

@@ -151,7 +151,21 @@ data class PropertyConfig(
     val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
     val shrinkLimit: ShrinkLimit = ShrinkLimit(1000)
 ) {
-    companion object
+
+    operator fun plus(other: TerminationCriteria): PropertyConfig = this.copy(terminationCriteria = other)
+    operator fun plus(other: ShrinkLimit): PropertyConfig = this.copy(shrinkLimit = other)
+    operator fun plus(other: DiscardRatio): PropertyConfig = this.copy(maxDiscardRatio = other)
+
+    companion object {
+        fun default(): PropertyConfig = PropertyConfig()
+        fun verifiedTermination(): TerminationCriteria = NoEarlyTermination(Confidence())
+        fun earlyTermination(confidence: Confidence): TerminationCriteria = EarlyTermination(confidence)
+        fun noEarlyTermination(confidence: Confidence): TerminationCriteria = NoEarlyTermination(confidence)
+        fun testLimit(n: Int): TerminationCriteria = NoConfidenceTermination(TestLimit(n))
+        fun shrinkLimit(l: Int): ShrinkLimit = ShrinkLimit(l)
+        fun maxDiscardRatio(ratio: Double): DiscardRatio = DiscardRatio(ratio)
+        fun once(): TerminationCriteria = testLimit(1)
+    }
 }
 
 val defaultMinTests = TestLimit(100)

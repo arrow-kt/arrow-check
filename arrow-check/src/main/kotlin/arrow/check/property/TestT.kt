@@ -108,8 +108,8 @@ fun Test.failure(): Nothing = failWith(nil())
 // Sometimes useful in combinators to explicitly show success like in assert
 fun Test.succeeded(): Unit = Unit
 
-fun Test.assert(b: Boolean): Unit =
-    if (b) succeeded() else failure()
+fun Test.assert(b: Boolean, msg: () -> Doc<Markup>): Unit =
+    if (b) succeeded() else failWith(msg())
 
 fun <A> Test.diff(a: A, other: A, SA: Show<A> = Show.any(), cmp: (A, A) -> Boolean): Unit =
     if (cmp(a, other)) succeeded()
