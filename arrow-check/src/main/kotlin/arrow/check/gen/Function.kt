@@ -103,9 +103,8 @@ fun <A, B> Fn<A, B>.shrink(shrinkB: (B) -> Flow<B>): Flow<Fn<A, B>> = when (this
     Fn.NilFn -> emptyFlow()
     is Fn.UnitFn -> flowOf(Fn.NilFn as Fn<A, B>).onCompletion { emitAll(shrinkB(b.value()).map { Fn.UnitFn(Eval.now(it)) as Fn<A, B> }) }
     is Fn.EitherFn<*, *, B> ->
-        (rFn as Fn<Any?, B>).shrink(shrinkB).map { combineFn(Fn.NilFn, it) as Fn<A, B> }
+        flowOf(combineFn(Fn.NilFn, rFn) as Fn<A, B>, combineFn(lFn, Fn.NilFn) as Fn<A, B>)
             .onCompletion {
-                emitAll((lFn as Fn<Any?, B>).shrink(shrinkB).map { combineFn(it, Fn.NilFn) as Fn<A, B> })
                 emitAll(lFn.shrink(shrinkB).map { combineFn(it, rFn) as Fn<A, B> })
                 emitAll(rFn.shrink(shrinkB).map { combineFn(lFn, it) as Fn<A, B> })
             }
