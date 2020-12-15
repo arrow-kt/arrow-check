@@ -51,7 +51,7 @@ import arrow.core.value
 import arrow.fx.IO
 import arrow.fx.IO.Companion.effect
 import arrow.fx.extensions.fx
-import arrow.fx.extensions.io.functor.unit
+import arrow.fx.extensions.io.functor.void
 import arrow.fx.extensions.io.monadDefer.monadDefer
 import arrow.fx.fix
 import arrow.fx.typeclasses.MonadDefer
@@ -134,7 +134,7 @@ fun recheck(
     recheck(config, size, seed, property(propertyConfig, c))
 
 fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property): IO<Unit> =
-    checkReport(seed, size, config, None, prop).unit()
+    checkReport(seed, size, config, None, prop).void()
 
 fun checkNamed(
     name: String,
