@@ -2,9 +2,11 @@ package arrow.check.gen
 
 import arrow.check.internal.AndThenS
 import arrow.check.internal.flatMap
+import arrow.check.pretty.showPretty
 import arrow.check.property.Size
 import arrow.core.*
 import arrow.syntax.collections.tail
+import arrow.typeclasses.Show
 import kotlinx.coroutines.flow.*
 import kotlin.random.Random
 
@@ -84,7 +86,7 @@ fun golden(s: Size): Size = Size((s.unSize * 0.61803398875).toInt())
 fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
     long_(range).shrink { it.shrinkTowards(range.origin) }
 
-// TODO Should the range be inclusive or exclusive?
+// TODO Make this inclusive inclusive range
 fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
     generate { randSeed, size ->
         val (min, max) = range.bounds(size)
@@ -123,6 +125,7 @@ fun Gen.Companion.byte_(range: Range<Byte>): Gen<Any?, Byte> =
     long_(range.map { it.toLong() }).map { it.toByte() }
 
 // floating point numbers
+// TODO make sure this is inclusive exclusive
 fun Gen.Companion.double(range: Range<Double>): Gen<Any?, Double> =
     double_(range).shrink { it.shrinkTowards(range.origin) }
 
@@ -228,7 +231,7 @@ fun <R, A> Gen.Companion.recursive(
     else choice(*(nonRec + rec().map { it.small() }).toTypedArray())
 }
 
-fun <R, A> Gen.Companion.discard(): Gen<R, A> = Gen { null }
+fun Gen.Companion.discard(): Gen<Any?, Nothing> = Gen { null }
 
 fun <R, A> Gen<R, A>.ensure(predicate: Predicate<A>): Gen<R, A> =
     flatMap { (if (predicate(it)) Gen.just(it) else Gen.discard()) }
@@ -342,6 +345,12 @@ fun <R, L, A> Gen.Companion.either(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Eit
         )
     }
 
+fun <R, L, A> Gen.Companion.either_(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Either<L, A>> =
+    choice(
+        lgen.map { it.left() },
+        rgen.map { it.right() }
+    )
+
 fun <R, E, A> Gen.Companion.validated(errGen: Gen<R, E>, succGen: Gen<R, A>): Gen<R, Validated<E, A>> =
     either(errGen, succGen).map { Validated.fromEither(it) }
 
@@ -380,20 +389,14 @@ internal fun <R, A> List<Gen<R, A>>.genSubterms(): Gen<R, Subterms<A>> =
 internal fun <R, A> List<Gen<R, A>>.subtermList(f: (List<A>) -> Gen<R, A>): Gen<R, A> =
     genSubterms().flatMap { it.fromSubterms(f) }
 
-fun <R, A> Gen<R, A>.subtermGen(f: (A) -> Gen<R, A>): Gen<R, A> =
-    listOf(this).subtermList { f(it.first()) }
+fun <R, A> Gen<R, A>.subtermN(f: suspend (A) -> A): Gen<R, A> =
+    listOf(this).subtermList { Gen { _ -> Rose(f(it[0])) } }
 
-fun <R, A> Gen<R, A>.subterm(f: (A) -> A): Gen<R, A> =
-    subtermGen { Gen.just(f(it)) }
+fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A) -> A): Gen<R, A> =
+    listOf(this, this).subtermList { Gen { _ -> Rose(f(it[0], it[1])) } }
 
-// TODO Add others
-
-// permutation
-fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
-    map { a -> Gen.bool_().map { if (it) a else null } }
-        .sequence()
-        .map { it.mapNotNull(::identity) as List<A> }
-        .shrink { it.shrink() }
+fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A, A) -> A): Gen<R, A> =
+    listOf(this, this, this).subtermList { Gen { _ -> Rose(f(it[0], it[1], it[2])) } }
 
 sealed class Subterms<A> {
     data class One<A>(val a: A) : Subterms<A>()
@@ -410,17 +413,161 @@ fun <A> Subterms<A>.shrinkSubterms(): Sequence<Subterms<A>> = when (this) {
     is Subterms.All -> l.asSequence().map { Subterms.One(it) }
 }
 
-// samples // No point for IO imo as these are debug only anyway
-// if you need them in IO just wrap them in IO { ... }
-suspend fun <R, A> Gen<R, A>.sample(r: R): A {
+// permutation
+fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
+    map { a -> Gen.bool_().map { if (it) a else null } }
+        .sequence()
+        .map { it.mapNotNull(::identity) }
+        .shrink { it.shrink() }
+
+fun <A> List<A>.shuffle(): Gen<Any?, List<A>> =
+    if (isEmpty()) Gen.just(emptyList())
+    else {
+        Gen.int(Range.constant(0, size - 1)).flatMap { n ->
+            val xs = toMutableList()
+            val x = xs.removeAt(n)
+            xs.toList().shuffle().map { listOf(x) + it }
+        }
+    }
+
+// MapN boilerpalate
+fun <R, A, B, C> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, f: (A, B) -> C): Gen<R, C> = g1.map2(g2, f)
+
+fun <R, A, B, C, D> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, g3: Gen<R, C>, f: (A, B, C) -> D): Gen<R, D> =
+    g1.map2(g2.map2(g3) { b, c -> b to c }) { a, (b, c) -> f(a, b, c) }
+
+fun <R, A, B, C, D, E> Gen.Companion.mapN(
+    g1: Gen<R, A>,
+    g2: Gen<R, B>,
+    g3: Gen<R, C>,
+    g4: Gen<R, D>,
+    f: (A, B, C, D) -> E
+): Gen<R, E> =
+    g1.map2(g2.map2(g3.map2(g4) { c, d -> c to d }) { b, cd -> b to cd }) { a, (b, cd) -> f(a, b, cd.first, cd.second) }
+
+fun <R, A, B, C, D, E, F> Gen.Companion.mapN(
+    g1: Gen<R, A>,
+    g2: Gen<R, B>,
+    g3: Gen<R, C>,
+    g4: Gen<R, D>,
+    g5: Gen<R, E>,
+    f: (A, B, C, D, E) -> F
+): Gen<R, F> =
+    g1.map2(g2.map2(g3.map2(g4.map2(g5) { d, e -> d to e }) { c, de -> c to de }) { b, cde -> b to cde }) { a, (b, cde) ->
+        f(a, b, cde.first, cde.second.first, cde.second.second)
+    }
+
+fun <R, A, B, C, D, E, F, G> Gen.Companion.mapN(
+    g1: Gen<R, A>,
+    g2: Gen<R, B>,
+    g3: Gen<R, C>,
+    g4: Gen<R, D>,
+    g5: Gen<R, E>,
+    g6: Gen<R, F>,
+    f: (A, B, C, D, E, F) -> G
+): Gen<R, G> =
+    g1.map2(g2.map2(g3.map2(g4.map2(g5.map2(g6) { e, f -> e to f }) { d, ef -> d to ef }) { c, def -> c to def }) { b, cdef -> b to cdef }) { a, (b, cdef) ->
+        val (c, def) = cdef
+        val (d, ef) = def
+        val (e, f2) = ef
+        f(a, b, c, d, e, f2)
+    }
+
+fun <R, A, B, C, D, E, F, G, H> Gen.Companion.mapN(
+    g1: Gen<R, A>,
+    g2: Gen<R, B>,
+    g3: Gen<R, C>,
+    g4: Gen<R, D>,
+    g5: Gen<R, E>,
+    g6: Gen<R, F>,
+    g7: Gen<R, G>,
+    f: (A, B, C, D, E, F, G) -> H
+): Gen<R, H> =
+    g1.map2(g2.map2(g3.map2(g4.map2(g5.map2(g6.map2(g7) { f, g -> f to g }) { e, fg -> e to fg }) { d, efg -> d to efg }) { c, defg -> c to defg }) { b, cdefg -> b to cdefg }) { a, (b, cdefg) ->
+        val (c, defg) = cdefg
+        val (d, efg) = defg
+        val (e, fg) = efg
+        val (f2, g) = fg
+        f(a, b, c, d, e, f2, g)
+    }
+
+fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
+    g1: Gen<R, A>,
+    g2: Gen<R, B>,
+    g3: Gen<R, C>,
+    g4: Gen<R, D>,
+    g5: Gen<R, E>,
+    g6: Gen<R, F>,
+    g7: Gen<R, G>,
+    g8: Gen<R, H>,
+    f: (A, B, C, D, E, F, G, H) -> I
+): Gen<R, I> =
+    g1.map2(g2.map2(g3.map2(g4.map2(g5.map2(g6.map2(g7.map2(g8) { g, h -> g to h }) { f, gh -> f to gh }) { e, fgh -> e to fgh }) { d, efgh -> d to efgh }) { c, defgh -> c to defgh }) { b, cdefgh -> b to cdefgh }) { a, (b, cdefgh) ->
+        val (c, defgh) = cdefgh
+        val (d, efgh) = defgh
+        val (e, fgh) = efgh
+        val (f2, gh) = fgh
+        val (g, h) = gh
+        f(a, b, c, d, e, f2, g, h)
+    }
+
+// Debugging generators
+suspend fun <R, A> Gen<R, A>.sample(size: Size = Size(30), r: R): A {
     tailrec suspend fun loop(n: Int): A =
         if (n <= 0) throw IllegalStateException("Gen.Sample too many discards")
         else {
             val seed = RandSeed(Random.nextLong())
-            when (val res = this.runGen(Tuple3(seed, Size(30), r))?.res) {
+            when (val res = this.runGen(Tuple3(seed, size, r))?.res) {
                 null -> loop(n - 1)
                 else -> res
             }
         }
     return loop(100)
+}
+
+suspend fun <A> Gen<Any?, A>.sample(size: Size = Size(30)): A = sample(size, Unit)
+
+suspend fun <R, A> Gen<R, A>.print(
+    seed: RandSeed = RandSeed(Random.nextLong()),
+    size: Size = Size(30),
+    SA: Show<A> = Show.any(),
+    env: R
+): Unit {
+    when (val rose = runGen(Tuple3(seed, size, env))) {
+        null -> {
+            println("=== Outcome ===")
+            println("<discard>")
+        }
+        else -> {
+            println("=== Outcome ===")
+            println(rose.res.showPretty(SA))
+            println("=== Shrinks ===")
+            rose.shrinks.collect {
+                if (it == null) println("<discard>")
+                else println(it.res.showPretty(SA))
+            }
+        }
+    }
+}
+
+suspend fun <A> Gen<Any?, A>.print(
+    seed: RandSeed = RandSeed(Random.nextLong()),
+    size: Size = Size(30),
+    SA: Show<A> = Show.any()
+): Unit = print(seed, size, SA, Unit)
+
+suspend fun <R, A> Gen<R, A>.printTree(
+    seed: RandSeed = RandSeed(Random.nextLong()),
+    size: Size = Size(30),
+    SA: Show<A> = Show.any(),
+    env: R
+): Unit {
+    when (val rose = runGen(Tuple3(seed, size, env))) {
+        null -> {
+            println("<discarded>")
+        }
+        else -> {
+            TODO()
+        }
+    }
 }
