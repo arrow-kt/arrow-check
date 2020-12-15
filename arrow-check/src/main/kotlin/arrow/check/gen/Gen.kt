@@ -8,7 +8,7 @@ import arrow.syntax.collections.tail
 import kotlinx.coroutines.flow.*
 import kotlin.random.Random
 
-class Gen<in R, A>(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
+class Gen<in R, out A>(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
     companion object {
         internal operator fun <R, A> invoke(f: suspend (Tuple3<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
             Gen(AndThenS.Single(f))
@@ -57,7 +57,8 @@ fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 :
 fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
     Gen { (seed, size) -> Rose(f(seed, size)) }
 
-fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> = Gen(runGen.andThen { it?.expand(f) })
+fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> =
+    Gen(runGen.andThen { it?.expand(f.andThen { it.asFlow() }) })
 
 fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.prune(n) })
 

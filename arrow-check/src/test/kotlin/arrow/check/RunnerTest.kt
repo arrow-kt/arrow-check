@@ -3,6 +3,7 @@ package arrow.check
 import arrow.check.gen.Gen
 import arrow.check.gen.int
 import arrow.check.gen.list
+import arrow.check.gen.toFunction
 import arrow.check.property.*
 import pretty.text
 
@@ -51,6 +52,13 @@ class RunnerTest : PropertySpec({
         classify("Multi element lists", xs.size > 1)
 
         xs.roundtrip({ it.reversed() }, { it.reversed() })
+    }
+
+    "fn" {
+        val (f) = forAll(Gen.int(0..100).toFunction(Long.toFunction()))
+
+        println("Run ${f(0)} | ${f(1)}")
+        assert(f(1) < 4)
     }
 
     // test interleaved suspension

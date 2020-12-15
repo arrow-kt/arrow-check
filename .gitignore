@@ -13,7 +13,6 @@
 
 # Generated files
 bin/
-gen/
 out/
 
 # Gradle files
