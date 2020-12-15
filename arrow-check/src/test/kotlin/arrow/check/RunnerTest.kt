@@ -55,9 +55,10 @@ class RunnerTest : PropertySpec({
     }
 
     "fn" {
+        // val (f) = forAll(Gen.int(0..100).toFunction(ListToFunction(Unit.toFunction())))
         val (f) = forAll(Gen.int(0..100).toFunction(Long.toFunction()))
 
-        println("Run ${f(0)} | ${f(1)}")
+        println("Run ${f(1)} | ${f(0)}")
         assert(f(1) < 4)
     }
 

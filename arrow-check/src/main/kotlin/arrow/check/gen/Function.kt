@@ -162,7 +162,7 @@ private fun <A, B, C> funMapRec(fb: ToFunction<B>, f: (A) -> Eval<B>, cF: (B) ->
 }
 
 private fun <A, B, C> ((Pair<A, B>) -> C).curry(): ((A) -> ((B) -> C)) =
-    { a -> { b -> this(a to b) } }
+    AndThen { a -> AndThen { b: B -> a to b }.andThenF(AndThen(this)) }
 
 private fun <A, B, C> funPair(fA: ToFunction<A>, fB: ToFunction<B>, f: (Pair<A, B>) -> C): Fn<Pair<A, B>, C> = fA.run {
     fB.run {
@@ -174,8 +174,8 @@ private fun <A, B, C> funPair(fA: ToFunction<A>, fB: ToFunction<B>, f: (Pair<A, 
 
 private fun <A, B, C> funEither(fA: ToFunction<A>, fB: ToFunction<B>, f: (Either<A, B>) -> C): Fn<Either<A, B>, C> =
     Fn.EitherFn(
-        fA.run { toFunction(AndThen(f).compose { it.left() }) },
-        fB.run { toFunction(AndThen(f).compose { it.right() }) }
+        fA.run { toFunction(AndThen(f).compose { Either.Left(it) }) },
+        fB.run { toFunction(AndThen(f).compose { Either.Right(it) }) }
     )
 
 private fun <R, A> Gen<R, A>.variant(l: Long): Gen<R, A> =

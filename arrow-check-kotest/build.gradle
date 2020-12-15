@@ -9,6 +9,10 @@ apply from: "$DOC_CREATION"
 dependencies {
     api project(":arrow-check")
 
-    api "io.kotest:kotest-runner-junit5-jvm:$KOTEST_VERSION" // for kotest framework
-    api "io.kotest:kotest-assertions-core-jvm:$KOTEST_VERSION" // for kotest core jvm assertions
+    api("io.kotest:kotest-runner-junit5-jvm:$KOTEST_VERSION") { // for kotest framework
+        exclude group: "io.arrow-kt"
+    }
+    api("io.kotest:kotest-assertions-core-jvm:$KOTEST_VERSION") { // for kotest core jvm assertions
+        exclude group: "io.arrow-kt"
+    }
 }
