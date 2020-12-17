@@ -20,6 +20,9 @@ class RandSeed private constructor(
     override fun toString(): String = "RandSeed($seed, $gamma)"
 
     // See http://hackage.haskell.org/package/QuickCheck-2.13.2/docs/src/Test.QuickCheck.Random.html#integerVariant
+    /**
+     * Modify the random seed in a way that even small variations in [i] brings larger variants.
+     */
     fun variant(i: Long): RandSeed = when {
         i >= 1 -> gammaF(i)(this.split().a)
         else -> gammaF(1 - i)(this.split().b)
@@ -49,7 +52,14 @@ class RandSeed private constructor(
         else -> 1 + ilog2(i / 2)
     }
 
+    /**
+     * Generate a random long.
+     */
     fun nextLong(): Tuple2<Long, RandSeed> = nextSeed(seed, gamma).let { mix64(it) toT RandSeed(it, gamma) }
+
+    /**
+     * Generate a random long within bounds (inclusive, exclusive).
+     */
     fun nextLong(origin: Long, bound: Long): Tuple2<Long, RandSeed> = when {
         origin >= bound -> throw IllegalArgumentException("Invalid bounds $origin $bound")
         else -> {
@@ -80,7 +90,14 @@ class RandSeed private constructor(
         }
     }
 
+    /**
+     * Generate a random integer
+     */
     fun nextInt(): Tuple2<Int, RandSeed> = nextSeed(seed, gamma).let { mix32(it) toT RandSeed(it, gamma) }
+
+    /**
+     * Generate a random integer within bounds (inclusive, exclusive)
+     */
     fun nextInt(origin: Int, bound: Int): Tuple2<Int, RandSeed> = when {
         origin >= bound -> throw IllegalArgumentException("Invalid bounds $origin $bound")
         else -> {
@@ -111,10 +128,16 @@ class RandSeed private constructor(
         }
     }
 
+    /**
+     * Generate a random double
+     */
     fun nextDouble(): Tuple2<Double, RandSeed> = nextSeed(seed, gamma).let {
         mix64(it).ushr(11) * DOUBLE_UNIT toT RandSeed(it, gamma)
     }
 
+    /**
+     * Generate a random double within bounds (inclusive, exclusive)
+     */
     fun nextDouble(origin: Double, bound: Double): Tuple2<Double, RandSeed> {
         val (l, s) = nextLong()
         var r = l.ushr(11) * DOUBLE_UNIT
@@ -129,6 +152,9 @@ class RandSeed private constructor(
         return r toT s
     }
 
+    /**
+     * Split the seed into two new seeds
+     */
     fun split(): Tuple2<RandSeed, RandSeed> {
         val (l, seed) = nextLong()
         val nl = nextSeed(seed.seed, gamma)

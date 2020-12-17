@@ -8,21 +8,49 @@ import java.math.BigDecimal
 import kotlin.math.max
 import kotlin.math.min
 
+/**
+ * [Range] reflects a growable range from an origin out towards a lower and upper bound.
+ *
+ * @param origin The origin of a range will only be used to shrink towards that origin
+ * @param bounds A function that generates an lower and upper bound depending on the [Size].
+ */
 data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
 
+    /**
+     * Change the [Range] by mapping over it
+     */
     fun <B> map(f: (A) -> B): Range<B> = Range(
         f(origin),
         bounds andThen { (a, b) -> f(a) toT f(b) }
     )
 
+    /**
+     * Extract the lower bound using the given [Size]
+     */
     fun lowerBound(s: Size): A = bounds(s).a
+
+    /**
+     * Extract the lower bound using the given [Size]
+     */
     fun upperBound(s: Size): A = bounds(s).b
 
     companion object {
 
+        /**
+         * Singleton range which always has [a] as a bound.
+         */
         fun <A> singleton(a: A): Range<A> = Range(a) { a toT a }
 
+        /**
+         * Create a constant range that does not change with [Size].
+         *
+         * [start] will also be used as [origin].
+         */
         fun <A> constant(start: A, end: A): Range<A> = Range(start) { start toT end }
+
+        /**
+         * Create a constant range with a specific origin.
+         */
         fun <A> constant(origin: A, start: A, end: A): Range<A> = Range(origin) { start toT end }
 
         fun constant(range: IntRange): Range<Int> = constant(range.first, range.last)
@@ -32,7 +60,16 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
         fun constant(range: CharProgression): Range<Char> = constant(range.first, range.last)
         fun constant(range: LongProgression): Range<Long> = constant(range.first, range.last)
 
+        /**
+         * Create a range that grows linear with the [Size].
+         *
+         * The [origin] of this range will be the [start].
+         */
         fun linear(start: Int, end: Int): Range<Int> = linearFrom(start, start, end)
+
+        /**
+         * Create a range that grows linear with the [Size] from a specific [origin].
+         */
         fun linearFrom(origin: Int, start: Int, end: Int): Range<Int> = Range(origin) { s ->
             val xSized = scaleLinear(s, origin, start).clamp(start.toLong(), end.toLong()).toInt()
             val ySized = scaleLinear(s, origin, end).clamp(start.toLong(), end.toLong()).toInt()
@@ -71,7 +108,7 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Tuple2<A, A>) {
     }
 }
 
-fun scaleLinear(size: Size, origin: Int, target: Int): Long {
+internal fun scaleLinear(size: Size, origin: Int, target: Int): Long {
     val sz = max(size.unSize, min(99, size.unSize))
     val z = origin.toLong()
     val n = target.toLong()
@@ -80,7 +117,7 @@ fun scaleLinear(size: Size, origin: Int, target: Int): Long {
 }
 
 // TODO mpp compatible option
-fun scaleLinear(size: Size, origin: Long, target: Long): BigDecimal {
+internal fun scaleLinear(size: Size, origin: Long, target: Long): BigDecimal {
     val sz = max(size.unSize, min(99, size.unSize))
 
     val z = origin.toBigDecimal()
@@ -89,7 +126,7 @@ fun scaleLinear(size: Size, origin: Long, target: Long): BigDecimal {
     return z + diff
 }
 
-fun scaleLinear(size: Size, origin: Double, target: Double): BigDecimal {
+internal fun scaleLinear(size: Size, origin: Double, target: Double): BigDecimal {
     val sz = max(size.unSize, min(99, size.unSize))
 
     val z = origin.toBigDecimal()
@@ -98,14 +135,14 @@ fun scaleLinear(size: Size, origin: Double, target: Double): BigDecimal {
     return z + diff
 }
 
-fun Long.clamp(x: Long, y: Long): Long =
+internal fun Long.clamp(x: Long, y: Long): Long =
     if (x > y) min(x, max(y, this))
     else min(y, max(x, this))
 
-fun BigDecimal.clamp(x: Long, y: Long): Long =
+internal fun BigDecimal.clamp(x: Long, y: Long): Long =
     if (x > y) max(y.toBigDecimal()).min(x.toBigDecimal()).toLong()
     else max(x.toBigDecimal()).min(y.toBigDecimal()).toLong()
 
-fun BigDecimal.clamp(x: Double, y: Double): Double =
+internal fun BigDecimal.clamp(x: Double, y: Double): Double =
     if (x > y) max(y.toBigDecimal()).min(x.toBigDecimal()).toDouble()
     else max(x.toBigDecimal()).min(y.toBigDecimal()).toDouble()

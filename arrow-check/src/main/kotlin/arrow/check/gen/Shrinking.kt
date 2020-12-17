@@ -2,6 +2,9 @@ package arrow.check.gen
 
 import arrow.core.toT
 
+/**
+ * Shrink the number towards a destination.
+ */
 fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
     this -> emptySequence()
     else -> {
@@ -10,6 +13,9 @@ fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
     }
 }
 
+/**
+ * Shrink the number towards a destination.
+ */
 fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destination) {
     this -> emptySequence()
     else -> {
@@ -21,10 +27,18 @@ fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destinat
     }
 }
 
+/**
+ * Shrink the list, this will only shrink the size.
+ *
+ * This is only used to add shrinking to collections, it does not shrink individual elements.
+ *
+ * > To have elements itself also shrink you have to either manually write the shrinker
+ *  (like [Gen.shrink] or have shrinking already be present before)
+ */
 fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())
     .flatMap { removes(it.toInt()) }
 
-fun <A> List<A>.removes(n: Int): Sequence<List<A>> = loopRemove(n, size)
+internal fun <A> List<A>.removes(n: Int): Sequence<List<A>> = loopRemove(n, size)
 
 private fun <A> List<A>.loopRemove(k: Int, n: Int): Sequence<List<A>> =
     (take(k) toT drop(k)).let { (head, tail) ->
@@ -37,7 +51,7 @@ private fun <A> List<A>.loopRemove(k: Int, n: Int): Sequence<List<A>> =
         }
     }
 
-fun <T : Any> iterate(start: T, f: (T) -> T) = generateSequence(start) { f(it) }
+internal fun <T : Any> iterate(start: T, f: (T) -> T) = generateSequence(start) { f(it) }
 
-fun halves(i: Long): Sequence<Long> =
+private fun halves(i: Long): Sequence<Long> =
     generateSequence(i) { it / 2 }.takeWhile { it != 0L }

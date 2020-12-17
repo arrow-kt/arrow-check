@@ -81,4 +81,4 @@ sealed class AndThenS<in I, out O> {
     }
 }
 
-internal fun <I, O, X> AndThenS<I, O>.flatMap(g: suspend (O) -> AndThenS<I, X>): AndThenS<I, X> = AndThenS.Join(andThen(g))
+fun <I, O, X> AndThenS<I, O>.flatMap(g: suspend (O) -> AndThenS<I, X>): AndThenS<I, X> = AndThenS.Join(andThen(g))
