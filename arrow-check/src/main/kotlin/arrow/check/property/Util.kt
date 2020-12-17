@@ -13,32 +13,87 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
+/**
+ * Sealed class with all annotations that arrow-check supports
+ */
 sealed class Markup {
+    /**
+     * Renders text inside the annotation as red and also prefixes with -
+     *
+     * @param offset Refers to the offset where the prefix is inserted
+     */
     data class DiffRemoved(val offset: Int) : Markup()
+
+    /**
+     * Renders text inside the annotation as red and also prefixes with +
+     *
+     * @param offset Refers to the offset where the prefix is inserted
+     */
     data class DiffAdded(val offset: Int) : Markup()
+
+    /**
+     * Annotation which wraps the Diff.
+     *
+     * Not used much atm, however may be useful for special rendering methods later.
+     */
     object Diff : Markup()
+
+    /**
+     * Wraps a tests annotation output
+     */
     object Annotation : Markup()
+
+    /**
+     * Wraps a tests footnote output
+     */
     object Footnote : Markup()
+
+    /**
+     * Wraps a tests coverage output
+     */
     object Coverage : Markup()
+
+    /**
+     * Wraps a test coverages coverage bar
+     */
     object CoverageFill : Markup()
+
+    /**
+     * Wraps a tests status
+     */
     sealed class Progress : Markup() {
         object Running : Progress()
         object Shrinking : Progress()
     }
 
+    /**
+     * Wraps a tests result text
+     */
     sealed class Result : Markup() {
         object Failed : Result()
         object GaveUp : Result()
         object Success : Result()
     }
 
+    /**
+     * Annotates icons.
+     *
+     * Useful for future settings that go lower on the unicode count
+     */
     data class Icon(val name: IconType) : Markup()
+
+    /**
+     * Annotate coverage output to indicate failure or success
+     */
     sealed class Style : Markup() {
         object Failure : Style()
         object Success : Style()
     }
 }
 
+/**
+ * All icons currenty in use.
+ */
 sealed class IconType {
     object GaveUp : IconType()
     object Failure : IconType()
@@ -49,8 +104,16 @@ sealed class IconType {
 }
 
 // TODO if possible (might be hard within the jvm, but maybe gradle has options) later on we can extend this with source pos info to print text at specific points in test source
+/**
+ * Test failure.
+ *
+ * Contains rich doc describing it.
+ */
 inline class Failure(val unFailure: Doc<Markup>)
 
+/**
+ * Test Log
+ */
 /* inline */ class Log(val unLog: List<JournalEntry>) {
     companion object
 }
@@ -66,18 +129,37 @@ interface LogMonoid : Monoid<Log> {
 
 fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
 
+/**
+ * Test annotations
+ */
 sealed class JournalEntry {
-    // inputs forAll adds those
+
+    /**
+     * Inputs refer to values returned by forAll, usually not added manually.
+     */
     data class Input(val text: () -> Doc<Markup>) : JournalEntry()
 
-    // user supplied information
+    /**
+     * Annotations, added by [Test.annotate] by users.
+     */
     data class Annotate(val text: () -> Doc<Markup>) : JournalEntry()
 
+    /**
+     * Footnotes, added by [Test.footnote] by users.
+     */
     data class Footnote(val text: () -> Doc<Markup>) : JournalEntry()
-    // labels, classes, tables
+
+    /**
+     * Coverage labels. Used to track classified and covered input.
+     *
+     * Usually not added manually, but by the coverage methods themselves.
+     */
     data class JournalLabel(val label: Label<Boolean>) : JournalEntry()
 }
 
+/**
+ * Coverage label
+ */
 data class Label<A>(
     val table: LabelTable?,
     val name: LabelName,
@@ -91,6 +173,9 @@ inline class LabelTable(val unLabelTable: String)
 
 inline class LabelName(val unLabelName: String)
 
+/**
+ * Coverage with a special monoid instance to combine several runs.
+ */
 data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>>) {
     companion object {
         fun <A> monoid(SA: Semigroup<A>) = object : CoverageMonoid<A> {
@@ -99,9 +184,15 @@ data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>
     }
 }
 
+/**
+ * Check if a coverage report contains only covered labels
+ */
 fun Coverage<CoverCount>.coverageSuccess(test: TestCount): Boolean =
     coverageFailures(test).isEmpty()
 
+/**
+ * Check if a coverage report contains any uncovered labels
+ */
 fun Coverage<CoverCount>.coverageFailures(testCount: TestCount): List<Label<CoverCount>> =
     unCoverage.values.flatMap { it.values }.filter { it.labelCovered(testCount).not() }
 
@@ -142,9 +233,25 @@ interface CoverCountSemigroup : Semigroup<CoverCount> {
 fun CoverCount.coverPercentage(test: TestCount): CoverPercentage =
     CoverPercentage(((unCoverCount.toDouble() / test.unTestCount.toDouble() * 100.0) * 10).roundToInt().toDouble() / 10.0)
 
+/**
+ * Check if a label is covered
+ */
 fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
     annotation.coverPercentage(test).unCoverPercentage >= min.unCoverPercentage
 
+/**
+ * A property config determins how a property is run, though it mostly affects how it terminates.
+ *
+ * The config provides 3 main ways to modify it:
+ * - The constructor
+ * - generated optics
+ * - [PropertyConfig.plus] wich accepts any of its properties and overwrites it.
+ *  There are a bunch of smart constructors on the companion object of [PropertyConfig] to help with that.
+ *
+ * @param terminationCriteria Either confidence based termination which checks for coverage
+ * @param maxDiscardRatio Maximum threshold for discarded tests
+ * @param shrinkLimit Maximum shrinking depth. Note this does not refer to shrinking runs, only depth!
+ */
 @optics
 data class PropertyConfig(
     val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
@@ -168,8 +275,15 @@ data class PropertyConfig(
     }
 }
 
+/**
+ * Default minimum amount of tests that need to be run
+ */
 val defaultMinTests = TestLimit(100)
 
+/**
+ * Confidence refers to how much leeway a test is given before it decides that reaching a certain coverage
+ *  percentage is not possible.
+ */
 data class Confidence(val certainty: Long = 10.0.pow(9.0).toLong(), val tolerance: Double = 0.9)
 
 sealed class TerminationCriteria

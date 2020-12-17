@@ -1,5 +1,8 @@
 package arrow.check
 
+/**
+ * Top level config which controls how tests are run, but mostly deals with test output
+ */
 data class Config(
   val useColor: UseColor,
   val verbose: Verbose

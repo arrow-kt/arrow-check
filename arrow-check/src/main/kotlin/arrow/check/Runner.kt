@@ -95,7 +95,7 @@ suspend fun checkReport(name: PropertyName?, prop: Property): Report<Result> =
 suspend fun checkReport(config: Config, name: PropertyName?, prop: Property): Report<Result> =
     checkReport(RandSeed(Random.nextLong()), Size(0), config, name, prop)
 
-internal suspend fun checkReport(
+suspend fun checkReport(
     seed: RandSeed,
     size: Size,
     config: Config,

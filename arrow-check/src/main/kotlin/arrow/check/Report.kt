@@ -16,6 +16,11 @@ import pretty.symbols.dot
 import kotlin.math.floor
 import kotlin.math.max
 
+/**
+ * A test report.
+ *
+ * Polymorphic to allow reporting both in progress and final results with different types.
+ */
 data class Report<out A>(
   val numTests: TestCount,
   val numDiscarded: DiscardCount,
@@ -25,11 +30,19 @@ data class Report<out A>(
     companion object
 }
 
+/**
+ * Represents current progress of a property test.
+ *
+ * Can be used to display live output while testing or shrinking.
+ */
 sealed class Progress {
     object Running : Progress()
     data class Shrinking(val report: FailureSummary) : Progress()
 }
 
+/**
+ * Final test result.
+ */
 sealed class Result {
     object Success : Result()
     object GivenUp : Result()
@@ -38,6 +51,9 @@ sealed class Result {
     companion object
 }
 
+/**
+ * Summary of a failed test
+ */
 data class FailureSummary(
   val usedSize: Size,
   val usedSeed: RandSeed,
@@ -54,6 +70,11 @@ sealed class FailureAnnotation {
     data class Annotation(val text: () -> Doc<Markup>) : FailureAnnotation()
 }
 
+/**
+ * Summary of tests currently running in a group of properties.
+ *
+ * Currently mostly unused, but will become useful should a test runner ever get added.
+ */
 data class Summary(
   val waiting: PropertyCount,
   // val running: PropertyCount, TODO readd once I add execPar

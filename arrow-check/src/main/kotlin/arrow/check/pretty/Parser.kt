@@ -61,6 +61,13 @@ internal sealed class KValue {
     companion object
 }
 
+/**
+ * Uses [Show] to turn the value into a string, then parse it into a generic format and prettyprint.
+ *
+ * The result can then be rendered out.
+ *
+ * @param SA Optional [Show] instance, default uses [Any.toString].
+ */
 fun <A> A.showPretty(SA: Show<A> = Show.any()): Doc<Nothing> = SA.run {
     val str = show()
     outputParser().runParser("", str).fold({
