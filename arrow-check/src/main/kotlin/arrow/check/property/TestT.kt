@@ -210,7 +210,7 @@ fun <A> Test.diff(a: A, other: A, SA: Show<A> = Show.any(), cmp: (A, A) -> Boole
         }
     })
 
-fun Log.coverage(): Coverage<CoverCount> =
+internal fun Log.coverage(): Coverage<CoverCount> =
     unLog.filterIsInstance<JournalEntry.JournalLabel>().map {
         val l = it.label
         Coverage(

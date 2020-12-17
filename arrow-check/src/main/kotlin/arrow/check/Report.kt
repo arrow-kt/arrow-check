@@ -147,7 +147,7 @@ fun Report<Result>.prettyResult(name: PropertyName?): Doc<Markup> = when (status
             status.summary.pretty()
 }
 
-fun <A> Coverage<A>.ifNotEmpty(f: Coverage<A>.() -> Doc<Markup>): Doc<Markup> =
+internal fun <A> Coverage<A>.ifNotEmpty(f: Coverage<A>.() -> Doc<Markup>): Doc<Markup> =
     if (unCoverage.isEmpty()) nil()
     else f(this)
 
@@ -234,7 +234,7 @@ fun FailureSummary.pretty(): Doc<Markup> = annotations.prettyAnnotations().ifNot
         footnotes.map { it().annotate(Markup.Footnote) }.ifNotEmpty { vSep() + line() } +
         failureDoc
 
-fun <A> List<Doc<A>>.ifNotEmpty(f: List<Doc<A>>.() -> Doc<A>): Doc<A> =
+internal fun <A> List<Doc<A>>.ifNotEmpty(f: List<Doc<A>>.() -> Doc<A>): Doc<A> =
     if (isEmpty()) nil()
     else f(this)
 
@@ -265,7 +265,7 @@ fun DiscardCount.discardCount(): Doc<Nothing> =
     if (this.unDiscardCount == 0) nil()
     else " with".text() spaced this.unDiscardCount.doc() spaced "discarded".text()
 
-fun <A> Int.plural(singular: Doc<A>, plural: Doc<A>): Doc<A> =
+internal fun <A> Int.plural(singular: Doc<A>, plural: Doc<A>): Doc<A> =
     if (this == 1) doc() spaced singular
     else doc() spaced plural
 

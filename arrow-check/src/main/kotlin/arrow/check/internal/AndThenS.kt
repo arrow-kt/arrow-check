@@ -1,7 +1,7 @@
 package arrow.check.internal
 
 // Add to arrow core?
-sealed class AndThenS<in I, out O> {
+internal sealed class AndThenS<in I, out O> {
     data class Single<I, O>(val f: suspend (I) -> O, val index: Int = 1) : AndThenS<I, O>() {
         override fun toString(): String = "Single(depth = $index)"
     }
@@ -81,4 +81,4 @@ sealed class AndThenS<in I, out O> {
     }
 }
 
-fun <I, O, X> AndThenS<I, O>.flatMap(g: suspend (O) -> AndThenS<I, X>): AndThenS<I, X> = AndThenS.Join(andThen(g))
+internal fun <I, O, X> AndThenS<I, O>.flatMap(g: suspend (O) -> AndThenS<I, X>): AndThenS<I, X> = AndThenS.Join(andThen(g))

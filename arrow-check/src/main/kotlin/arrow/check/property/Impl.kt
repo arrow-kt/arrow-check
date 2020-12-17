@@ -313,7 +313,7 @@ internal suspend fun shrinkResult(
     return Result.Failure(best)
 }
 
-object AbortFlowException : Throwable()
+internal object AbortFlowException : Throwable()
 
 // Not really a fully fledged promise, but enough for this use case
 internal class Promise<A> {
@@ -355,7 +355,7 @@ private var <T> Continuation<T>.completion: Continuation<*>?
     get() = completionField.get(this) as Continuation<*>
     set(value) = completionField.set(this@completion, value)
 
-var <T> Continuation<T>.stateStack: List<Map<String, *>>
+internal var <T> Continuation<T>.stateStack: List<Map<String, *>>
     get() {
         if (!coroutineImplClass.isInstance(this)) return emptyList()
         val resultForThis = (this.javaClass.declaredFields)

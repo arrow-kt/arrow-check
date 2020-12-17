@@ -12,7 +12,7 @@ import pretty.*
 import pretty.symbols.*
 import kotlin.math.min
 
-sealed class KValue {
+internal sealed class KValue {
     data class RawString(val s: String) : KValue()
     data class Decimal(val l: Long) : KValue()
     data class Rational(val r: Double) : KValue()
@@ -69,22 +69,22 @@ fun <A> A.showPretty(SA: Show<A> = Show.any()): Doc<Nothing> = SA.run {
 }.doc().group()
 
 // @extension
-interface KValueEq : Eq<KValue> {
+internal interface KValueEq : Eq<KValue> {
     override fun KValue.eqv(b: KValue): Boolean = this == b
 }
 
-fun KValue.Companion.eq(): Eq<KValue> = object : KValueEq {}
+internal fun KValue.Companion.eq(): Eq<KValue> = object : KValueEq {}
 
-typealias Parser<A> = KParsecT<Nothing, String, Char, ForId, A>
+internal typealias Parser<A> = KParsecT<Nothing, String, Char, ForId, A>
 
-fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForId>(String.stream(), Id.monad())
+internal fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForId>(String.stream(), Id.monad())
 
 // Top level parser
-fun outputParser(): Parser<KValue> = parser().run {
+internal fun outputParser(): Parser<KValue> = parser().run {
     valueParser { true }.k().altSum(this, ListK.foldable()).apTap(eof()).fix()
 }
 
-fun valueParser(pred: (Char) -> Boolean): List<Parser<KValue>> = parser().run {
+internal fun valueParser(pred: (Char) -> Boolean): List<Parser<KValue>> = parser().run {
     listOf(
         listParser(),
         recordParser(),
@@ -96,7 +96,7 @@ fun valueParser(pred: (Char) -> Boolean): List<Parser<KValue>> = parser().run {
     ) as List<Parser<KValue>>
 }
 
-fun listParser(): Parser<KValue> = parser().run {
+internal fun listParser(): Parser<KValue> = parser().run {
     unit().fix().flatMap {
         char('[').followedBy(
             valueParser { it != ',' && it != ']' }.map { it.withSeparator(',').apTap(char(']')).fix() }.k()
@@ -105,13 +105,13 @@ fun listParser(): Parser<KValue> = parser().run {
     }.fix()
 }
 
-fun consParser(): Parser<KValue> = parser().run {
+internal fun consParser(): Parser<KValue> = parser().run {
     takeAtLeastOneWhile("constructor name".some()) { it != '(' && it.isLetter() }
         .flatMap { conName -> tupleParser().map { props -> KValue.Cons(conName, (props as KValue.KTuple).vals) }.fix() }
         .fix()
 }
 
-fun recordParser(): Parser<KValue> = parser().run {
+internal fun recordParser(): Parser<KValue> = parser().run {
     fx.monad {
         val conName = takeAtLeastOneWhile("constructor name".some()) { it != '(' && it.isLetter() }.bind()
         val props = propertyParser().withSeparator(',').between('(', ')').bind()
@@ -119,7 +119,7 @@ fun recordParser(): Parser<KValue> = parser().run {
     }.fix()
 }
 
-fun propertyParser(): Parser<Tuple2<String, KValue>> = parser().run {
+internal fun propertyParser(): Parser<Tuple2<String, KValue>> = parser().run {
     fx.monad {
         val propName = takeAtLeastOneWhile("property name".some()) { it != '=' }.bind()
         val value = char('=').label("equals").fix()
@@ -129,7 +129,7 @@ fun propertyParser(): Parser<Tuple2<String, KValue>> = parser().run {
     }.fix()
 }
 
-fun <A> Parser<A>.between(start: Char, end: Char): Parser<A> = parser().run {
+internal fun <A> Parser<A>.between(start: Char, end: Char): Parser<A> = parser().run {
     fx.monad {
         char(start).label("$start").bind()
         val a = this@between.bind()
@@ -138,7 +138,7 @@ fun <A> Parser<A>.between(start: Char, end: Char): Parser<A> = parser().run {
     }.fix()
 }
 
-fun <A> Parser<A>.withSeparator(sep: Char): Parser<List<A>> = parser().run {
+internal fun <A> Parser<A>.withSeparator(sep: Char): Parser<List<A>> = parser().run {
     fx.monad {
         val seq = this@withSeparator.apTap(char(sep).label("$sep").followedBy(space())).many().bind().toList()
         val last = this@withSeparator.optional().bind()
@@ -147,11 +147,11 @@ fun <A> Parser<A>.withSeparator(sep: Char): Parser<List<A>> = parser().run {
     }.fix()
 }
 
-fun stringValueParser(pred: (Char) -> Boolean): Parser<KValue> = parser().run {
+internal fun stringValueParser(pred: (Char) -> Boolean): Parser<KValue> = parser().run {
     takeAtLeastOneWhile("string value".some(), pred).map { KValue.RawString(it) }.fix()
 }
 
-fun tupleParser(): Parser<KValue> = parser().run {
+internal fun tupleParser(): Parser<KValue> = parser().run {
     unit().fix().flatMap {
         char('(').followedBy(
             valueParser { it != ',' && it != ')' }.map { it.withSeparator(',').apTap(char(')')) }.k()
@@ -160,6 +160,6 @@ fun tupleParser(): Parser<KValue> = parser().run {
     }.fix()
 }
 
-fun rawStringParser(): Parser<KValue> = parser().run {
+internal fun rawStringParser(): Parser<KValue> = parser().run {
     takeRemaining().map { KValue.RawString(it) }.fix()
 }

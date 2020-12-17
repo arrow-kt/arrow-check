@@ -194,7 +194,7 @@ inline class GroupName(val unGroupName: String)
 
 /* inline */class Size(val unSize: Int)
 
-fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> =
+internal fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> =
     unCoverage.values.flatMap {
         val total = it.values.sumBy { it.annotation.unCoverCount }
         it.values.map { total toT it }
@@ -224,11 +224,11 @@ fun Confidence.sufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
 fun Confidence.insufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
     wilsonHigh(k, n, 1.toDouble() / certainty) < p
 
-fun wilsonLow(k: Int, n: Int, a: Double): Double = wilson(k, n, invnormcdf(a / 2))
+internal fun wilsonLow(k: Int, n: Int, a: Double): Double = wilson(k, n, invnormcdf(a / 2))
 
-fun wilsonHigh(k: Int, n: Int, a: Double): Double = wilson(k, n, invnormcdf(1 - a / 2))
+internal fun wilsonHigh(k: Int, n: Int, a: Double): Double = wilson(k, n, invnormcdf(1 - a / 2))
 
-fun wilson(k: Int, n: Int, z: Double): Double {
+internal fun wilson(k: Int, n: Int, z: Double): Double {
     val p = k / n.toDouble()
     return (p + z * z / (2 * n) + z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
 }
@@ -236,7 +236,7 @@ fun wilson(k: Int, n: Int, z: Double): Double {
 // Quickcheck added this without erfc, so I'll use that. Credits to them:
 //  https://github.com/nick8325/quickcheck/blob/master/Test/QuickCheck/Test.hs
 //  and the source quickcheck used https://web.archive.org/web/20151110174102/http://home.online.no/~pjacklam/notes/invnorm/
-fun invnormcdf(d: Double): Double = when {
+internal fun invnormcdf(d: Double): Double = when {
     d > 1 -> Double.NaN
     d < 0 -> Double.NaN
     d == 0.0 -> Double.NEGATIVE_INFINITY

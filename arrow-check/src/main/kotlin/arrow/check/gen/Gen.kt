@@ -27,7 +27,7 @@ import kotlin.random.Random
  * The environment [R] is local state which can be passed down through generators. By using [local] it is possible
  *  to make generators stateful. This is similar to how a split [RandSeed] is passed down through [flatMap].
  */
-class Gen<in R, out A>(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
+class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
     companion object {
         internal operator fun <R, A> invoke(f: suspend (Tuple3<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
             Gen(AndThenS.Single(f))
