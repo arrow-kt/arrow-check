@@ -56,8 +56,6 @@ internal class PropertyTestImpl : PropertyTest {
             COROUTINE_SUSPENDED
         }
 
-    override suspend fun discard(): Nothing = forAll(Gen.discard())
-
     override fun writeLog(log: JournalEntry) {
         completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log(listOf(log)))))
     }

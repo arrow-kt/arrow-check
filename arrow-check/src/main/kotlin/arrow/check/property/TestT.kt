@@ -14,18 +14,68 @@ import arrow.typeclasses.Eq
 import arrow.typeclasses.Show
 import pretty.*
 
+/**
+ * The test interface allows basic unit test functionality.
+ *
+ * - [writeLog] allows annotating the test with [JournalEntry]'s.
+ * - [failWith] fails the unit test with a prettified [Doc] which may contain the reason for the failure.
+ *
+ * Upon this all other relevant combinators can be built and the [PropertyTest] interface merely expands
+ *  the functionality by adding [PropertyTest.forAll] to the primitives.
+ */
 interface Test {
+    /**
+     * Append a [JournalEntry] to this tests log.
+     */
     fun writeLog(log: JournalEntry): Unit
 
+    /**
+     * Fail a test with a prettified [Doc].
+     */
     fun failWith(msg: Doc<Markup>): Nothing
 
     // Move when we can have multiple receivers...
+    /**
+     * Test two values for equality and should they be unequal provide a pretty-printed diff.
+     *
+     * The diff should make spotting the inequality much easier, especially in larger datatypes.
+     *
+     * @param other Object to compare to.
+     * @param EQA Optional equality instance, default uses [Any.equals].
+     * @param SA Optional show instance, default uses [Any.toString].
+     *
+     * @see neqv To test for inequality
+     * @see diff As a more lower level operator
+     */
     fun <A> A.eqv(other: A, EQA: Eq<A> = Eq.any(), SA: Show<A> = Show.any()): Unit =
         diff(this, other, SA) { a, b -> EQA.run { a.eqv(b) } }
 
+    /**
+     * Test two values for inequality and should they be equal provide a pretty-printed diff.
+     *
+     * The diff may seem useless here, however that entirely depends on the way equality is implemented.
+     *  Two elements expected to be different may also be different and yet fail this test if the
+     *  equality test itself is wrong.
+     *
+     * @param other Object to compare to.
+     * @param EQA Optional equality instance, default uses [Any.equals].
+     * @param SA Optional show instance, default uses [Any.toString].
+     *
+     * @see eqv To test for equality
+     * @see diff As a more lower level operator
+     */
     fun <A> A.neqv(other: A, EQA: Eq<A> = Eq.any(), SA: Show<A> = Show.any()): Unit =
         diff(this, other, SA) { a, b -> EQA.run { a.neqv(b) } }
 
+    /**
+     * Test if a pair of [encode]/[decode] end up at the same value again.
+     *
+     * Offers much nicer failure output than directly testing this.
+     *
+     * @param EQ Optional equality instance, default uses [Any.equals].
+     * @param SA Optional show instance for the initial value, default uses [Any.toString].
+     * @param SB Optional show instance for the encoded value, default uses [Any.toString].
+     */
     suspend fun <A, B> A.roundtrip(
         encode: suspend (A) -> B,
         decode: suspend (B) -> A,
@@ -42,6 +92,17 @@ interface Test {
         }, SB
     )
 
+    /**
+     * Test if a pair of [encode]/[decode] end up at the same value again.
+     *
+     * Overload of [roundtrip] which allows [decode] to have its result wrapped in an [Either] or a
+     *  similar datatype that implements the [Applicative] interface.
+     *
+     * @param AP Applicative instance to operate over the result of [decode].
+     * @param EQF Optional equality instance, default uses [Any.equals].
+     * @param SFA Optional show instance for the initial value, default uses [Any.toString].
+     * @param SB Optional show instance for the encoded value, default uses [Any.toString].
+     */
     suspend fun <F, A, B> A.roundtrip(
         encode: suspend (A) -> B,
         decode: suspend (B) -> Kind<F, A>,
@@ -72,45 +133,63 @@ interface Test {
     }
 }
 
+/**
+ * Fail a test with a [String] rather than a [Doc]. Offered only for convenience.
+ */
 fun Test.failWith(msg: String): Nothing = failWith(msg.doc())
 
+/**
+ * Append an annotation to the test.
+ *
+ * This is lazy to only incur the sometimes larger cost of rendering data when a failed test is rendered.
+ */
 fun Test.annotate(msg: () -> Doc<Markup>): Unit =
     writeLog(JournalEntry.Annotate(msg))
 
+/**
+ * Append a footnote to the test.
+ *
+ * This is lazy to only incur the sometimes larger cost of rendering data when a failed test is rendered.
+ */
 fun Test.footnote(msg: () -> Doc<Markup>): Unit =
     writeLog(JournalEntry.Footnote(msg))
 
-fun Test.cover(p: Double, name: String, bool: Boolean): Unit =
-    writeLog(JournalEntry.JournalLabel(Label(null, LabelName(name), CoverPercentage(p), bool)))
-
-fun Test.classify(name: String, bool: Boolean): Unit =
-    cover(0.0, name, bool)
-
-fun Test.label(name: String): Unit =
-    cover(0.0, name, true)
-
-fun <A> Test.collect(a: A, SA: Show<A> = Show.any()): Unit =
-    cover(0.0, SA.run { a.show() }, true)
-
-fun Test.coverTable(table: String, p: Double, name: String, bool: Boolean): Unit =
-    writeLog(JournalEntry.JournalLabel(Label(LabelTable(table), LabelName(name), CoverPercentage(p), bool)))
-
-fun Test.tabulate(table: String, name: String): Unit =
-    coverTable(table, 0.0, name, true)
-
+/**
+ * Fail a test with an exception and display that exception.
+ */
 fun Test.failException(e: Throwable): Nothing =
     failWith(
         ("━━━ Failed: (Exception) ━━━".text() + hardLine() + e.toString().doc())
     )
 
+/**
+ * Fail a test without an explicit failure message.
+ */
 fun Test.failure(): Nothing = failWith(nil())
 
-// Sometimes useful in combinators to explicitly show success like in assert
+/**
+ * Constant function which returns [Unit]
+ *
+ * Sometimes useful in combinators to explicitly show success like in assert
+ */
 fun Test.succeeded(): Unit = Unit
 
-fun Test.assert(b: Boolean, msg: () -> Doc<Markup>): Unit =
+/**
+ * Assert that a specific condition holds, otherwise fail the test.
+ *
+ * @param b Condition
+ * @param msg Lazy message to use should [b] be false.
+ */
+fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
     if (b) succeeded() else failWith(msg())
 
+/**
+ * Compare two elements using a comparison function and, should that function produce false, create
+ *  a diff of the two values as the failure output.
+ *
+ * @param SA Optional show instance, default uses [Any.toString]
+ * @param cmp Comparison function to which [a] and [other] will be passed.
+ */
 fun <A> Test.diff(a: A, other: A, SA: Show<A> = Show.any(), cmp: (A, A) -> Boolean): Unit =
     if (cmp(a, other)) succeeded()
     else failWith(SA.run {

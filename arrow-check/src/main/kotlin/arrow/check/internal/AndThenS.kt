@@ -1,5 +1,6 @@
 package arrow.check.internal
 
+// Add to arrow core?
 sealed class AndThenS<in I, out O> {
     data class Single<I, O>(val f: suspend (I) -> O, val index: Int = 1) : AndThenS<I, O>() {
         override fun toString(): String = "Single(depth = $index)"
