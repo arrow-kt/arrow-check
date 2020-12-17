@@ -3,7 +3,6 @@ package arrow.check
 import arrow.check.gen.Gen
 import arrow.check.gen.int
 import arrow.check.gen.list
-import arrow.check.gen.toFunction
 import arrow.check.property.*
 import pretty.text
 
@@ -54,13 +53,17 @@ class RunnerTest : PropertySpec({
         xs.roundtrip({ it.reversed() }, { it.reversed() })
     }
 
+    /*
     "fn" {
         // val (f) = forAll(Gen.int(0..100).toFunction(ListToFunction(Unit.toFunction())))
-        val (f) = forAll(Gen.int(0..100).toFunction(Long.toFunction()))
+        // val either = forAll(Gen.either(Gen.int(0..100), Gen.int(0..100)))
+        val (f) = forAll(GenTest.int(0..100).toFunction(Long.toFunction()))
+        // println(either)
 
         println("Run ${f(1)} | ${f(0)}")
         assert(f(1) < 4)
     }
+     */
 
     // test interleaved suspension
 })

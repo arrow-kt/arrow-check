@@ -200,7 +200,6 @@ fun golden(s: Size): Size = Size((s.unSize * 0.61803398875).toInt())
 fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
     long_(range).shrink { it.shrinkTowards(range.origin) }
 
-// TODO Make this inclusive inclusive range
 /**
  * Generate [Long]'s in [range] (inclusive, inclusive) without shrinking.
  *
@@ -210,7 +209,9 @@ fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
     generate { randSeed, size ->
         val (min, max) = range.bounds(size)
         if (min == max) min
-        else randSeed.nextLong(min, max).a
+        else if (max == Long.MAX_VALUE && min == Long.MIN_VALUE) randSeed.nextLong().a
+        else if (max == Long.MAX_VALUE) randSeed.nextLong(min, max).a // Better solution?
+        else randSeed.nextLong(min, max + 1).a
     }
 
 /**
@@ -304,7 +305,6 @@ fun Gen.Companion.byte_(range: Range<Byte>): Gen<Any?, Byte> =
     long_(range.map { it.toLong() }).map { it.toByte() }
 
 // floating point numbers
-// TODO make sure this is inclusive exclusive
 /**
  * Generate [Double]'s in [range] (inclusive, exclusive) with shrinking.
  *
@@ -362,7 +362,7 @@ fun Gen.Companion.bool(): Gen<Any?, Boolean> =
  * @see bool For a version that does shrink.
  */
 fun Gen.Companion.bool_(): Gen<Any?, Boolean> =
-    generate { randSeed, _ -> randSeed.nextInt(0, 2).a != 0 }
+    generate { randSeed, _ -> randSeed.nextInt(0, 2).a == 0 }
 
 // chars
 /**
@@ -723,7 +723,9 @@ internal fun <R, K, A> Gen<R, Pair<K, A>>.uniqueByKey(n: Int): Gen<R, List<Gen<R
     fun go(k: Int, map: Map<K, Gen<R, Pair<K, A>>>): Gen<R, List<Gen<R, Pair<K, A>>>> =
         if (k > 100) Gen.discard()
         else freeze().replicate(n).flatMap {
-            val res = (map + it.map { it.bimap({ it.first }, ::identity) }.toMap())
+            val xs = it.map { it.bimap({ it.first }, ::identity) }.toMap()
+                .toList().take(n - map.size).toMap()
+            val res = map + xs
             if (res.size >= n) Gen.just(res.values.toList())
             else go(k + 1, res)
         }
@@ -989,6 +991,9 @@ fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
         val (g, h) = gh
         f(a, b, c, d, e, f2, g, h)
     }
+
+fun <R, A, B> Gen<R, A>.tupled(other: Gen<R, B>): Gen<R, Pair<A, B>> =
+    map2(other) { a, b -> a to b }
 
 // Debugging generators
 /**

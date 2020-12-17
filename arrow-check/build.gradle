@@ -20,7 +20,7 @@ dependencies {
     implementation "io.arrow-kt:arrow-recursion:$VERSION_NAME" // Recursion schemes
     api "kotlin-pretty:kotlin-pretty:0.5.2" // Pretty printing diffs
     api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
-    api "kparsec:kparsec:0.2.2" // Parser combinators to create toString-output parser
+    implementation("kparsec:kparsec:0.2.3") // Parser combinators to create toString-output parser
 
     testImplementation project(":arrow-check-kotest")
 }

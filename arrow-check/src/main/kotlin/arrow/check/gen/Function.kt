@@ -42,12 +42,13 @@ fun <A, B> Fun<A, B>.show(SA: Show<A>, SB: Show<B>): String =
 
 sealed class Fn<in A, out B> {
     object NilFn : Fn<Any?, Nothing>()
-    class UnitFn<out B>(val b: Eval<B>) : Fn<Unit, B>()
+    class UnitFn<out B>(val b: B) : Fn<Unit, B>()
     class EitherFn<in A, in B, out C>(
         val lFn: Fn<A, C>,
         val rFn: Fn<B, C>
     ) : Fn<Either<A, B>, C>()
 
+    // TODO Creation of this is stack unsafe. Wrap in eval? NO CLUE
     class PairFn<in A, in B, out C>(
         val pairFn: Fn<A, Fn<B, C>>
     ) : Fn<Pair<A, B>, C>()
@@ -60,7 +61,7 @@ sealed class Fn<in A, out B> {
 
     fun <C> map(f: (B) -> C): Fn<A, C> = when (this) {
         NilFn -> NilFn
-        is UnitFn -> UnitFn(b.map(f)) as Fn<A, C>
+        is UnitFn -> UnitFn(f(b)) as Fn<A, C>
         is EitherFn<*, *, B> -> EitherFn(
             (lFn as Fn<A, B>).map(f),
             (rFn as Fn<A, B>).map(f)
@@ -76,7 +77,7 @@ sealed class Fn<in A, out B> {
 
 fun <A, B> Fn<A, B>.abstract(def: B): (A) -> Eval<B> = when (this) {
     Fn.NilFn -> { _: A -> Eval.now(def) }
-    is Fn.UnitFn -> { _: A -> b }
+    is Fn.UnitFn -> { _: A -> Eval.now(b) }
     is Fn.EitherFn<*, *, B> -> { a: A ->
         (a as Either<Any?, Any?>).fold({
             (lFn as Fn<Any?, B>).abstract(def)(it)
@@ -101,7 +102,7 @@ fun <A, B> Fn<A, B>.abstract(def: B): (A) -> Eval<B> = when (this) {
 
 fun <A, B> Fn<A, B>.shrink(shrinkB: (B) -> Flow<B>): Flow<Fn<A, B>> = when (this) {
     Fn.NilFn -> emptyFlow()
-    is Fn.UnitFn -> flowOf(Fn.NilFn as Fn<A, B>).onCompletion { emitAll(shrinkB(b.value()).map { Fn.UnitFn(Eval.now(it)) as Fn<A, B> }) }
+    is Fn.UnitFn -> flowOf(Fn.NilFn as Fn<A, B>).onCompletion { emitAll(shrinkB(b).map { Fn.UnitFn(it) as Fn<A, B> }) }
     is Fn.EitherFn<*, *, B> ->
         flowOf(combineFn(Fn.NilFn, rFn) as Fn<A, B>, combineFn(lFn, Fn.NilFn) as Fn<A, B>)
             .onCompletion {
@@ -130,7 +131,7 @@ private fun <A, B, C> combineFn(l: Fn<A, C>, r: Fn<B, C>): Fn<Either<A, B>, C> =
 
 fun <A, B> Fn<A, B>.table(): Map<A, B> = when (this) {
     Fn.NilFn -> emptyMap()
-    is Fn.UnitFn -> mapOf(Unit to b.value()) as Map<A, B>
+    is Fn.UnitFn -> mapOf(Unit to b) as Map<A, B>
     is Fn.EitherFn<*, *, B> ->
         ((lFn as Fn<Any, B>).table().mapKeys { it.key.left() } +
                 (rFn as Fn<Any?, B>).table().mapKeys { it.key.right() }) as Map<A, B>
@@ -161,7 +162,7 @@ private fun <A, B, C> funMapRec(fb: ToFunction<B>, f: (A) -> Eval<B>, cF: (B) ->
 }
 
 private fun <A, B, C> ((Pair<A, B>) -> C).curry(): ((A) -> ((B) -> C)) =
-    AndThen { a -> AndThen { b: B -> a to b }.andThenF(AndThen(this)) }
+    { a: A -> { b: B -> this(a to b) } }
 
 private fun <A, B, C> funPair(fA: ToFunction<A>, fB: ToFunction<B>, f: (Pair<A, B>) -> C): Fn<Pair<A, B>, C> = fA.run {
     fB.run {
@@ -181,7 +182,7 @@ private fun <R, A> Gen<R, A>.variant(l: Long): Gen<R, A> =
     Gen(runGen.compose { (seed, size, env) -> Tuple3(seed.variant(l), size, env) })
 
 fun Unit.toFunction(): ToFunction<Unit> = object : ToFunction<Unit> {
-    override fun <B> toFunction(f: (Unit) -> B): Fn<Unit, B> = Fn.UnitFn(Eval.later { f(Unit) })
+    override fun <B> toFunction(f: (Unit) -> B): Fn<Unit, B> = Fn.UnitFn(f(Unit))
     override fun <R, B> Gen<R, B>.vary(a: Unit): Gen<R, B> = this
 }
 
@@ -238,7 +239,7 @@ internal interface StreamFunc<A> : ToFunction<Stream<A>> {
                 is ListF.ConsF -> l.tail.map { l.a to it }
             }
         }, {
-            it?.let { (head, tail) -> Stream(ListF.ConsF(head, Eval.later { tail })) } ?: Stream(ListF.NilF())
+            it?.let { (head, tail) -> Stream(ListF.ConsF(head, Eval.now(tail))) } ?: Stream(ListF.NilF())
         }, f)
 
     override fun <R, B> Gen<R, B>.vary(a: Stream<A>): Gen<R, B> {
@@ -250,12 +251,18 @@ internal interface StreamFunc<A> : ToFunction<Stream<A>> {
     }
 }
 
-fun <A> ListToFunction(AF: ToFunction<A>): ToFunction<List<A>> = Stream.func(AF)
-    .map({
-        it.foldRight<List<A>>(Eval.now(emptyList())) { v, acc ->
-            acc.map { listOf(v) + it }
-        }.value()
-    }, { Stream.fromList(it) })
+fun <A> ListToFunction(AF: ToFunction<A>): ToFunction<List<A>> = object : ToFunction<List<A>> {
+    override fun <B> toFunction(f: (List<A>) -> B): Fn<List<A>, B> =
+        funMapRec(Stream.func(AF), {
+            Eval.later { Stream.fromList(it) }
+        }, {
+           it.foldRight(Eval.now(emptyList<A>())) { a, acc -> acc.map { listOf(a) + it } }
+               .value()
+        }, f)
+
+    override fun <R, B> Gen<R, B>.vary(a: List<A>): Gen<R, B> =
+        Stream.func(AF).run { vary(Stream.fromList(a)) }
+}
 
 fun Long.Companion.toFunction(): ToFunction<Long> = object : ToFunction<Long> {
     override fun <B> toFunction(f: (Long) -> B): Fn<Long, B> =
