@@ -108,11 +108,3 @@ internal suspend fun checkReport(
     println(report.renderResult(config.useColor, name))
     return report
 }
-
-internal data class State(
-    val numTests: TestCount,
-    val numDiscards: DiscardCount,
-    val size: Size,
-    val seed: RandSeed,
-    val coverage: Coverage<CoverCount>
-)
