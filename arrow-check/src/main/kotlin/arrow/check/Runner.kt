@@ -1,7 +1,13 @@
 package arrow.check
 
 import arrow.check.gen.RandSeed
-import arrow.check.property.*
+import arrow.check.property.Property
+import arrow.check.property.PropertyConfig
+import arrow.check.property.PropertyName
+import arrow.check.property.PropertyTest
+import arrow.check.property.Size
+import arrow.check.property.property
+import arrow.check.property.runProperty
 import arrow.core.Tuple2
 import kotlin.random.Random
 

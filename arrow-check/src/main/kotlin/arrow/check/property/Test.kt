@@ -5,14 +5,22 @@ import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
-import arrow.core.*
+import arrow.core.ForId
+import arrow.core.Id
 import arrow.core.extensions.id.applicative.applicative
 import arrow.core.extensions.id.eq.eq
 import arrow.core.extensions.list.foldable.combineAll
+import arrow.core.value
 import arrow.typeclasses.Applicative
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Show
-import pretty.*
+import pretty.Doc
+import pretty.annotate
+import pretty.doc
+import pretty.hardLine
+import pretty.nil
+import pretty.plus
+import pretty.text
 
 /**
  * The test interface allows basic unit test functionality.

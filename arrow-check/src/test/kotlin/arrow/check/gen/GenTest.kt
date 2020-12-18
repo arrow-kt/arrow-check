@@ -1,8 +1,13 @@
 package arrow.check.gen
 
 import arrow.check.PropertySpec
-import arrow.check.property.*
-import kotlinx.coroutines.flow.collect
+import arrow.check.property.PropertyConfig
+import arrow.check.property.PropertyTest
+import arrow.check.property.annotate
+import arrow.check.property.assert
+import arrow.check.property.cover
+import arrow.check.property.coverTable
+import arrow.check.property.property
 import pretty.text
 
 class GenTest : PropertySpec({
@@ -382,7 +387,6 @@ class GenTest : PropertySpec({
 
     "Gen.nonEmptyList"(property {
         val a = forAll(Gen.int(0..100).nonEmptyList(Range.constant(1..21)))
-
 
         for (i in 1..21) cover(3.0, "$i", a.size == i)
 

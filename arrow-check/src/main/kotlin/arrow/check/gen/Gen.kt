@@ -4,10 +4,29 @@ import arrow.check.internal.AndThenS
 import arrow.check.internal.flatMap
 import arrow.check.pretty.showPretty
 import arrow.check.property.Size
-import arrow.core.*
+import arrow.core.Const
+import arrow.core.Either
+import arrow.core.Ior
+import arrow.core.NonEmptyList
+import arrow.core.Predicate
+import arrow.core.Tuple2
+import arrow.core.Tuple3
+import arrow.core.Validated
+import arrow.core.andThen
+import arrow.core.identity
+import arrow.core.left
+import arrow.core.right
+import arrow.core.toMap
+import arrow.core.toT
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Show
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flattenConcat
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlin.random.Random
 
 /**
@@ -145,7 +164,7 @@ fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.pru
 /**
  * Create a generator with access to the [Size] parameter.
  */
-fun <R, A> Gen.Companion.sized(f: suspend (Size) -> Gen<R, A>): Gen<R, A> =
+fun <R, A> Gen.Companion.sized(f: (Size) -> Gen<R, A>): Gen<R, A> =
     generate { _, size -> f(size) }.flatMap { it }
 
 /**

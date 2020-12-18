@@ -3,7 +3,13 @@ package arrow.check
 import arrow.check.gen.Gen
 import arrow.check.gen.int
 import arrow.check.gen.list
-import arrow.check.property.*
+import arrow.check.property.PropertyConfig
+import arrow.check.property.assert
+import arrow.check.property.classify
+import arrow.check.property.failWith
+import arrow.check.property.failure
+import arrow.check.property.property
+import kotlinx.coroutines.delay
 import pretty.text
 
 class RunnerTest : PropertySpec({
@@ -66,4 +72,14 @@ class RunnerTest : PropertySpec({
      */
 
     // test interleaved suspension
+    "Interleaved delay on a failed test"(property {
+        // This validates interleaved suspension even on multishot uses during shrinking
+        val res = check {
+            val xs = forAll(Gen.int(0..100))
+            delay(10)
+            assert(xs <= 10)
+        }.not()
+
+        assert(res) { "Test did not fail".text() }
+    }.once())
 })

@@ -1,14 +1,28 @@
 package arrow.check.property
 
-import arrow.check.*
-import arrow.check.gen.*
+import arrow.check.FailureAnnotation
+import arrow.check.FailureSummary
+import arrow.check.Progress
+import arrow.check.Report
+import arrow.check.gen.Gen
+import arrow.check.gen.RandSeed
+import arrow.check.gen.Rose
+import arrow.check.gen.flatMap
+import arrow.check.gen.map
+import arrow.check.gen.runEnv
+import arrow.check.testCount
 import arrow.core.None
 import arrow.core.Tuple3
 import arrow.core.extensions.list.monadFilter.filterMap
 import arrow.core.some
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
-import pretty.*
+import pretty.Doc
+import pretty.doc
+import pretty.hardLine
+import pretty.plus
+import pretty.spaced
+import pretty.text
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
@@ -134,7 +148,7 @@ internal suspend fun runProperty(
     config: PropertyConfig,
     prop: suspend PropertyTest.() -> Unit,
     hook: suspend (Report<Progress>) -> Unit
-): Report<Result> {
+): Report<arrow.check.Result> {
     val (confidence, minTests) = when (config.terminationCriteria) {
         is EarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
         is NoEarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
@@ -176,16 +190,16 @@ internal suspend fun runProperty(
             size.unSize > 99 ->
                 currState = State(numTests, numDiscards, Size(0), seed, currCoverage)
             enoughTestsRun -> {
-                fun failureRep(msg: Doc<Markup>): Report<Result> = Report(
+                fun failureRep(msg: Doc<Markup>): Report<arrow.check.Result> = Report(
                     numTests, numDiscards, currCoverage,
-                    Result.Failure(
+                    arrow.check.Result.Failure(
                         FailureSummary(
                             size, seed, ShrinkCount(0), msg, emptyList(), emptyList()
                         )
                     )
                 )
 
-                val successRep = Report(numTests, numDiscards, currCoverage, Result.Success)
+                val successRep = Report(numTests, numDiscards, currCoverage, arrow.check.Result.Success)
                 val labelsCovered = currCoverage.coverageSuccess(numTests)
                 val confidenceReport =
                     if (coverageReached && labelsCovered) successRep
@@ -202,7 +216,7 @@ internal suspend fun runProperty(
             }
             numDiscards.unDiscardCount >= config.maxDiscardRatio.unDiscardRatio * numTests.unTestCount.coerceAtLeast(
                 minTests.unTestLimit
-            ) -> return@runProperty Report(numTests, numDiscards, currCoverage, Result.GivenUp)
+            ) -> return@runProperty Report(numTests, numDiscards, currCoverage, arrow.check.Result.GivenUp)
             else -> {
                 seed.split().let { (s1, s2) ->
                     val res = execPropertyTest(prop, s1, size)
@@ -262,7 +276,7 @@ internal suspend fun shrinkResult(
     shrinkLimit: ShrinkLimit,
     node: Rose<TestResult<Unit>>,
     hook: suspend (FailureSummary) -> Unit
-): Result {
+): arrow.check.Result {
     var shrinkCount = 0
     var current: Rose<TestResult<Unit>> = node
 
@@ -310,7 +324,7 @@ internal suspend fun shrinkResult(
             // Nothing to do we just finished with this flow
         }
     }
-    return Result.Failure(best)
+    return arrow.check.Result.Failure(best)
 }
 
 internal object AbortFlowException : Throwable()
@@ -336,7 +350,7 @@ internal class Promise<A> {
                 state.compareAndSet(curr, a)
                 (curr.cont as Continuation<A>).resume(a)
             }
-            else -> state.compareAndSet(curr, f(a, curr as A)).let {  }
+            else -> state.compareAndSet(curr, f(a, curr as A)).let {}
         }
 
     object EMPTY

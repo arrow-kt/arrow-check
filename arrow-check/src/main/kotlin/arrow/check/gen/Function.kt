@@ -1,11 +1,22 @@
 package arrow.check.gen
 
-import arrow.core.*
+import arrow.core.AndThen
+import arrow.core.Either
+import arrow.core.Eval
+import arrow.core.Tuple3
+import arrow.core.andThen
 import arrow.core.extensions.eval.monad.flatten
+import arrow.core.left
+import arrow.core.right
 import arrow.recursion.pattern.ListF
 import arrow.syntax.collections.tail
 import arrow.typeclasses.Show
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 

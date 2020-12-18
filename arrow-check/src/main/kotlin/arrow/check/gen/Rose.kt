@@ -2,7 +2,11 @@ package arrow.check.gen
 
 import arrow.core.Tuple2
 import arrow.core.toT
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 
 typealias Shrinks<A> = Flow<Rose<A>?>
 
