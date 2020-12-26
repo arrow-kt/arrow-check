@@ -70,8 +70,8 @@ fun <C> RoseF.Companion.foldable(): Foldable<RoseFPartialOf<C>> = object : RoseF
 // @extension
 interface RoseFTraverse<C> : Traverse<RoseFPartialOf<C>>, RoseFFoldable<C> {
     override fun <G, A, B> Kind<RoseFPartialOf<C>, A>.traverse(
-        AP: Applicative<G>,
-        f: (A) -> Kind<G, B>
+      AP: Applicative<G>,
+      f: (A) -> Kind<G, B>
     ): Kind<G, Kind<RoseFPartialOf<C>, B>> = AP.run {
         fix().shrunk.traverse(AP, f).map {
             RoseF(fix().res, it.fix())

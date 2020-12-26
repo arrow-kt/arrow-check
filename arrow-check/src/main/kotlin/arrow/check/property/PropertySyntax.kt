@@ -52,8 +52,8 @@ class PropertyTestContinuation<A> : MonadContinuation<PropertyTPartialOf<ForIO>,
         PropertyT.monad(MM()).just(a)
 
     override fun <A, B> tailRecM(
-        a: A,
-        f: (A) -> Kind<PropertyTPartialOf<ForIO>, Either<A, B>>
+      a: A,
+      f: (A) -> Kind<PropertyTPartialOf<ForIO>, Either<A, B>>
     ): Kind<PropertyTPartialOf<ForIO>, B> =
         PropertyT.monad(MM()).tailRecM(a, f)
 
@@ -83,9 +83,9 @@ interface PropertyTest<M> : PropertyTMonadTest<M> {
         forAll(gen, MM(), SA)
 
     fun <A, B> forAllFn(
-        gen: Gen<Fun<A, B>>,
-        SA: Show<A> = Show.any(),
-        SB: Show<B> = Show.any()
+      gen: Gen<Fun<A, B>>,
+      SA: Show<A> = Show.any(),
+      SB: Show<B> = Show.any()
     ): PropertyT<M, (A) -> B> =
         forAllFn(gen, MM(), SA, SB)
 
@@ -102,9 +102,9 @@ interface PropertyTest<M> : PropertyTMonadTest<M> {
         forAll(GenT.monadGen().f().fix(), SA)
 
     fun <A, B> forAllFn(
-        SA: Show<A> = Show.any(),
-        SB: Show<B> = Show.any(),
-        f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, Fun<A, B>>
+      SA: Show<A> = Show.any(),
+      SB: Show<B> = Show.any(),
+      f: MonadGen<GenTPartialOf<ForId>, ForId>.() -> GenTOf<ForId, Fun<A, B>>
     ) =
         forAllFn(GenT.monadGen().f().fix(), SA, SB)
 
