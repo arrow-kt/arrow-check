@@ -5,8 +5,8 @@ import arrow.fx.extensions.io.applicative.applicative
 import arrow.fx.fix
 
 data class Config(
-    val useColor: UseColor,
-    val verbose: Verbose
+  val useColor: UseColor,
+  val verbose: Verbose
 )
 
 sealed class Verbose {

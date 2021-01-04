@@ -54,10 +54,10 @@ import kotlin.math.floor
 import kotlin.math.max
 
 data class Report<out A>(
-    val numTests: TestCount,
-    val numDiscarded: DiscardCount,
-    val coverage: Coverage<CoverCount>,
-    val status: A
+  val numTests: TestCount,
+  val numDiscarded: DiscardCount,
+  val coverage: Coverage<CoverCount>,
+  val status: A
 ) {
     companion object
 }
@@ -76,12 +76,12 @@ sealed class Result {
 }
 
 data class FailureSummary(
-    val usedSize: Size,
-    val usedSeed: RandSeed,
-    val numShrinks: ShrinkCount,
-    val failureDoc: Doc<Markup>,
-    val annotations: List<FailureAnnotation>,
-    val footnotes: List<() -> Doc<Markup>>
+  val usedSize: Size,
+  val usedSeed: RandSeed,
+  val numShrinks: ShrinkCount,
+  val failureDoc: Doc<Markup>,
+  val annotations: List<FailureAnnotation>,
+  val footnotes: List<() -> Doc<Markup>>
 ) {
     companion object
 }
@@ -92,11 +92,11 @@ sealed class FailureAnnotation {
 }
 
 data class Summary(
-    val waiting: PropertyCount,
-    // val running: PropertyCount, TODO readd once I add execPar
-    val failed: PropertyCount,
-    val gaveUp: PropertyCount,
-    val successful: PropertyCount
+  val waiting: PropertyCount,
+  // val running: PropertyCount, TODO readd once I add execPar
+  val failed: PropertyCount,
+  val gaveUp: PropertyCount,
+  val successful: PropertyCount
 ) {
     companion object {
         fun monoid() = object : Monoid<Summary> {
@@ -122,10 +122,10 @@ data class Summary(
 inline class PropertyCount(val unPropertyCount: Int)
 
 data class ColumnWidth(
-    val percentage: Int,
-    val min: Int,
-    val name: Int,
-    val nameFail: Int
+  val percentage: Int,
+  val min: Int,
+  val name: Int,
+  val nameFail: Int
 ) {
     companion object {
         fun monoid(): Monoid<ColumnWidth> = object : Monoid<ColumnWidth> {
@@ -355,8 +355,8 @@ sealed class Style {
 // TODO this could be implemented with renderDecorated if that had nicer types
 fun SimpleDoc<Style>.renderMarkup(): String {
     tailrec fun SimpleDoc<Style>.go(
-        xs: List<Style>,
-        cont: (String) -> String
+      xs: List<Style>,
+      cont: (String) -> String
     ): String = when (val dF = unDoc.value()) {
         is SimpleDocF.Fail -> throw IllegalStateException("Encountered Fail in doc render. Please report this!")
         is SimpleDocF.Nil -> cont("")

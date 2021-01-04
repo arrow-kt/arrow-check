@@ -159,8 +159,8 @@ fun GenT.Companion.monadGen(): MonadGen<GenTPartialOf<ForId>, ForId> = object : 
 
     override fun <A> just(a: A): Kind<GenTPartialOf<ForId>, A> = MM().just(a)
     override fun <A, B> tailRecM(
-        a: A,
-        f: (A) -> Kind<GenTPartialOf<ForId>, Either<A, B>>
+      a: A,
+      f: (A) -> Kind<GenTPartialOf<ForId>, Either<A, B>>
     ): Kind<GenTPartialOf<ForId>, B> =
         MM().tailRecM(a, f)
 
@@ -398,9 +398,9 @@ interface MonadGen<M, B> : Monad<M>, MonadFilter<M>, Alternative<M> {
         }
 
     fun <A> recursive(
-        chooseFn: (List<Kind<M, A>>) -> Kind<M, A>,
-        nonRec: List<Kind<M, A>>,
-        rec: () -> List<Kind<M, A>>
+      chooseFn: (List<Kind<M, A>>) -> Kind<M, A>,
+      nonRec: List<Kind<M, A>>,
+      rec: () -> List<Kind<M, A>>
     ): Kind<M, A> =
         sized { s ->
             if (s.unSize <= 1) chooseFn(nonRec)

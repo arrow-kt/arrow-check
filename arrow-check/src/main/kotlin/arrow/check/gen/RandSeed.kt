@@ -13,8 +13,8 @@ import arrow.core.toT
  *  I don't want to rely on reflection to get it!
  */
 class RandSeed private constructor(
-    val seed: Long,
-    val gamma: Long // Has to be odd!
+  val seed: Long,
+  val gamma: Long // Has to be odd!
 ) {
 
     override fun toString(): String = "RandSeed($seed, $gamma)"
