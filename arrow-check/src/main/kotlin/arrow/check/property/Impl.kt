@@ -11,10 +11,7 @@ import arrow.check.gen.flatMap
 import arrow.check.gen.map
 import arrow.check.gen.runEnv
 import arrow.check.testCount
-import arrow.core.None
 import arrow.core.Tuple3
-import arrow.core.extensions.list.monadFilter.filterMap
-import arrow.core.some
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
 import pretty.Doc
@@ -150,16 +147,16 @@ internal suspend fun runProperty(
     hook: suspend (Report<Progress>) -> Unit
 ): Report<arrow.check.Result> {
     val (confidence, minTests) = when (config.terminationCriteria) {
-        is EarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
-        is NoEarlyTermination -> config.terminationCriteria.confidence.some() to config.terminationCriteria.limit
-        is NoConfidenceTermination -> None to config.terminationCriteria.limit
+        is EarlyTermination -> config.terminationCriteria.confidence to config.terminationCriteria.limit
+        is NoEarlyTermination -> config.terminationCriteria.confidence to config.terminationCriteria.limit
+        is NoConfidenceTermination -> null to config.terminationCriteria.limit
     }
 
     fun successVerified(testCount: TestCount, coverage: Coverage<CoverCount>): Boolean =
-        testCount.unTestCount.rem(100) == 0 && confidence.fold({ false }, { it.success(testCount, coverage) })
+        testCount.unTestCount.rem(100) == 0 && confidence?.success(testCount, coverage) ?: false
 
     fun failureVerified(testCount: TestCount, coverage: Coverage<CoverCount>): Boolean =
-        testCount.unTestCount.rem(100) == 0 && confidence.fold({ false }, { it.failure(testCount, coverage) })
+        testCount.unTestCount.rem(100) == 0 && confidence?.failure(testCount, coverage) ?: false
 
     var currState = State(
         TestCount(0),
@@ -283,16 +280,16 @@ internal suspend fun shrinkResult(
     fun makeSummary(log: Log, fail: Failure): FailureSummary {
         return FailureSummary(
             size, seed, ShrinkCount(shrinkCount), fail.unFailure,
-            annotations = log.unLog.filterMap { entry ->
+            annotations = log.unLog.mapNotNull { entry ->
                 when (entry) {
-                    is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text).some()
-                    is JournalEntry.Input -> FailureAnnotation.Input(entry.text).some()
-                    else -> None
+                    is JournalEntry.Annotate -> FailureAnnotation.Annotation(entry.text)
+                    is JournalEntry.Input -> FailureAnnotation.Input(entry.text)
+                    else -> null
                 }
             },
-            footnotes = log.unLog.filterMap { entry ->
-                if (entry is JournalEntry.Footnote) entry.text.some()
-                else None
+            footnotes = log.unLog.mapNotNull {
+                if (it is JournalEntry.Footnote) it.text
+                else null
             }
         )
     }

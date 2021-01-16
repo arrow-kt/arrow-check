@@ -3,20 +3,16 @@ package arrow.check.pretty
 import arrow.Kind
 import arrow.check.property.Markup
 import arrow.core.None
-import arrow.core.Option
 import arrow.core.Tuple2
 import arrow.core.andThen
+import arrow.core.computations.nullable
 import arrow.core.extensions.fx
 import arrow.core.extensions.list.foldable.foldLeft
 import arrow.core.extensions.list.functor.map
 import arrow.core.extensions.list.functor.tupleLeft
 import arrow.core.extensions.list.monadFilter.filterMap
-import arrow.core.getOrElse
 import arrow.core.identity
-import arrow.core.none
-import arrow.core.some
 import arrow.core.toMap
-import arrow.core.toOption
 import arrow.core.toT
 import arrow.recursion.typeclasses.Birecursive
 import arrow.syntax.collections.tail
@@ -124,7 +120,10 @@ internal infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).le
     }
 }
 
-internal fun diffMaps(a: List<Tuple2<String, KValue>>, b: List<Tuple2<String, KValue>>): List<Tuple2<String, ValueDiff>> =
+internal fun diffMaps(
+    a: List<Tuple2<String, KValue>>,
+    b: List<Tuple2<String, KValue>>
+): List<Tuple2<String, ValueDiff>> =
     a.toMap().let { aMap ->
         val diffOrAdd = b.map { (k, v) ->
             if (aMap.containsKey(k)) k toT aMap.getValue(k).toDiff(v)
@@ -157,23 +156,23 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
     fun moveDownFrom(e: Endpoint): Endpoint = Endpoint(
         e.x,
         e.y + 1,
-        rArr.safeGet(e.y).fold({ e.script }, { listOf(Edit.Add(it)) + e.script })
+        rArr.safeGet(e.y)?.let { listOf(Edit.Add(it)) + e.script } ?: e.script
     )
 
     fun moveRightFrom(e: Endpoint): Endpoint = Endpoint(
         e.x + 1,
         e.y,
-        lArr.safeGet(e.x).fold({ e.script }, { listOf(Edit.Remove(it)) + e.script })
+        lArr.safeGet(e.x)?.let { listOf(Edit.Remove(it)) + e.script } ?: e.script
     )
 
-    fun slideFrom(e: Endpoint): Endpoint = Option.fx {
-        val l = !lArr.safeGet(e.x)
-        val r = !rArr.safeGet(e.y)
+    fun slideFrom(e: Endpoint): Endpoint = nullable.eager<Endpoint> {
+        val l = lArr.safeGet(e.x)()
+        val r = rArr.safeGet(e.y)()
         // call shallow diff here (only top level: type and conName)
         if (KValue.eq().run { l.eqv(r) })
-            !slideFrom(Endpoint(e.x + 1, e.y + 1, listOf(Edit.Compare(l, r)) + e.script)).some()
-        else !none<Endpoint>()
-    }.getOrElse { e }
+            slideFrom(Endpoint(e.x + 1, e.y + 1, listOf(Edit.Compare(l, r)) + e.script))
+        else null
+    } ?: e
 
     fun isComplete(e: Endpoint): Boolean = e.x >= m && e.y >= n
 
@@ -193,14 +192,13 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
             .filter { it in -m..n }
             .map(::searchAlongK andThen ::slideFrom)
             .let { endpoints ->
-                endpoints.firstOrNull(::isComplete).toOption().fold({
-                    searchToD(
+                endpoints.firstOrNull(::isComplete)?.let { (_, _, script) -> script }
+                    ?: searchToD(
                         d + 1,
                         endpoints.map { it.x - it.y + d + 1 toT it }.toMap().let { m ->
                             Array(d * 2 + 2) { ind -> m[ind] } as Array<Endpoint>
                         }
                     )
-                }, { (_, _, script) -> script })
             }
     }
 
@@ -227,9 +225,9 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
     } else editScript.map { it.toValueDiff() }
 }
 
-internal fun <T> Array<T>.safeGet(i: Int): Option<T> = when (i) {
-    in (0 until size) -> get(i).some()
-    else -> None
+internal fun <T : Any> Array<T>.safeGet(i: Int): T? = when (i) {
+    in (0 until size) -> get(i)
+    else -> null
 }
 
 internal sealed class DiffType {

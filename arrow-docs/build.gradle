@@ -17,5 +17,5 @@ apply from: "$DOC_VALIDATION"
 
 dependencies {
     compile project(":arrow-check")
-    compile project(":arrow-check-kotlintest")
+    compile project(":arrow-check-kotest")
 }

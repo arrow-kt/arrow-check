@@ -240,12 +240,12 @@ fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
     annotation.coverPercentage(test).unCoverPercentage >= min.unCoverPercentage
 
 /**
- * A property config determins how a property is run, though it mostly affects how it terminates.
+ * A property config determines how a property is run, though it mostly affects how it terminates.
  *
  * The config provides 3 main ways to modify it:
  * - The constructor
  * - generated optics
- * - [PropertyConfig.plus] wich accepts any of its properties and overwrites it.
+ * - [PropertyConfig.plus] which accepts any of its properties and overwrites it.
  *  There are a bunch of smart constructors on the companion object of [PropertyConfig] to help with that.
  *
  * @param terminationCriteria Either confidence based termination which checks for coverage

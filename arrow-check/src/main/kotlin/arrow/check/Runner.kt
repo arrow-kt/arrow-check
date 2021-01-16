@@ -9,12 +9,19 @@ import arrow.check.property.Size
 import arrow.check.property.property
 import arrow.check.property.runProperty
 import arrow.core.Tuple2
+import arrow.core.toT
 import kotlin.random.Random
 
-suspend fun checkGroup(groupName: String, props: List<Tuple2<String, Property>>): Boolean =
-    checkGroup(detectConfig(), groupName, props)
+suspend fun checkGroup(groupName: String, vararg props: Pair<String, Property>): Boolean =
+    checkGroup(detectConfig(), groupName, *props)
 
-suspend fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Property>>): Boolean {
+suspend fun checkGroup(config: Config, groupName: String, vararg props: Pair<String, Property>): Boolean =
+    checkGroup(config, groupName, *props.map { (n, p) -> n toT p }.toTypedArray())
+
+suspend fun checkGroup(groupName: String, vararg props: Tuple2<String, Property>): Boolean =
+    checkGroup(detectConfig(), groupName, *props)
+
+suspend fun checkGroup(config: Config, groupName: String, vararg props: Tuple2<String, Property>): Boolean {
     println("━━━ $groupName ━━━")
 
     val summary =

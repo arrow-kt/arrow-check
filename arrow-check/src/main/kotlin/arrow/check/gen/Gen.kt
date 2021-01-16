@@ -198,14 +198,14 @@ fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
  *
  * This operation preserves shrinking.
  */
-fun <R, A> Gen<R, A>.small(): Gen<R, A> = scale(::golden)
+fun <R, A> Gen<R, A>.small(): Gen<R, A> = scale { it.golden() }
 
 /**
  * Modify [Size] using the golden ratio.
  *
  * @see Gen.small A combinator which uses this function.
  */
-fun golden(s: Size): Size = Size((s.unSize * 0.61803398875).toInt())
+fun Size.golden(): Size = Size((unSize * 0.61803398875).toInt())
 
 // Generators
 // Integral numbers
@@ -1012,7 +1012,13 @@ fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
     }
 
 fun <R, A, B> Gen<R, A>.tupled(other: Gen<R, B>): Gen<R, Pair<A, B>> =
-    map2(other) { a, b -> a to b }
+    map2(other, ::Pair)
+
+fun <R, A, B> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>): Gen<R, Pair<A, B>> =
+    first.map2(second, ::Pair)
+
+fun <R, A, B, C> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>, third: Gen<R, C>): Gen<R, Triple<A, B, C>> =
+    Gen.mapN(first, second, third) { a, b, c -> Triple(a, b, c) }
 
 // Debugging generators
 /**
@@ -1055,28 +1061,6 @@ suspend fun <R, A> Gen<R, A>.print(
                 if (it == null) println("<discard>")
                 else println(it.res.showPretty(SA))
             }
-        }
-    }
-}
-
-suspend fun <A> Gen<Any?, A>.print(
-    seed: RandSeed = RandSeed(Random.nextLong()),
-    size: Size = Size(30),
-    SA: Show<A> = Show.any()
-): Unit = print(seed, size, SA, Unit)
-
-suspend fun <R, A> Gen<R, A>.printTree(
-    seed: RandSeed = RandSeed(Random.nextLong()),
-    size: Size = Size(30),
-    SA: Show<A> = Show.any(),
-    env: R
-): Unit {
-    when (val rose = runGen(Tuple3(seed, size, env))) {
-        null -> {
-            println("<discarded>")
-        }
-        else -> {
-            TODO()
         }
     }
 }

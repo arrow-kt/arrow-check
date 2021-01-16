@@ -186,7 +186,7 @@ class RandSeed private constructor(
             if (gamma.rem(2L) == 0L) throw IllegalArgumentException("Gamma has to be an odd value!")
             else RandSeed(seed, gamma)
 
-        internal const val GOLDEN_GAMMA = -0x61c8864680b583ebL
+        private const val GOLDEN_GAMMA = -0x61c8864680b583ebL
         private const val DOUBLE_UNIT = 1.0 / ((1L).shl(53))
 
         private fun nextSeed(seed: Long, gamma: Long): Long = seed + gamma

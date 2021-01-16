@@ -1,9 +1,12 @@
 package arrow.check.pretty
 
+import arrow.core.Eval
+import arrow.core.ForEval
 import arrow.core.ForId
 import arrow.core.Id
 import arrow.core.ListK
 import arrow.core.Tuple2
+import arrow.core.extensions.eval.monad.monad
 import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.listk.foldable.foldable
 import arrow.core.identity
@@ -116,9 +119,9 @@ internal interface KValueEq : Eq<KValue> {
 
 internal fun KValue.Companion.eq(): Eq<KValue> = object : KValueEq {}
 
-internal typealias Parser<A> = KParsecT<Nothing, String, Char, ForId, A>
+internal typealias Parser<A> = KParsecT<Nothing, String, Char, ForEval, A>
 
-internal fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForId>(String.stream(), Id.monad())
+internal fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForEval>(String.stream(), Eval.monad())
 
 // Top level parser
 internal fun outputParser(): Parser<KValue> = parser().run {

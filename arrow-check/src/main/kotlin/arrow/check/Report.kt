@@ -54,7 +54,7 @@ import kotlin.math.max
 /**
  * A test report.
  *
- * Polymorphic to allow reporting both in progress and final results with different types.
+ * Polymorphic to allow reporting both in progress and final results.
  */
 data class Report<out A>(
   val numTests: TestCount,
@@ -371,7 +371,7 @@ sealed class Style {
 }
 
 // TODO this could be implemented with renderDecorated if that had nicer types
-// This could probably be a suspend dsl
+// This should be using a StringBuilder instead
 fun SimpleDoc<Style>.renderMarkup(): String {
     tailrec fun SimpleDoc<Style>.go(
       xs: List<Style>,

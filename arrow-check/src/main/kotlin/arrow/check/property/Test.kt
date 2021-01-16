@@ -1,17 +1,10 @@
 package arrow.check.property
 
-import arrow.Kind
 import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
-import arrow.core.ForId
-import arrow.core.Id
-import arrow.core.extensions.id.applicative.applicative
-import arrow.core.extensions.id.eq.eq
 import arrow.core.extensions.list.foldable.combineAll
-import arrow.core.value
-import arrow.typeclasses.Applicative
 import arrow.typeclasses.Eq
 import arrow.typeclasses.Show
 import pretty.Doc
@@ -42,7 +35,7 @@ interface Test {
      */
     fun failWith(msg: Doc<Markup>): Nothing
 
-    // Move when we can have multiple receivers...
+    // TODO Move when we can have multiple receivers...
     /**
      * Test two values for equality and should they be unequal provide a pretty-printed diff.
      *
@@ -90,43 +83,14 @@ interface Test {
         EQ: Eq<A> = Eq.any(),
         SA: Show<A> = Show.any(),
         SB: Show<B> = Show.any()
-    ): Unit = this.roundtrip(
-        encode,
-        { Id(decode(it)) },
-        Id.applicative(),
-        Id.eq(EQ) as Eq<Kind<ForId, A>>,
-        Show {
-            SA.run { value().show() }
-        }, SB
-    )
-
-    /**
-     * Test if a pair of [encode]/[decode] end up at the same value again.
-     *
-     * Overload of [roundtrip] which allows [decode] to have its result wrapped in an [Either] or a
-     *  similar datatype that implements the [Applicative] interface.
-     *
-     * @param AP Applicative instance to operate over the result of [decode].
-     * @param EQF Optional equality instance, default uses [Any.equals].
-     * @param SFA Optional show instance for the initial value, default uses [Any.toString].
-     * @param SB Optional show instance for the encoded value, default uses [Any.toString].
-     */
-    suspend fun <F, A, B> A.roundtrip(
-        encode: suspend (A) -> B,
-        decode: suspend (B) -> Kind<F, A>,
-        AP: Applicative<F>,
-        EQF: Eq<Kind<F, A>> = Eq.any(),
-        SFA: Show<Kind<F, A>> = Show.any(),
-        SB: Show<B> = Show.any()
     ): Unit {
-        val fa = AP.just(this@roundtrip)
         val intermediate = encode(this@roundtrip)
         val decoded = decode(intermediate)
 
-        if (EQF.run { fa.eqv(decoded) }) succeeded()
+        if (EQ.run { this@roundtrip.eqv(decoded) }) succeeded()
         else failWith(
-            SFA.run {
-                val diff = fa.show().diff(decoded.show())
+            SA.run {
+                val diff = this@roundtrip.show().diff(decoded.show())
 
                 "━━━ Intermediate ━━━".text() + hardLine() +
                         intermediate.showPretty(SB) + hardLine() +
