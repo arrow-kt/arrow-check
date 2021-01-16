@@ -12,6 +12,13 @@ import arrow.core.Tuple2
 import arrow.core.toT
 import kotlin.random.Random
 
+/**
+ * Check an entire group of named properties.
+ *
+ * Fails if any property failed or gave up.
+ *
+ * @see check For a function that checks just one property
+ */
 suspend fun checkGroup(groupName: String, vararg props: Pair<String, Property>): Boolean =
     checkGroup(detectConfig(), groupName, *props)
 
@@ -40,6 +47,15 @@ suspend fun checkGroup(config: Config, groupName: String, vararg props: Tuple2<S
     return summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
 }
 
+/**
+ * Perform a property test.
+ *
+ * @return Boolean indicating success or failure.
+ *
+ * @see recheck For a function that allows passing a [RandSeed] and [Size] to reproduce a test
+ * @see checkNamed For a function that attaches a name to the property.
+ * @see checkReport For a function that returns a detailed report rather than a boolean.
+ */
 suspend fun check(
     propertyConfig: PropertyConfig = PropertyConfig(),
     c: suspend PropertyTest.() -> Unit
@@ -58,6 +74,13 @@ suspend fun check(prop: Property): Boolean =
 
 suspend fun check(config: Config, prop: Property): Boolean = check(config, null, prop)
 
+/**
+ * Reproduce a test case using the given [RandSeed] and [Size].
+ *
+ * Unless *any* generator used in the test changed, this will reproduce a test exactly
+ *
+ * @see check for a function that performs the test with random inputs
+ */
 suspend fun recheck(size: Size, seed: RandSeed, prop: Property): Unit =
     recheck(detectConfig(), size, seed, prop)
 
@@ -80,6 +103,11 @@ suspend fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property):
     checkReport(seed, size, config, null, prop)
 }
 
+/**
+ * Perform a property test using a named property.
+ *
+ * Basically just adds a name to the output.
+ */
 suspend fun checkNamed(
     name: String,
     propertyConfig: PropertyConfig = PropertyConfig(),
@@ -102,6 +130,11 @@ suspend fun checkNamed(config: Config, name: String, prop: Property): Boolean =
 suspend fun check(config: Config, name: PropertyName?, prop: Property): Boolean =
     checkReport(config, name, prop).status is Result.Success
 
+/**
+ * Perform a property test and return a detailed report.
+ *
+ * @see check if you are only interested in whether or not the test is a successful
+ */
 suspend fun checkReport(name: PropertyName?, prop: Property): Report<Result> =
     checkReport(RandSeed(Random.nextLong()), Size(0), detectConfig(), name, prop)
 

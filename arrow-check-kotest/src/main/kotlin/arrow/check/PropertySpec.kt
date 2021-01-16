@@ -18,11 +18,11 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
         return super.defaultTestCaseConfig() ?: TestCaseConfig()
     }
 
-    operator fun String.invoke(props: List<Tuple2<String, Property>>): Unit =
+    operator fun String.invoke(vararg props: Tuple2<String, Property>): Unit =
         addTest(
             DescriptionName.TestName(this, this, false, false),
             {
-                checkGroup(this@invoke, props)
+                checkGroup(this@invoke, *props)
                     .let {
                         if (it.not()) throw AssertionError("Some tests failed!")
                     }
