@@ -130,9 +130,9 @@ internal fun diffMaps(
             else k toT ValueDiff(ValueDiffF.ValueDAdded(v))
         }.toMap()
 
-        val diffOrRemove = a.filterMap { (k, v) ->
-            if (diffOrAdd.containsKey(k)) None
-            else (k to ValueDiff(ValueDiffF.ValueDRemoved(v))).some()
+        val diffOrRemove = a.mapNotNull { (k, v) ->
+            if (diffOrAdd.containsKey(k)) null
+            else (k to ValueDiff(ValueDiffF.ValueDRemoved(v)))
         }
 
         (diffOrAdd.toList() + diffOrRemove).map { (k, v) -> k toT v }

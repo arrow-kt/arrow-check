@@ -34,7 +34,7 @@ class RandSeed private constructor(
         }
     }
 
-    private fun encode(n: Long, k: Int, r: RandSeed): RandSeed = when (k) {
+    private tailrec fun encode(n: Long, k: Int, r: RandSeed): RandSeed = when (k) {
         -1 -> r
         else -> when {
             n and (1L shl k) == 0L -> encode(n, k - 1, r.split().a)
@@ -42,14 +42,17 @@ class RandSeed private constructor(
         }
     }
 
-    private fun zeroes(n: Int, r: RandSeed): RandSeed = when (n) {
+    private tailrec fun zeroes(n: Int, r: RandSeed): RandSeed = when (n) {
         0 -> r
         else -> zeroes(n - 1, r.split().a)
     }
 
-    private fun ilog2(i: Long): Int = when (i) {
-        1L -> 0
-        else -> 1 + ilog2(i / 2)
+    private fun ilog2(i: Long): Int {
+        tailrec fun go(i: Long, acc: Int): Int = when (i) {
+            1L -> acc
+            else -> go(i / 2, acc + 1)
+        }
+        return go(i, 0)
     }
 
     /**
