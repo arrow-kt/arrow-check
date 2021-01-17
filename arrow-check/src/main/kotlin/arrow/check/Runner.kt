@@ -20,31 +20,31 @@ import kotlin.random.Random
  * @see check For a function that checks just one property
  */
 suspend fun checkGroup(groupName: String, vararg props: Pair<String, Property>): Boolean =
-    checkGroup(detectConfig(), groupName, *props)
+  checkGroup(detectConfig(), groupName, *props)
 
 suspend fun checkGroup(config: Config, groupName: String, vararg props: Pair<String, Property>): Boolean =
-    checkGroup(config, groupName, *props.map { (n, p) -> n toT p }.toTypedArray())
+  checkGroup(config, groupName, *props.map { (n, p) -> n toT p }.toTypedArray())
 
 suspend fun checkGroup(groupName: String, vararg props: Tuple2<String, Property>): Boolean =
-    checkGroup(detectConfig(), groupName, *props)
+  checkGroup(detectConfig(), groupName, *props)
 
 suspend fun checkGroup(config: Config, groupName: String, vararg props: Tuple2<String, Property>): Boolean {
-    println("━━━ $groupName ━━━")
+  println("━━━ $groupName ━━━")
 
-    val summary =
-        props.fold(Summary.monoid().empty().copy(waiting = PropertyCount(props.size))) { acc, (n, prop) ->
-            val res = checkReport(config, PropertyName(n), prop)
-            Summary.monoid().run {
-                acc + empty().copy(waiting = PropertyCount(-1)) +
-                        when (res.status) {
-                            is Result.Failure -> empty().copy(failed = PropertyCount(1))
-                            is Result.Success -> empty().copy(successful = PropertyCount(1))
-                            is Result.GivenUp -> empty().copy(gaveUp = PropertyCount(1))
-                        }
-            }
-        }
+  val summary =
+    props.fold(Summary.monoid().empty().copy(waiting = PropertyCount(props.size))) { acc, (n, prop) ->
+      val res = checkReport(config, PropertyName(n), prop)
+      Summary.monoid().run {
+        acc + empty().copy(waiting = PropertyCount(-1)) +
+          when (res.status) {
+            is Result.Failure -> empty().copy(failed = PropertyCount(1))
+            is Result.Success -> empty().copy(successful = PropertyCount(1))
+            is Result.GivenUp -> empty().copy(gaveUp = PropertyCount(1))
+          }
+      }
+    }
 
-    return summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
+  return summary.failed.unPropertyCount == 0 && summary.gaveUp.unPropertyCount == 0
 }
 
 /**
@@ -57,20 +57,20 @@ suspend fun checkGroup(config: Config, groupName: String, vararg props: Tuple2<S
  * @see checkReport For a function that returns a detailed report rather than a boolean.
  */
 suspend fun check(
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Boolean =
-    check(property(propertyConfig, c))
+  check(property(propertyConfig, c))
 
 suspend fun check(
-    config: Config,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  config: Config,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Boolean =
-    check(config, property(propertyConfig, c))
+  check(config, property(propertyConfig, c))
 
 suspend fun check(prop: Property): Boolean =
-    check(detectConfig(), prop)
+  check(detectConfig(), prop)
 
 suspend fun check(config: Config, prop: Property): Boolean = check(config, null, prop)
 
@@ -82,25 +82,25 @@ suspend fun check(config: Config, prop: Property): Boolean = check(config, null,
  * @see check for a function that performs the test with random inputs
  */
 suspend fun recheck(size: Size, seed: RandSeed, prop: Property): Unit =
-    recheck(detectConfig(), size, seed, prop)
+  recheck(detectConfig(), size, seed, prop)
 
 suspend fun recheck(
-    size: Size,
-    seed: RandSeed,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  size: Size,
+  seed: RandSeed,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Unit = recheck(size, seed, property(propertyConfig, c))
 
 suspend fun recheck(
-    config: Config,
-    size: Size,
-    seed: RandSeed,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  config: Config,
+  size: Size,
+  seed: RandSeed,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Unit = recheck(config, size, seed, property(propertyConfig, c))
 
 suspend fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property): Unit {
-    checkReport(seed, size, config, null, prop)
+  checkReport(seed, size, config, null, prop)
 }
 
 /**
@@ -109,26 +109,26 @@ suspend fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property):
  * Basically just adds a name to the output.
  */
 suspend fun checkNamed(
-    name: String,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  name: String,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Boolean = checkNamed(name, property(propertyConfig, c))
 
 suspend fun checkNamed(name: String, prop: Property): Boolean =
-    check(detectConfig(), PropertyName(name), prop)
+  check(detectConfig(), PropertyName(name), prop)
 
 suspend fun checkNamed(
-    config: Config,
-    name: String,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTest.() -> Unit
+  config: Config,
+  name: String,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTest.() -> Unit
 ): Boolean = check(config, PropertyName(name), property(propertyConfig, c))
 
 suspend fun checkNamed(config: Config, name: String, prop: Property): Boolean =
-    check(config, PropertyName(name), prop)
+  check(config, PropertyName(name), prop)
 
 suspend fun check(config: Config, name: PropertyName?, prop: Property): Boolean =
-    checkReport(config, name, prop).status is Result.Success
+  checkReport(config, name, prop).status is Result.Success
 
 /**
  * Perform a property test and return a detailed report.
@@ -136,21 +136,21 @@ suspend fun check(config: Config, name: PropertyName?, prop: Property): Boolean 
  * @see check if you are only interested in whether or not the test is a successful
  */
 suspend fun checkReport(name: PropertyName?, prop: Property): Report<Result> =
-    checkReport(RandSeed(Random.nextLong()), Size(0), detectConfig(), name, prop)
+  checkReport(RandSeed(Random.nextLong()), Size(0), detectConfig(), name, prop)
 
 suspend fun checkReport(config: Config, name: PropertyName?, prop: Property): Report<Result> =
-    checkReport(RandSeed(Random.nextLong()), Size(0), config, name, prop)
+  checkReport(RandSeed(Random.nextLong()), Size(0), config, name, prop)
 
 suspend fun checkReport(
-    seed: RandSeed,
-    size: Size,
-    config: Config,
-    name: PropertyName?,
-    prop: Property
+  seed: RandSeed,
+  size: Size,
+  config: Config,
+  name: PropertyName?,
+  prop: Property
 ): Report<Result> {
-    val report = runProperty(size, seed, prop.config, prop.prop) {
-        // TODO Live update will come back once I finish concurrent output
-    }
-    println(report.renderResult(config.useColor, name))
-    return report
+  val report = runProperty(size, seed, prop.config, prop.prop) {
+    // TODO Live update will come back once I finish concurrent output
+  }
+  println(report.renderResult(config.useColor, name))
+  return report
 }
