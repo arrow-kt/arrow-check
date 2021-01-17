@@ -2,15 +2,11 @@ package arrow.check.pretty
 
 import arrow.Kind
 import arrow.check.property.Markup
-import arrow.core.None
 import arrow.core.Tuple2
 import arrow.core.andThen
 import arrow.core.computations.nullable
-import arrow.core.extensions.fx
-import arrow.core.extensions.list.foldable.foldLeft
 import arrow.core.extensions.list.functor.map
 import arrow.core.extensions.list.functor.tupleLeft
-import arrow.core.extensions.list.monadFilter.filterMap
 import arrow.core.identity
 import arrow.core.toMap
 import arrow.core.toT
@@ -312,7 +308,7 @@ internal fun <A> List<Tuple2<A, Doc<A>>>.encloseSepVert(l: Doc<A>, r: Doc<A>, se
         .map { (a, b) -> b.a toT (a + b.b.align()) }
         .let { xs ->
             if (xs.size == 1) xs.first().let { (ann, d) -> d.annotate(ann) }
-            else xs.tail().foldLeft(xs.first().let { (ann, d) -> d.annotate(ann) }) { acc, (ann, d) ->
+            else xs.tail().fold(xs.first().let { (ann, d) -> d.annotate(ann) }) { acc, (ann, d) ->
                 (acc + (hardLine() + d).annotate(ann))
             }
         } + r).align()

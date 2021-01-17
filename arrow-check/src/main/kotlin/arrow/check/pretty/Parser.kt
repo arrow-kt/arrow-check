@@ -2,8 +2,6 @@ package arrow.check.pretty
 
 import arrow.core.Eval
 import arrow.core.ForEval
-import arrow.core.ForId
-import arrow.core.Id
 import arrow.core.ListK
 import arrow.core.Tuple2
 import arrow.core.extensions.eval.monad.monad
