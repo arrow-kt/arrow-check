@@ -138,10 +138,10 @@ interface MonadTransDistributive<G> {
      *  the type returned (by using something like .let {} to let intellij display it nicely.
      */
     fun <F, M, A> Kind2<G, Kind<F, M>, A>.distributeT(
-        MTF: MonadTrans<F>,
-        MFunc: MFunctor<F>,
-        MM: Monad<M>,
-        MT: MonadFromMonadTrans<F>
+      MTF: MonadTrans<F>,
+      MFunc: MFunctor<F>,
+      MM: Monad<M>,
+      MT: MonadFromMonadTrans<F>
     ): Kind2<F, Kind<G, M>, A>
 
     interface MonadFromMonadTrans<F> {
@@ -152,10 +152,10 @@ interface MonadTransDistributive<G> {
 // @extension
 interface OptionTMonadTransDistributive : MonadTransDistributive<ForOptionT> {
     override fun <F, M, A> Kind2<ForOptionT, Kind<F, M>, A>.distributeT(
-        MTF: MonadTrans<F>,
-        MFunc: MFunctor<F>,
-        MM: Monad<M>,
-        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+      MTF: MonadTrans<F>,
+      MFunc: MFunctor<F>,
+      MM: Monad<M>,
+      MT: MonadTransDistributive.MonadFromMonadTrans<F>
     ): Kind2<F, Kind<ForOptionT, M>, A> =
         MFunc.run {
             fix().value().hoist(MM, object : FunctionK<M, OptionTPartialOf<M>> {
@@ -175,10 +175,10 @@ fun OptionT.Companion.monadTransDistributive(): MonadTransDistributive<ForOption
 // @extension
 interface RoseMonadTransDistributive : MonadTransDistributive<ForRose> {
     override fun <F, M, A> Kind2<ForRose, Kind<F, M>, A>.distributeT(
-        MTF: MonadTrans<F>,
-        MFunc: MFunctor<F>,
-        MM: Monad<M>,
-        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+      MTF: MonadTrans<F>,
+      MFunc: MFunctor<F>,
+      MM: Monad<M>,
+      MT: MonadTransDistributive.MonadFromMonadTrans<F>
     ): Kind2<F, Kind<ForRose, M>, A> = MFunc.run {
         fix().runRose.hoist(MM, object : FunctionK<M, RosePartialOf<M>> {
             override fun <A> invoke(fa: Kind<M, A>): Kind<RosePartialOf<M>, A> = Rose.monadTrans().run { fa.liftT(MM) }
@@ -206,10 +206,10 @@ fun Rose.Companion.monadTransDistributive(): MonadTransDistributive<ForRose> = o
 interface GenTMonadTransDistributive : MonadTransDistributive<ForGenT> {
 
     override fun <F, M, A> Kind2<ForGenT, Kind<F, M>, A>.distributeT(
-        MTF: MonadTrans<F>,
-        MFunc: MFunctor<F>,
-        MM: Monad<M>,
-        MT: MonadTransDistributive.MonadFromMonadTrans<F>
+      MTF: MonadTrans<F>,
+      MFunc: MFunctor<F>,
+      MM: Monad<M>,
+      MT: MonadTransDistributive.MonadFromMonadTrans<F>
     ): Kind2<F, Kind<ForGenT, M>, A> = GenT(AndThen(fix().runGen).andThen {
         Rose.mFunctor().run {
             it.hoist(

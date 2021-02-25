@@ -6,23 +6,14 @@ jobs:
   arrow-check_build_documentation:
 
     env:
-      BASEDIR: ${{github.workspace}}/..
       JAVA_OPTS: -Xms512m -Xmx1024m
-      ARROW_LIB: arrow-check
 
     runs-on: macos-latest
+    timeout-minutes: 90
 
     steps:
     - uses: actions/checkout@v2
-    - name: Checkout orchestrator
-      run: |
-        cd $BASEDIR
-        git clone https://github.com/arrow-kt/arrow.git --depth 1 --no-single-branch
-    - name: Install
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        BRANCH_NAME=${{ github.event.pull_request.head.ref }}
-        $BASEDIR/arrow/scripts/action-install.sh $ARROW_LIB $BRANCH_NAME
-    - name: Generate API doc and validate
-      run: ./gradlew buildArrowDoc
+    - name: Generate API doc
+      run: ./gradlew dokka
+    - name: Validation
+      run: ./gradlew :arrow-docs:runAnk

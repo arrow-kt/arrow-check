@@ -29,8 +29,8 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         )
 
     operator fun String.invoke(
-        propertyConfig: PropertyConfig = PropertyConfig(),
-        c: suspend PropertyTestSyntax.() -> Unit
+      propertyConfig: PropertyConfig = PropertyConfig(),
+      c: suspend PropertyTestSyntax.() -> Unit
     ): Unit =
         addTestCase(
             this,
@@ -44,9 +44,9 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : A
         )
 
     operator fun String.invoke(
-        args: Config,
-        propertyConfig: PropertyConfig = PropertyConfig(),
-        c: suspend PropertyTestSyntax.() -> Unit
+      args: Config,
+      propertyConfig: PropertyConfig = PropertyConfig(),
+      c: suspend PropertyTestSyntax.() -> Unit
     ): Unit =
         addTestCase(
             this,

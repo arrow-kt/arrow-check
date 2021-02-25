@@ -51,7 +51,7 @@ import arrow.core.value
 import arrow.fx.IO
 import arrow.fx.IO.Companion.effect
 import arrow.fx.extensions.fx
-import arrow.fx.extensions.io.functor.unit
+import arrow.fx.extensions.io.functor.void
 import arrow.fx.extensions.io.monadDefer.monadDefer
 import arrow.fx.fix
 import arrow.fx.typeclasses.MonadDefer
@@ -96,15 +96,15 @@ fun checkGroup(config: Config, groupName: String, props: List<Tuple2<String, Pro
     }
 
 fun check(
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Boolean> =
     check(property(propertyConfig, c))
 
 fun check(
-    config: Config,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  config: Config,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Boolean> =
     check(config, property(propertyConfig, c))
 
@@ -117,29 +117,29 @@ fun recheck(size: Size, seed: RandSeed, prop: Property): IO<Unit> =
     detectConfig().flatMap { recheck(it, size, seed, prop) }
 
 fun recheck(
-    size: Size,
-    seed: RandSeed,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  size: Size,
+  seed: RandSeed,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Unit> =
     recheck(size, seed, property(propertyConfig, c))
 
 fun recheck(
-    config: Config,
-    size: Size,
-    seed: RandSeed,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  config: Config,
+  size: Size,
+  seed: RandSeed,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Unit> =
     recheck(config, size, seed, property(propertyConfig, c))
 
 fun recheck(config: Config, size: Size, seed: RandSeed, prop: Property): IO<Unit> =
-    checkReport(seed, size, config, None, prop).unit()
+    checkReport(seed, size, config, None, prop).void()
 
 fun checkNamed(
-    name: String,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  name: String,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Boolean> =
     checkNamed(name, property(propertyConfig, c))
 
@@ -147,10 +147,10 @@ fun checkNamed(name: String, prop: Property): IO<Boolean> =
     detectConfig().flatMap { check(it, PropertyName(name).some(), prop) }
 
 fun checkNamed(
-    config: Config,
-    name: String,
-    propertyConfig: PropertyConfig = PropertyConfig(),
-    c: suspend PropertyTestSyntax.() -> Unit
+  config: Config,
+  name: String,
+  propertyConfig: PropertyConfig = PropertyConfig(),
+  c: suspend PropertyTestSyntax.() -> Unit
 ): IO<Boolean> =
     check(config, PropertyName(name).some(), property(propertyConfig, c))
 
@@ -173,11 +173,11 @@ fun checkReport(config: Config, name: Option<PropertyName>, prop: Property): IO<
     }
 
 internal fun checkReport(
-    seed: RandSeed,
-    size: Size,
-    config: Config,
-    name: Option<PropertyName>,
-    prop: Property
+  seed: RandSeed,
+  size: Size,
+  config: Config,
+  name: Option<PropertyName>,
+  prop: Property
 ): IO<Report<Result>> =
     IO.fx {
         val report = !runProperty(IO.monadDefer(), size, seed, prop.config, prop.prop) {
@@ -190,21 +190,21 @@ internal fun checkReport(
 
 // ---------------- Running a single property
 data class State(
-    val numTests: TestCount,
-    val numDiscards: DiscardCount,
-    val size: Size,
-    val seed: RandSeed,
-    val coverage: Coverage<CoverCount>
+  val numTests: TestCount,
+  val numDiscards: DiscardCount,
+  val size: Size,
+  val seed: RandSeed,
+  val coverage: Coverage<CoverCount>
 )
 
 // TODO also clean this up... split it apart etc
 fun <M> runProperty(
-    MM: MonadDefer<M>,
-    initialSize: Size,
-    initialSeed: RandSeed,
-    config: PropertyConfig,
-    prop: PropertyT<M, Unit>,
-    hook: (Report<Progress>) -> Kind<M, Unit>
+  MM: MonadDefer<M>,
+  initialSize: Size,
+  initialSeed: RandSeed,
+  config: PropertyConfig,
+  prop: PropertyT<M, Unit>,
+  hook: (Report<Progress>) -> Kind<M, Unit>
 ): Kind<M, Report<Result>> {
     // Catch all errors M throws and report them using failException. This also catches all errors in all shrink branches the same way
     val wrappedProp = PropertyT.monadError(MM).run {
@@ -352,13 +352,13 @@ fun <M> runProperty(
 
 // TODO inline classes for params
 fun <M> shrinkResult(
-    MM: Monad<M>,
-    size: Size,
-    seed: RandSeed,
-    shrinkLimit: Int,
-    shrinkRetries: Int,
-    node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>,
-    hook: (FailureSummary) -> Kind<M, Unit>
+  MM: Monad<M>,
+  size: Size,
+  seed: RandSeed,
+  shrinkLimit: Int,
+  shrinkRetries: Int,
+  node: RoseF<Option<Tuple2<Log, Either<Failure, Unit>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>>,
+  hook: (FailureSummary) -> Kind<M, Unit>
 ): Kind<M, Result> = Rose.birecursive<M, Option<Tuple2<Log, Either<Failure, Unit>>>>(MM).run {
     Rose(MM.just(node)).hylo<Nested<M, RoseFPartialOf<Option<Tuple2<Log, Either<Failure, Unit>>>>>, Rose<M, Option<Tuple2<Log, Either<Failure, Unit>>>>, (ShrinkCount) -> Kind<M, Result>>(
         {
@@ -414,8 +414,8 @@ fun <M> shrinkResult(
 }
 
 fun <M, A, L, W> Rose<M, Option<Tuple2<W, Either<L, A>>>>.runTreeN(
-    MM: Monad<M>,
-    retries: Int
+  MM: Monad<M>,
+  retries: Int
 ): Kind<M, RoseF<Option<Tuple2<W, Either<L, A>>>, Rose<M, Option<Tuple2<W, Either<L, A>>>>>> =
     MM.fx.monad {
         val r = runRose.bind()

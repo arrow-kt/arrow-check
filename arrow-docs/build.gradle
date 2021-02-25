@@ -1,21 +1,18 @@
 buildscript {
     repositories {
-        maven { url "https://oss.jfrog.org/artifactory/oss-snapshot-local/" }
+        mavenCentral()
     }
     dependencies {
-        classpath "io.arrow-kt:arrow-ank-gradle:$VERSION_NAME"
+        classpath "io.arrow-kt:arrow-ank-gradle:$ARROW_VERSION"
     }
 }
 
 plugins {
-    id "base"
     id "org.jetbrains.kotlin.jvm"
-    id "org.jetbrains.kotlin.kapt"
-    id "net.rdrei.android.buildtimetracker"
     id "org.jlleitschuh.gradle.ktlint"
 }
 
-apply from: "$SUBPROJECT_CONF"
+apply from: "$SUB_PROJECT"
 
 dependencies {
     compile project(":arrow-check")
@@ -25,7 +22,7 @@ dependencies {
 apply plugin: 'ank-gradle-plugin'
 
 ank {
-    source = file("${projectDir}/docs")
-    target = file("${projectDir}/build/site")
+    source = file("${rootDir}/build/apidocs")
+    target = file("${rootDir}/build/_apidocs")
     classpath = sourceSets.main.runtimeClasspath
 }

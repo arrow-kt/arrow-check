@@ -166,11 +166,11 @@ interface MonadTest<M> : Monad<M> {
         diff(this, other, SA) { a, b -> EQA.run { a.neqv(b) } }
 
     fun <A, B> A.roundtrip(
-        encode: (A) -> B,
-        decode: (B) -> A,
-        EQ: Eq<A> = Eq.any(),
-        SA: Show<A> = Show.any(),
-        SB: Show<B> = Show.any()
+      encode: (A) -> B,
+      decode: (B) -> A,
+      EQ: Eq<A> = Eq.any(),
+      SA: Show<A> = Show.any(),
+      SB: Show<B> = Show.any()
     ): Kind<M, Unit> = this.roundtrip(
         encode,
         decode.andThen(::Id),
@@ -182,11 +182,11 @@ interface MonadTest<M> : Monad<M> {
     )
 
     fun <A, B> A.roundtripEffect(
-        encode: (A) -> Kind<M, B>,
-        decode: (B) -> Kind<M, A>,
-        EQ: Eq<A> = Eq.any(),
-        SA: Show<A> = Show.any(),
-        SB: Show<B> = Show.any()
+      encode: (A) -> Kind<M, B>,
+      decode: (B) -> Kind<M, A>,
+      EQ: Eq<A> = Eq.any(),
+      SA: Show<A> = Show.any(),
+      SB: Show<B> = Show.any()
     ): Kind<M, Unit> = this.roundtripEffect(
         encode,
         decode.andThen { it.map(::Id) },
@@ -198,21 +198,21 @@ interface MonadTest<M> : Monad<M> {
     )
 
     fun <F, A, B> A.roundtrip(
-        encode: (A) -> B,
-        decode: (B) -> Kind<F, A>,
-        AP: Applicative<F>,
-        EQF: Eq<Kind<F, A>> = Eq.any(),
-        SFA: Show<Kind<F, A>> = Show.any(),
-        SB: Show<B> = Show.any()
+      encode: (A) -> B,
+      decode: (B) -> Kind<F, A>,
+      AP: Applicative<F>,
+      EQF: Eq<Kind<F, A>> = Eq.any(),
+      SFA: Show<Kind<F, A>> = Show.any(),
+      SB: Show<B> = Show.any()
     ): Kind<M, Unit> = roundtripEffect(encode.andThen { just(it) }, decode.andThen { just(it) }, AP, EQF, SFA, SB)
 
     fun <F, A, B> A.roundtripEffect(
-        encode: (A) -> Kind<M, B>,
-        decode: (B) -> Kind<M, Kind<F, A>>,
-        AP: Applicative<F>,
-        EQF: Eq<Kind<F, A>> = Eq.any(),
-        SFA: Show<Kind<F, A>> = Show.any(),
-        SB: Show<B> = Show.any()
+      encode: (A) -> Kind<M, B>,
+      decode: (B) -> Kind<M, Kind<F, A>>,
+      AP: Applicative<F>,
+      EQF: Eq<Kind<F, A>> = Eq.any(),
+      SFA: Show<Kind<F, A>> = Show.any(),
+      SB: Show<B> = Show.any()
     ): Kind<M, Unit> = fx.monad {
         val fa = AP.just(this@roundtripEffect)
         val intermediate = encode(this@roundtripEffect).bind()

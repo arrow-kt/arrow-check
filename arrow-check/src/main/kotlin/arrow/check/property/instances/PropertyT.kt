@@ -71,8 +71,8 @@ interface PropertyTMonad<M> : Monad<PropertyTPartialOf<M>> {
         }
 
     override fun <A, B> tailRecM(
-        a: A,
-        f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
+      a: A,
+      f: (A) -> Kind<PropertyTPartialOf<M>, Either<A, B>>
     ): Kind<PropertyTPartialOf<M>, B> =
         f(a).flatMap { it.fold({ tailRecM(it, f) }, { just(it) }) }
 }

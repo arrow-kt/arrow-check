@@ -80,10 +80,10 @@ sealed class JournalEntry {
 }
 
 data class Label<A>(
-    val table: Option<LabelTable>,
-    val name: LabelName,
-    val min: CoverPercentage,
-    val annotation: A
+  val table: Option<LabelTable>,
+  val name: LabelName,
+  val min: CoverPercentage,
+  val annotation: A
 )
 
 inline class CoverPercentage(val unCoverPercentage: Double)
@@ -148,10 +148,10 @@ fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
 
 @optics
 data class PropertyConfig(
-    val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
-    val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
-    val shrinkLimit: ShrinkLimit = ShrinkLimit(1000),
-    val shrinkRetries: ShrinkRetries = ShrinkRetries(0)
+  val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
+  val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
+  val shrinkLimit: ShrinkLimit = ShrinkLimit(1000),
+  val shrinkRetries: ShrinkRetries = ShrinkRetries(0)
 ) {
     companion object
 }

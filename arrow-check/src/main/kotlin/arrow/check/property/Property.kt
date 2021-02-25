@@ -133,9 +133,9 @@ fun <M, A> discard(MM: Monad<M>): PropertyT<M, A> =
     )
 
 fun <M, A, B> forAllFn(
-    gen: Gen<Fun<A, B>>,
-    MM: Monad<M>,
-    SA: Show<A> = Show.any(),
-    SB: Show<B> = Show.any()
+  gen: Gen<Fun<A, B>>,
+  MM: Monad<M>,
+  SA: Show<A> = Show.any(),
+  SB: Show<B> = Show.any()
 ): PropertyT<M, (A) -> B> =
     forAll(gen, MM, Fun.show(SA, SB)).map(MM) { it.component1() }
