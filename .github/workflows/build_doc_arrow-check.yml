@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Generate API doc and validate
-      run: ./gradlew buildArrowDoc
+    - name: Generate API doc
+      run: ./gradlew dokka
+    - name: Validation
+      run: ./gradlew :arrow-docs:runAnk
