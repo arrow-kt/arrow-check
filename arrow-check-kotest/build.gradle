@@ -4,7 +4,6 @@ plugins {
 }
 
 apply from: "$SUB_PROJECT"
-apply from: "$DOC_CREATION"
 
 dependencies {
     api project(":arrow-check")

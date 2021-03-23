@@ -5,7 +5,6 @@ import arrow.core.ForEval
 import arrow.core.ListK
 import arrow.core.Tuple2
 import arrow.core.extensions.eval.monad.monad
-import arrow.core.extensions.id.monad.monad
 import arrow.core.extensions.listk.foldable.foldable
 import arrow.core.identity
 import arrow.core.k
@@ -30,7 +29,6 @@ import pretty.align
 import pretty.doc
 import pretty.encloseSep
 import pretty.fillBreak
-import pretty.fix
 import pretty.flatAlt
 import pretty.group
 import pretty.lineBreak

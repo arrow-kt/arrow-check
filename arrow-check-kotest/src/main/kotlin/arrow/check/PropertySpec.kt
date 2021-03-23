@@ -5,7 +5,6 @@ import arrow.check.property.PropertyConfig
 import arrow.check.property.PropertyName
 import arrow.check.property.PropertyTest
 import arrow.check.property.property
-import arrow.core.Tuple2
 import io.kotest.core.spec.DslDrivenSpec
 import io.kotest.core.test.DescriptionName
 import io.kotest.core.test.TestCaseConfig
@@ -20,7 +19,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
     return super.defaultTestCaseConfig() ?: TestCaseConfig()
   }
 
-  operator fun String.invoke(vararg props: Tuple2<String, Property>): Unit =
+  operator fun String.invoke(vararg props: Pair<String, Property>): Unit =
     addTest(
       DescriptionName.TestName(this, this, false, false),
       {

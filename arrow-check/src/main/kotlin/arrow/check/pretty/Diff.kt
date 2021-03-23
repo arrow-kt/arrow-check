@@ -4,7 +4,6 @@ import arrow.Kind
 import arrow.check.property.Markup
 import arrow.core.Tuple2
 import arrow.core.andThen
-import arrow.core.computations.nullable
 import arrow.core.extensions.list.functor.map
 import arrow.core.extensions.list.functor.tupleLeft
 import arrow.core.identity
@@ -161,14 +160,15 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
     lArr.safeGet(e.x)?.let { listOf(Edit.Remove(it)) + e.script } ?: e.script
   )
 
-  fun slideFrom(e: Endpoint): Endpoint = nullable.eager<Endpoint> {
-    val l = lArr.safeGet(e.x)()
-    val r = rArr.safeGet(e.y)()
+  fun <A, B> zipNullable(a: A?, b: B?): Pair<A, B>? = if (a != null && b != null) a to b else null
+
+  fun slideFrom(e: Endpoint): Endpoint {
+    val (l, r) = zipNullable(lArr.safeGet(e.x), rArr.safeGet(e.y)) ?: return e
     // call shallow diff here (only top level: type and conName)
-    if (KValue.eq().run { l.eqv(r) })
+    return if (KValue.eq().run { l.eqv(r) })
       slideFrom(Endpoint(e.x + 1, e.y + 1, listOf(Edit.Compare(l, r)) + e.script))
-    else null
-  } ?: e
+    else e
+  }
 
   fun isComplete(e: Endpoint): Boolean = e.x >= m && e.y >= n
 

@@ -4,17 +4,22 @@ plugins {
     id "org.jlleitschuh.gradle.ktlint"
 }
 
+apply plugin: 'kotlinx-atomicfu'
+
 apply from: "$SUB_PROJECT"
 
 dependencies {
-    kapt "io.arrow-kt:arrow-meta:$ARROW_VERSION" // auto generation for @extension and @higherkind
+    kapt "io.arrow-kt:arrow-meta:$ARROW_VERSION" // auto generation for @optics
 
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$KOTLINX_COROUTINES_VERSION"
+
+    implementation "io.arrow-kt:arrow-core:$ARROW_VERSION" // lenses and @optics
     implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
     implementation "io.arrow-kt:arrow-syntax:$ARROW_VERSION" // helper functions like curried...
     implementation "io.arrow-kt:arrow-recursion:$ARROW_VERSION" // Recursion schemes
-    api "kotlin-pretty:kotlin-pretty:0.5.2" // Pretty printing diffs
-    api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
+    api "kotlin-pretty:kotlin-pretty:0.6.0" // Pretty printing diffs
+    api "kotlin-pretty:kotlin-pretty-ansi:0.6.0" // Ansi terminal support with colors
     implementation("kparsec:kparsec:0.2.3") // Parser combinators to create toString-output parser
 
-    testImplementation project(":arrow-check-kotlintest")
+    testImplementation project(":arrow-check-kotest")
 }

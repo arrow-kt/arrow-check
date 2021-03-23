@@ -28,7 +28,6 @@ import pretty.SimpleDoc
 import pretty.SimpleDocF
 import pretty.alterAnnotations
 import pretty.annotate
-import pretty.ansistyle.monoid.monoid
 import pretty.color
 import pretty.colorDull
 import pretty.doc
@@ -41,7 +40,6 @@ import pretty.nest
 import pretty.nil
 import pretty.plus
 import pretty.spaced
-import pretty.spaces
 import pretty.symbols.bullet
 import pretty.symbols.comma
 import pretty.symbols.dot
@@ -370,13 +368,15 @@ sealed class Style {
     data class Ansi(val st: AnsiStyle) : Style()
 }
 
+private fun spaces(nr: Int): String = generateSequence { " " }.take(nr).joinToString("")
+
 // TODO this could be implemented with renderDecorated if that had nicer types
 // This should be using a StringBuilder instead
 fun SimpleDoc<Style>.renderMarkup(): String {
     tailrec fun SimpleDoc<Style>.go(
       xs: List<Style>,
       cont: (String) -> String
-    ): String = when (val dF = unDoc.value()) {
+    ): String = when (val dF = unDoc(Unit)) {
         is SimpleDocF.Fail -> throw IllegalStateException("Encountered Fail in doc render. Please report this!")
         is SimpleDocF.Nil -> cont("")
         is SimpleDocF.Line -> dF.doc.go(xs, AndThen(cont).compose { str ->
@@ -408,5 +408,5 @@ fun SimpleDoc<Style>.renderMarkup(): String {
             else str
         })
     }
-    return go(listOf(Style.Ansi(AnsiStyle.monoid().empty())), ::identity)
+    return go(listOf(Style.Ansi(AnsiStyle.empty())), ::identity)
 }
