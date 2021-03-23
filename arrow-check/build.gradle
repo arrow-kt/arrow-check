@@ -5,22 +5,16 @@ plugins {
 }
 
 apply from: "$SUB_PROJECT"
-apply from: "$DOC_CREATION"
-apply plugin: 'kotlinx-atomicfu'
 
 dependencies {
-    kapt "io.arrow-kt:arrow-meta:$VERSION_NAME" // auto generation for @extension and @higherkind
+    kapt "io.arrow-kt:arrow-meta:$ARROW_VERSION" // auto generation for @extension and @higherkind
 
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$KOTLINX_COROUTINES_VERSION"
-
-    api "io.arrow-kt:arrow-core:$VERSION_NAME"
-    implementation "io.arrow-kt:arrow-fx-coroutines:$VERSION_NAME"
-    implementation "io.arrow-kt:arrow-optics:$VERSION_NAME" // lenses and @optics
-    implementation "io.arrow-kt:arrow-syntax:$VERSION_NAME" // helper functions like curried...
-    implementation "io.arrow-kt:arrow-recursion:$VERSION_NAME" // Recursion schemes
+    implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
+    implementation "io.arrow-kt:arrow-syntax:$ARROW_VERSION" // helper functions like curried...
+    implementation "io.arrow-kt:arrow-recursion:$ARROW_VERSION" // Recursion schemes
     api "kotlin-pretty:kotlin-pretty:0.5.2" // Pretty printing diffs
     api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
     implementation("kparsec:kparsec:0.2.3") // Parser combinators to create toString-output parser
 
-    testImplementation project(":arrow-check-kotest")
+    testImplementation project(":arrow-check-kotlintest")
 }
