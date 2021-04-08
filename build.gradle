@@ -33,7 +33,7 @@ subprojects {
             reportUndocumented = false
             sourceLink {
                 path = "src/main/kotlin"
-                url = "https://github.com/arrow-kt/arrow/blob/master/${relativeProjectPath('src/main/kotlin')}"
+                url = "https://github.com/arrow-kt/arrow/blob/main/${relativeProjectPath('src/main/kotlin')}"
                 lineSuffix = "#L"
             }
         }
