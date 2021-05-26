@@ -8,22 +8,17 @@ import arrow.check.gen.Gen
 import arrow.check.gen.RandSeed
 import arrow.check.gen.Rose
 import arrow.check.gen.flatMap
-import arrow.check.gen.map
-import arrow.check.gen.runEnv
 import arrow.check.testCount
 import arrow.core.Tuple3
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
 import pretty.Doc
-import pretty.doc
 import pretty.hardLine
 import pretty.plus
 import pretty.spaced
 import pretty.text
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.intrinsics.startCoroutineUninterceptedOrReturn
 import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
 import kotlin.coroutines.resume
 
@@ -36,42 +31,15 @@ internal data class State(
 )
 
 // ---------------- Running a single property
-internal class PropertyTestImpl : PropertyTest {
+internal class PropertyTestImpl : Test {
 
-  var promise: Promise<Gen<Any?, TestResult<*>>> = Promise()
+  internal var logs: MutableList<JournalEntry> = mutableListOf()
 
-  suspend fun waitFor(): Gen<Any?, TestResult<*>> = promise.await()
-    .also { promise = Promise() }
-
-  fun completeOrFlatMap(gen: Gen<Any?, TestResult<*>>): Unit = promise.complete(gen) { new, curr ->
-    curr.flatMap { currRes ->
-      new.map { newRes -> newRes.prependLog(currRes.log) }
-    }
-  }.let { }
-
-  override suspend fun <R, A> forAllWith(showA: (A) -> Doc<Markup>, env: R, gen: Gen<R, A>): A =
-    suspendCoroutineUninterceptedOrReturn { c ->
-      val labelHere = c.stateStack // save the whole coroutine stack labels
-      val interceptedC = intercepted.get(c)
-      var first = false
-      gen.runEnv(env).flatMap { x: A ->
-        c.stateStack = labelHere
-        // BOOOO
-        if (first) intercepted.set(c, interceptedC)
-        first = true
-
-        c.resume(x)
-
-        Gen.deferred().flatMap { it.map { it.prependLog(Log(listOf(JournalEntry.Input { showA(x) }))) } }
-      }.also(::completeOrFlatMap)
-      COROUTINE_SUSPENDED
-    }
+  fun getAndClearLogs(): List<JournalEntry> = logs.also { logs = mutableListOf() }
 
   override fun writeLog(log: JournalEntry) {
-    completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log(listOf(log)))))
+    logs.add(log)
   }
-
-  fun Gen.Companion.deferred(): Gen<Any?, Gen<Any?, TestResult<*>>> = Gen { Rose(waitFor()) }
 
   override fun failWith(msg: Doc<Markup>): Nothing {
     throw ShortCircuit.Failure(Failure(msg))
@@ -94,56 +62,36 @@ internal fun <A> TestResult<A>.prependLog(oldLog: Log): TestResult<A> = when (th
   is TestResult.Failed -> copy(log = Log.monoid().run { oldLog + log })
 }
 
-internal suspend inline fun execPropertyTest(
-  prop: suspend PropertyTest.() -> Unit,
+internal suspend inline fun <A> execPropertyTest(
+  gen: Gen<Any?, A>,
+  crossinline prop: suspend Test.(A) -> Unit,
   seed: RandSeed,
   size: Size
 ): Rose<TestResult<Unit>>? {
   val impl = PropertyTestImpl()
-  try {
-    prop.startCoroutineUninterceptedOrReturn(impl, Continuation(coroutineContext) {
-      if (it.isSuccess) impl.completeOrFlatMap(Gen.just(TestResult.Success(Unit, Log.monoid().empty())))
-      else {
-        when (val exception = it.exceptionOrNull()!!) {
-          is PropertyTestImpl.ShortCircuit.Failure -> {
-            impl.completeOrFlatMap(Gen.just(TestResult.Failed(exception.fail, Log.monoid().empty())))
-          }
-          else -> {
-            // Deduplicate...
-            val doc =
-              ("━━━ Failed: (Exception) ━━━".text() + hardLine() + it.exceptionOrNull()!!.toString()
-                .doc())
-            impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
-          }
-        }
+  val gen = gen.flatMap { a ->
+    Gen {
+      try {
+        impl.run { prop(a) }
+        Rose(TestResult.Success(Unit, Log(impl.getAndClearLogs())))
+      } catch (err: PropertyTestImpl.ShortCircuit.Failure) {
+        Rose(TestResult.Failed(err.fail, Log(impl.getAndClearLogs())))
+      } catch (err: Throwable) {
+        val doc = "━━━ Failed: (Exception) ━━━".text() + hardLine() + err.toString().text()
+        Rose(TestResult.Failed(Failure(doc), Log(impl.getAndClearLogs())))
       }
-    }).let {
-      if (it !== COROUTINE_SUSPENDED) impl.completeOrFlatMap(
-        Gen.just(
-          TestResult.Success(
-            Unit,
-            Log.monoid().empty()
-          )
-        )
-      )
     }
-  } catch (exc: PropertyTestImpl.ShortCircuit.Failure) {
-    impl.completeOrFlatMap(Gen.just(TestResult.Failed(exc.fail, Log.monoid().empty())))
-  } catch (exc: Throwable) {
-    // Deduplicate...
-    val doc =
-      ("━━━ Failed: (Exception) ━━━".text() + hardLine() + exc.toString().doc())
-    impl.completeOrFlatMap(Gen.just(TestResult.Failed(Failure(doc), Log.monoid().empty())))
   }
-  return impl.waitFor().runGen(Tuple3(seed, size, Unit)) as Rose<TestResult<Unit>>?
+  return gen.runGen(Tuple3(seed, size, Unit))
 }
 
 // TODO also clean this up... split it apart etc
-internal suspend fun runProperty(
+internal suspend fun <A> runProperty(
   initialSize: Size,
   initialSeed: RandSeed,
   config: PropertyConfig,
-  prop: suspend PropertyTest.() -> Unit,
+  gen: Gen<Any?, A>,
+  prop: suspend Test.(A) -> Unit,
   hook: suspend (Report<Progress>) -> Unit
 ): Report<arrow.check.Result> {
   val (confidence, minTests) = when (config.terminationCriteria) {
@@ -216,7 +164,7 @@ internal suspend fun runProperty(
       ) -> return@runProperty Report(numTests, numDiscards, currCoverage, arrow.check.Result.GivenUp)
       else -> {
         seed.split().let { (s1, s2) ->
-          val res = execPropertyTest(prop, s1, size)
+          val res = execPropertyTest(gen, prop, s1, size)
           when (res?.res) {
             null ->
               currState = State(

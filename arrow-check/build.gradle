@@ -17,9 +17,9 @@ dependencies {
     implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
     implementation "io.arrow-kt:arrow-syntax:$ARROW_VERSION" // helper functions like curried...
     implementation "io.arrow-kt:arrow-recursion:$ARROW_VERSION" // Recursion schemes
-    api "kotlin-pretty:kotlin-pretty:0.6.0" // Pretty printing diffs
-    api "kotlin-pretty:kotlin-pretty-ansi:0.6.0" // Ansi terminal support with colors
-    implementation("kparsec:kparsec:0.2.3") // Parser combinators to create toString-output parser
+    api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-jvm:0.6.0" // Pretty printing diffs
+    api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-ansi-jvm:0.6.0" // Ansi terminal support with colors
+    implementation("com.github.1Jajen1:Kparsec:79b78eb6d9") // Parser combinators to create toString-output parser
 
     testImplementation project(":arrow-check-kotest")
 }

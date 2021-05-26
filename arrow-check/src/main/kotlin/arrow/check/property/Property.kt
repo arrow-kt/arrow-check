@@ -1,28 +1,24 @@
 package arrow.check.property
 
-import arrow.check.gen.Gen
-import arrow.check.gen.discard
-import arrow.check.pretty.showPretty
 import arrow.typeclasses.Show
-import pretty.Doc
 
 // -------------- Property
 /**
  * Constructor function to create [Property]'s.
  */
-fun property(config: PropertyConfig = PropertyConfig(), prop: suspend PropertyTest.() -> Unit): Property = Property(config, prop)
+fun <A> property(config: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Property<A> = Property(config, prop)
 
 /**
  * A [Property] represents a config together with a property test.
  *
  * The [PropertyConfig] holds information about how the property [prop] will be run.
  */
-data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.() -> Unit) {
+data class Property<A>(val config: PropertyConfig, val prop: suspend Test.(A) -> Unit) {
 
     /**
      * Change the config of a [Property]
      */
-    fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property =
+    fun mapConfig(f: (PropertyConfig) -> PropertyConfig): Property<A> =
         copy(config = f(config))
 
     /**
@@ -30,7 +26,7 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
      *
      * Should the current [TerminationCriteria] be confidence based this value may be ignored.
      */
-    fun withTests(i: Int): Property =
+    fun withTests(i: Int): Property<A> =
         mapConfig {
             PropertyConfig.terminationCriteria.modify(it) {
                 val tl = TestLimit(i)
@@ -46,7 +42,7 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
      * Change the [Confidence] with which a property test determines whether or not label coverage has been
      *  reached or is deemed unreachable.
      */
-    fun withConfidence(c: Confidence): Property =
+    fun withConfidence(c: Confidence): Property<A> =
         mapConfig {
             PropertyConfig.terminationCriteria.modify(it) {
                 when (it) {
@@ -62,7 +58,7 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
      *
      * Keeps the same [TestLimit] and [Confidence].
      */
-    fun verifiedTermination(): Property =
+    fun verifiedTermination(): Property<A> =
         mapConfig {
             PropertyConfig.terminationCriteria.modify(it) {
                 when (it) {
@@ -76,14 +72,14 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
     /**
      * Change the [TerminationCriteria]
      */
-    fun withTerminationCriteria(i: TerminationCriteria): Property =
+    fun withTerminationCriteria(i: TerminationCriteria): Property<A> =
         mapConfig { PropertyConfig.terminationCriteria.set(it, i) }
 
     /**
      * Set the max ratio of discarded tests vs total tests. When this ratio is passed the test is aborted and
      *  reported as failed.
      */
-    fun withDiscardLimit(i: Double): Property =
+    fun withDiscardLimit(i: Double): Property<A> =
         mapConfig { PropertyConfig.maxDiscardRatio.set(it, DiscardRatio(i)) }
 
     /**
@@ -92,59 +88,15 @@ data class Property(val config: PropertyConfig, val prop: suspend PropertyTest.(
      * > This is not related to the total shrink runs, only to how many successful shrinks in a row
      *  will be attempted.
      */
-    fun withShrinkLimit(i: Int): Property =
+    fun withShrinkLimit(i: Int): Property<A> =
         mapConfig { PropertyConfig.shrinkLimit.set(it, ShrinkLimit(i)) }
 
     /**
      * Set [TestLimit] to 1.
      */
-    fun once(): Property = withTests(1)
+    fun once(): Property<A> = withTests(1)
 
     companion object
-}
-
-/**
- * A [PropertyTest] extends [Test] with [PropertyTest.forAllWith] which enables running a generator.
- */
-interface PropertyTest : Test {
-
-    /**
-     * Run a generator and return its result.
-     *
-     * @param showA A custom show method
-     * @param env Environment to pass to the generator
-     */
-    suspend fun <R, A> forAllWith(showA: (A) -> Doc<Markup>, env: R, gen: Gen<R, A>): A
-
-    /**
-     * Run a generator and return its result.
-     *
-     * @param showA A custom show method
-     */
-    suspend fun <A> forAllWith(showA: (A) -> Doc<Markup>, gen: Gen<Any?, A>): A =
-        forAllWith(showA, Unit, gen)
-
-    /**
-     * Run a generator and return its result.
-     *
-     * @param env Environment to pass to the generator
-     * @param SA Optional show instance, default uses [Any.toString]
-     */
-    suspend fun <R, A> forAll(env: R, gen: Gen<R, A>, SA: Show<A> = Show.any()): A =
-        forAllWith({ a -> a.showPretty(SA) }, env, gen)
-
-    /**
-     * Run a generator and return its result.
-     *
-     * @param SA Optional show instance, default uses [Any.toString]
-     */
-    suspend fun <A> forAll(gen: Gen<Any?, A>, SA: Show<A> = Show.any()): A =
-        forAll(Unit, gen, SA)
-
-    /**
-     * Discard a test run.
-     */
-    suspend fun discard(): Nothing = forAll(Gen.discard())
 }
 
 /**
@@ -159,7 +111,7 @@ interface PropertyTest : Test {
  * @see classify To have control over whether or not this label should be counted.
  * @see coverTable To append a covered label to a sub-table.
  */
-fun PropertyTest.cover(p: Double, name: String, bool: Boolean): Unit =
+fun Test.cover(p: Double, name: String, bool: Boolean): Unit =
     writeLog(JournalEntry.JournalLabel(Label(null, LabelName(name), CoverPercentage(p), bool)))
 
 /**
@@ -174,7 +126,7 @@ fun PropertyTest.cover(p: Double, name: String, bool: Boolean): Unit =
  * @see classify To have control over whether or not this label should be counted.
  * @see tabulate To append a label to a sub-table.
  */
-fun PropertyTest.classify(name: String, bool: Boolean): Unit =
+fun Test.classify(name: String, bool: Boolean): Unit =
     cover(0.0, name, bool)
 
 /**
@@ -188,7 +140,7 @@ fun PropertyTest.classify(name: String, bool: Boolean): Unit =
  * @see classify To have control over whether or not this label should be counted.
  * @see tabulate To append a label to a sub-table.
  */
-fun PropertyTest.label(name: String): Unit =
+fun Test.label(name: String): Unit =
     cover(0.0, name, true)
 
 /**
@@ -198,7 +150,7 @@ fun PropertyTest.label(name: String): Unit =
  *
  * @param SA Optional show instance, default is [Any.toString].
  */
-fun <A> PropertyTest.collect(a: A, SA: Show<A> = Show.any()): Unit =
+fun <A> Test.collect(a: A, SA: Show<A> = Show.any()): Unit =
     cover(0.0, SA.run { a.show() }, true)
 
 /**
@@ -206,7 +158,7 @@ fun <A> PropertyTest.collect(a: A, SA: Show<A> = Show.any()): Unit =
  *
  * Performs the same as [cover] however it inserts the label to a separate [table].
  */
-fun PropertyTest.coverTable(table: String, p: Double, name: String, bool: Boolean): Unit =
+fun Test.coverTable(table: String, p: Double, name: String, bool: Boolean): Unit =
     writeLog(JournalEntry.JournalLabel(Label(LabelTable(table), LabelName(name), CoverPercentage(p), bool)))
 
 /**
@@ -214,5 +166,5 @@ fun PropertyTest.coverTable(table: String, p: Double, name: String, bool: Boolea
  *
  * Performs the same as [label] however it inserts the label to a separate [table].
  */
-fun PropertyTest.tabulate(table: String, name: String): Unit =
+fun Test.tabulate(table: String, name: String): Unit =
     coverTable(table, 0.0, name, true)

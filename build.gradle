@@ -23,8 +23,7 @@ apply from: "$ROOT_PROJECT"
 subprojects { 
 
     repositories {
-        maven { url 'https://dl.bintray.com/jannis/kotlin-pretty' }
-        maven { url 'https://dl.bintray.com/jannis/kparsec' }
+        maven { url 'https://jitpack.io' }
     }
 
     dokka {

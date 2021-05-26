@@ -3,6 +3,7 @@ package arrow.check
 import arrow.check.gen.Gen
 import arrow.check.gen.int
 import arrow.check.gen.list
+import arrow.check.gen.tupledN
 import arrow.check.property.PropertyConfig
 import arrow.check.property.assert
 import arrow.check.property.classify
@@ -13,8 +14,8 @@ import kotlinx.coroutines.delay
 import pretty.text
 
 class RunnerTest : PropertySpec({
-    "empty property"(PropertyConfig.default() + PropertyConfig.once()) {
-        checkReport(null, property {}.once())
+    "empty property"(Gen.just(Unit), PropertyConfig.default() + PropertyConfig.once()) {
+        checkReport(null, Gen.just(Unit), property<Unit> {}.once())
             .let {
                 if (it.coverage.unCoverage.isNotEmpty()) failWith("Coverage was not empty")
                 if (it.numDiscarded.unDiscardCount != 0) failWith("Tests were discarded")
@@ -23,8 +24,8 @@ class RunnerTest : PropertySpec({
             }
     }
 
-    "fail property"(PropertyConfig.default() + PropertyConfig.once()) {
-        checkReport(null, property { failure() }.once())
+    "fail property"(Gen.just(Unit), PropertyConfig.default() + PropertyConfig.once()) {
+        checkReport(null, Gen.just(Unit), property<Unit> { failure() }.once())
             .let {
                 if (it.coverage.unCoverage.isNotEmpty()) failWith("Coverage was not empty")
                 if (it.numDiscarded.unDiscardCount != 0) failWith("Tests were discarded")
@@ -39,9 +40,7 @@ class RunnerTest : PropertySpec({
     }
 
     // a few basic property tests to validate they work
-    "Int.commutativity" {
-        val i = forAll(Gen.int(0..10))
-        val j = forAll(Gen.int(0..10))
+    "Int.commutativity"(Gen.tupledN(Gen.int(0..10), Gen.int(0..10))) { (i, j) ->
 
         classify("I: Not 0", i != 0)
         classify("J: Not 0", j != 0)
@@ -49,8 +48,7 @@ class RunnerTest : PropertySpec({
         assert(i + j == j + i) { "Not commutative".text() }
     }
 
-    "List.reverse roundtrips" {
-        val xs = forAll(Gen.int(0..100).list(0..10))
+    "List.reverse roundtrips"(Gen.int(0..100).list(0..10)) { xs ->
 
         classify("Empty lists", xs.isEmpty())
         classify("One element lists", xs.size == 1)
@@ -60,13 +58,12 @@ class RunnerTest : PropertySpec({
     }
 
     // test interleaved suspension
-    "Interleaved delay on a failed test"(property {
+    "Interleaved delay on a failed test"(Gen.just(Unit), property { _: Unit ->
         // This validates interleaved suspension even on multishot uses during shrinking
-        val res = check {
-            val xs = forAll(Gen.int(0..100))
+        val res = checkReport(Gen.int(0..100), property { xs ->
             delay(10)
             assert(xs <= 10)
-        }.not()
+        }).let { it.status !is Result.Success }
 
         assert(res) { "Test did not fail".text() }
     }.once())
