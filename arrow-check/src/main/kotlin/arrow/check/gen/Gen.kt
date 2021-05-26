@@ -32,9 +32,9 @@ import kotlin.random.Random
 /**
  * A generator wraps a suspend function from ([RandSeed], [Size], [R]) to [Rose].
  *
- * Combinators from `arrow-check` are either on present [Gen.Companion] or directly on the generators themselves.
+ * Combinators from `arrow-check` are either present on [Gen.Companion] or directly on the generators themselves.
  *
- * This means on every invocation it creates a single result plus all shrunk versions of that result.
+ * This means every invocation creates a single result plus all shrunk versions of that result.
  * > A [Rose]-Tree is a combination of a result plus a [Flow] of [Rose]-Tree's which represent the shrinks.
  *
  * > The generator is suspend mostly to make use of suspend functions inside the property context possible, but there
@@ -682,7 +682,7 @@ fun <R, A> Gen<R, A>.list(range: IntRange): Gen<R, List<A>> =
 
 internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
   if (n <= 0) Gen.just(emptyList())
-  else (0 until n).toList().fold(Gen.just(emptyList<A>()) as Gen<R, List<A>>) { acc, _ ->
+  else (0 until n).fold(Gen.just(emptyList<A>()) as Gen<R, List<A>>) { acc, _ ->
     acc.map2(this@replicate) { a, b -> a + b }
   }
 
