@@ -16,7 +16,7 @@ buildscript {
 }
 
 plugins {
-    id "org.jetbrains.kotlin.multiplatform" version "$KOTLIN_VERSION" apply false
+    id "org.jetbrains.kotlin.multiplatform" version "1.5.10" apply false // There is a bug in < 1.5 kotlin
     id "org.jlleitschuh.gradle.ktlint" version "$KTLINT_GRADLE_VERSION"
     id "org.jetbrains.dokka" version "$DOKKA_VERSION"
 }

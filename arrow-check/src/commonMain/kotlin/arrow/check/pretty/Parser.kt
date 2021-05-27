@@ -1,5 +1,24 @@
 package arrow.check.pretty
 
+import parsley.CharPredicate
+import parsley.Parser
+import parsley.alt
+import parsley.attempt
+import parsley.char
+import parsley.choice
+import parsley.compile
+import parsley.eof
+import parsley.filter
+import parsley.followedBy
+import parsley.followedByDiscard
+import parsley.many
+import parsley.map
+import parsley.parseOrNull
+import parsley.pure
+import parsley.recursive
+import parsley.satisfy
+import parsley.stringOf
+import parsley.zip
 import pretty.Doc
 import pretty.align
 import pretty.doc
@@ -22,52 +41,52 @@ import pretty.text
 import kotlin.math.min
 
 internal sealed class KValue {
-    data class RawString(val s: String) : KValue()
-    data class Decimal(val l: Long) : KValue()
-    data class Rational(val r: Double) : KValue()
-    data class KList(val vals: List<KValue>) : KValue()
-    data class KTuple(val vals: List<KValue>) : KValue()
-    data class Record(val name: String, val kv: List<Pair<String, KValue>>) : KValue()
-    data class Cons(val name: String, val props: List<KValue>) : KValue()
+  data class RawString(val s: String) : KValue()
+  data class Decimal(val l: Long) : KValue()
+  data class Rational(val r: Double) : KValue()
+  data class KList(val vals: List<KValue>) : KValue()
+  data class KTuple(val vals: List<KValue>) : KValue()
+  data class Record(val name: String, val kv: List<Pair<String, KValue>>) : KValue()
+  data class Cons(val name: String, val props: List<KValue>) : KValue()
 
-    fun doc(): Doc<Nothing> = when (this) {
-        is RawString -> s.doc()
-        is Decimal -> l.doc()
-        is Rational -> r.doc()
-        is KList -> vals.map { it.doc() }.newLineList().align()
-        is KTuple -> vals.map { it.doc() }.newLineTupled().align()
-        is Record -> {
-            val max = min(10, kv.maxBy { it.first.length }?.first?.length ?: 0)
-            name.text() +
-                    (kv.map { (k, v) ->
-                        (k.text().fillBreak(max).flatAlt(k.text()) spaced pretty.symbols.equals() spaced v.doc().align()).align()
-                    }).newLineTupled().align()
-        }
-        is Cons -> name.text() softLineBreak
-                (props.map { it.doc().align() })
-                    .newLineTupled()
-                    .align()
+  fun doc(): Doc<Nothing> = when (this) {
+    is RawString -> s.doc()
+    is Decimal -> l.doc()
+    is Rational -> r.doc()
+    is KList -> vals.map { it.doc() }.newLineList().align()
+    is KTuple -> vals.map { it.doc() }.newLineTupled().align()
+    is Record -> {
+      val max = min(10, kv.maxByOrNull { it.first.length }?.first?.length ?: 0)
+      name.text() +
+        (kv.map { (k, v) ->
+          (k.text().fillBreak(max).flatAlt(k.text()) spaced pretty.symbols.equals() spaced v.doc().align()).align()
+        }).newLineTupled().align()
     }
+    is Cons -> name.text() softLineBreak
+      (props.map { it.doc().align() })
+        .newLineTupled()
+        .align()
+  }
 
-    private fun <A> List<Doc<A>>.newLineTupled() =
-        // Special case this because here the highest layout for () is actually (\n\n) and in the worst case that will get chosen
-        if (isEmpty()) lParen() + rParen()
-        else encloseSep(
-            lParen() + lineBreak() + (space() + space()).flatAlt(nil()),
-            lineBreak() + rParen(),
-            comma() + space()
-        ).group()
+  private fun <A> List<Doc<A>>.newLineTupled() =
+    // Special case this because here the highest layout for () is actually (\n\n) and in the worst case that will get chosen
+    if (isEmpty()) lParen() + rParen()
+    else encloseSep(
+      lParen() + lineBreak() + (space() + space()).flatAlt(nil()),
+      lineBreak() + rParen(),
+      comma() + space()
+    ).group()
 
-    private fun <A> List<Doc<A>>.newLineList() =
-        // Special case this because here the highest layout for [] is actually [\n\n] and in the worst case that will get chosen
-        if (isEmpty()) lBracket() + rBracket()
-        else encloseSep(
-            lBracket() + lineBreak() + (space() + space()).flatAlt(nil()),
-            lineBreak() + rBracket(),
-            comma() + space()
-        ).group()
+  private fun <A> List<Doc<A>>.newLineList() =
+    // Special case this because here the highest layout for [] is actually [\n\n] and in the worst case that will get chosen
+    if (isEmpty()) lBracket() + rBracket()
+    else encloseSep(
+      lBracket() + lineBreak() + (space() + space()).flatAlt(nil()),
+      lineBreak() + rBracket(),
+      comma() + space()
+    ).group()
 
-    companion object
+  companion object
 }
 
 /**
@@ -79,102 +98,92 @@ internal sealed class KValue {
  */
 fun <A> A.showPretty(SA: (A) -> String = { it.toString() }): Doc<Nothing> {
   val str = SA(this)
-  /*
-  return outputParser().runParser("", str).fold({
-    KValue.RawString(str)
-  }, ::identity).doc().group()
-   */
-  TODO()
+  return (rootParser.parseOrNull(str.toCharArray()) ?: KValue.RawString(str))
+    .doc().group()
 }
 
-// @extension
-/*
-internal typealias Parser<A> = KParsecT<Nothing, String, Char, ForEval, A>
+internal typealias CharParser<A> = Parser<Char, Nothing, A>
 
-internal fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForEval>(String.stream(), Eval.monad())
+internal fun outputParser(): CharParser<KValue> =
+  valueParser { true }.followedByDiscard(Parser.eof())
 
-// Top level parser
-internal fun outputParser(): Parser<KValue> = parser().run {
-    valueParser { true }.k().altSum(this, ListK.foldable()).apTap(eof()).fix()
+internal fun valueParser(pred: CharPredicate): CharParser<KValue> =
+  Parser.choice(
+    // Parser.recursive { listParser() }, TODO Debug sine this breaks parsley...
+    Parser.recursive { recordParser() }.attempt(),
+    Parser.recursive { tupleParser().map { KValue.KTuple(it) } }.attempt(),
+    Parser.recursive { consParser() }.attempt(),
+    decimal().attempt(),
+    double().attempt(),
+    stringValueParser(pred)
+  )
+
+private val listValueParser = valueParser { it != ',' && it != ']' }
+
+internal fun listParser(): CharParser<KValue> = Parser.run {
+  listValueParser
+    .withSeparator(',')
+    .between('[', ']')
+    .map { KValue.KList(it) }
 }
 
-internal fun valueParser(pred: (Char) -> Boolean): List<Parser<KValue>> = parser().run {
-    listOf(
-        listParser(),
-        recordParser(),
-        tupleParser(),
-        consParser(),
-        signedLong(decimal()).map { KValue.Decimal(it) }.fix(),
-        signedDouble(double()).map { KValue.Rational(it) }.fix(),
-        stringValueParser(pred)
-    ) as List<Parser<KValue>>
+internal fun <A> CharParser<A>.withSeparator(c: Char): CharParser<List<A>> =
+  this.zip(Parser.char(c).followedBy(this).many()) { x, xs ->
+    listOf(x) + xs
+  }
+
+// TODO Why can I not use kotlin.text.isLetter here?!
+private fun Char.isLetter(): Boolean =
+  this in 'a'..'z' || this in 'A'..'Z'
+
+internal fun consParser(): CharParser<KValue> = Parser.run {
+  satisfy { it != '(' && it.isLetter() }.many()
+    .zip(tupleParser()) { name, props -> KValue.Cons(name, props) }
 }
 
-internal fun listParser(): Parser<KValue> = parser().run {
-    unit().fix().flatMap {
-        char('[').followedBy(
-            valueParser { it != ',' && it != ']' }.map { it.withSeparator(',').apTap(char(']')).fix() }.k()
-                .altSum(this@run, ListK.foldable()).fix()
-        ).map { KValue.KList(it.toList()) }.fix()
-    }.fix()
+private val tupleValueParser = valueParser { it != ',' && it != ')' }
+
+internal fun tupleParser(): CharParser<List<KValue>> = Parser.run {
+  tupleValueParser
+    .withSeparator(',')
+    .between('(', ')')
 }
 
-internal fun consParser(): Parser<KValue> = parser().run {
-    takeAtLeastOneWhile("constructor name".some()) { it != '(' && it.isLetter() }
-        .flatMap { conName -> tupleParser().map { props -> KValue.Cons(conName, (props as KValue.KTuple).vals) }.fix() }
-        .fix()
+internal fun recordParser(): CharParser<KValue> = Parser.run {
+  satisfy { it != '(' && it.isLetter() }.many()
+    .zip(propertyParser().withSeparator(',').between('(', ')')) { name, props ->
+      KValue.Record(name, props)
+    }
 }
 
-internal fun recordParser(): Parser<KValue> = parser().run {
-    fx.monad {
-        val conName = takeAtLeastOneWhile("constructor name".some()) { it != '(' && it.isLetter() }.bind()
-        val props = propertyParser().withSeparator(',').between('(', ')').bind()
-        KValue.Record(conName, props.toList())
-    }.fix()
+private val propertyValueParser = valueParser { it != ',' && it != ')' }
+
+internal fun propertyParser(): CharParser<Pair<String, KValue>> = Parser.run {
+  satisfy { c: Char -> c != '=' && c.isLetter() }.many()
+    .followedByDiscard(char('='))
+    .zip(propertyValueParser)
 }
 
-internal fun propertyParser(): Parser<Tuple2<String, KValue>> = parser().run {
-    fx.monad {
-        val propName = takeAtLeastOneWhile("property name".some()) { it != '=' }.bind()
-        val value = char('=').label("equals").fix()
-            .flatMap { space().fix() }
-            .flatMap { valueParser { it != ',' && it != ')' }.k().altSum(this@run, ListK.foldable()).fix() }.bind()
-        propName toT value
-    }.fix()
+internal fun <A> CharParser<A>.between(start: Char, end: Char): CharParser<A> =
+  Parser.run { char(start).followedBy(this@between).followedByDiscard(char(end)) }
+
+internal fun stringValueParser(pred: CharPredicate): CharParser<KValue> =
+  Parser.run { satisfy(p = pred).many().map { KValue.RawString(it) } }
+
+internal fun decimal(): CharParser<KValue> = Parser.run {
+  char('+').alt(char('-')).alt(pure(null))
+    .followedBy(satisfy { it in '0'..'9' }.many())
+    .stringOf()
+    .filter { it.isNotEmpty() }
+    .map { KValue.Decimal(it.toLong()) }
 }
 
-internal fun <A> Parser<A>.between(start: Char, end: Char): Parser<A> = parser().run {
-    fx.monad {
-        char(start).label("$start").bind()
-        val a = this@between.bind()
-        char(end).label("$end").bind()
-        a
-    }.fix()
+internal fun double(): CharParser<KValue> = Parser.run {
+  char('+').alt(char('-')).alt(pure(null))
+    .followedBy(satisfy { it in '0'..'9' || it == '.' }.many())
+    .stringOf()
+    .filter { it.isNotEmpty() }
+    .map { KValue.Rational(it.toDouble()) }
 }
 
-internal fun <A> Parser<A>.withSeparator(sep: Char): Parser<List<A>> = parser().run {
-    fx.monad {
-        val seq = this@withSeparator.apTap(char(sep).label("$sep").followedBy(space())).many().bind().toList()
-        val last = this@withSeparator.optional().bind()
-
-        last.fold({ seq }, { (seq + listOf(it)).k() })
-    }.fix()
-}
-
-internal fun stringValueParser(pred: (Char) -> Boolean): Parser<KValue> = parser().run {
-    takeAtLeastOneWhile("string value".some(), pred).map { KValue.RawString(it) }.fix()
-}
-
-internal fun tupleParser(): Parser<KValue> = parser().run {
-    unit().fix().flatMap {
-        char('(').followedBy(
-            valueParser { it != ',' && it != ')' }.map { it.withSeparator(',').apTap(char(')')) }.k()
-                .altSum(this@run, ListK.foldable()).fix()
-        ).map { KValue.KTuple(it.toList()) }.fix()
-    }.fix()
-}
-
-internal fun rawStringParser(): Parser<KValue> = parser().run {
-    takeRemaining().map { KValue.RawString(it) }.fix()
-}
- */
+internal val rootParser = outputParser().compile()

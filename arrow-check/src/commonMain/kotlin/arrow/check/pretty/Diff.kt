@@ -3,12 +3,17 @@ package arrow.check.pretty
 import arrow.check.property.Markup
 import arrow.core.andThen
 import arrow.core.tail
+import parsley.parseOrNull
 import pretty.Doc
 import pretty.align
 import pretty.alterAnnotations
 import pretty.annotate
 import pretty.column
+import pretty.fill
 import pretty.hardLine
+import pretty.indent
+import pretty.lineBreak
+import pretty.nest
 import pretty.plus
 import pretty.spaced
 import pretty.symbols.comma
@@ -18,6 +23,7 @@ import pretty.symbols.rBracket
 import pretty.symbols.rParen
 import pretty.symbols.space
 import pretty.text
+import kotlin.math.min
 
 internal sealed class ValueDiffF<out F> {
   // two values that are entirely different
@@ -44,10 +50,28 @@ internal sealed class ValueDiffF<out F> {
   // compared values were equal
   data class Same(val v: KValue) : ValueDiffF<Nothing>()
 
+  inline fun <B> map(f: (F) -> B): ValueDiffF<B> = when (this) {
+    is ValueD -> ValueD(l, r)
+    is ValueDRemoved -> ValueDRemoved(v)
+    is ValueDAdded -> ValueDAdded(v)
+    is TupleD -> TupleD(vals.map(f))
+    is ListD -> ListD(vals.map(f))
+    is Record -> Record(conName, props.map { (rec, v) -> rec to f(v) })
+    is Cons -> Cons(consName, props.map(f))
+    is Same -> Same(v)
+  }
+
   companion object
 }
 
 internal data class ValueDiff(val unDiff: ValueDiffF<ValueDiff>) {
+
+  @OptIn(ExperimentalStdlibApi::class)
+  fun <B> cata(f: (ValueDiffF<B>) -> B): B =
+    DeepRecursiveFunction<ValueDiff, B> { v ->
+      f(v.unDiff.map { callRecursive(it) })
+    }(this)
+
   companion object
 }
 
@@ -203,41 +227,40 @@ internal fun ValueDiff.toLineDiff(): Doc<DiffType> {
       ("-".text() spaced diff.l.doc()).annotate(DiffType.Removed) +
         (hardLine() spaced diff.r.doc()).annotate(DiffType.Added)
     is ValueDiffF.Same -> diff.v.doc()
-    else -> TODO()
-      /*cata<Pair<DiffType, Doc<DiffType>>> {
-        when (val vd = it.fix()) {
+    else ->
+      cata<Pair<DiffType, Doc<DiffType>>> {
+        when (val vd = it) {
           is ValueDiffF.ValueD ->
-            DiffType.Removed toT (vd.l.doc() + (hardLine() + vd.r.doc()).annotate(DiffType.Added))
+            DiffType.Removed to (vd.l.doc() + (hardLine() + vd.r.doc()).annotate(DiffType.Added))
           // value is the same, use KValue's pretty printer
-          is ValueDiffF.Same -> DiffType.Same toT vd.v.doc()
-          is ValueDiffF.ValueDAdded -> DiffType.Added toT vd.v.doc()
-          is ValueDiffF.ValueDRemoved -> DiffType.Removed toT vd.v.doc()
+          is ValueDiffF.Same -> DiffType.Same to vd.v.doc()
+          is ValueDiffF.ValueDAdded -> DiffType.Added to vd.v.doc()
+          is ValueDiffF.ValueDRemoved -> DiffType.Removed to vd.v.doc()
           // everything below contains a diff, that's why custom tuple/list methods are used that are always vertical without group
-          is ValueDiffF.TupleD -> DiffType.Same toT vd.vals.tupledNested()
-          is ValueDiffF.ListD -> DiffType.Same toT vd.vals.listNested()
-          is ValueDiffF.Cons -> DiffType.Same toT (vd.consName.text() +
+          is ValueDiffF.TupleD -> DiffType.Same to vd.vals.tupledNested()
+          is ValueDiffF.ListD -> DiffType.Same to vd.vals.listNested()
+          is ValueDiffF.Cons -> DiffType.Same to (vd.consName.text() +
             vd.props
               .tupledNested()
               .align()
             )
           is ValueDiffF.Record -> {
-            val max = min(10, vd.props.maxBy { it.a.length }?.a?.length ?: 0)
-            DiffType.Same toT (vd.conName.text() +
+            val max = min(10, vd.props.maxByOrNull { it.first.length }?.first?.length ?: 0)
+            DiffType.Same to (vd.conName.text() +
               vd.props
                 .map { (name, it) ->
                   val (pre, doc) = it
                   if (name.length > max)
-                    DiffType.Same toT (name.text() + (lineBreak().nest(max) spaced equals() spaced doc.align()).annotate(
+                    DiffType.Same to (name.text() + (lineBreak().nest(max) spaced pretty.symbols.equals() spaced doc.align()).annotate(
                       pre
                     )).align()
-                  else pre toT (name.text().fill(max) spaced equals() spaced doc.align()).align()
+                  else pre to (name.text().fill(max) spaced pretty.symbols.equals() spaced doc.align()).align()
                 }
                 .tupledNested()
                 .align())
           }
         }
-      }.b.indent(1) // save space for +/- // This also ensures the layout algorithm is optimal
-       */
+      }.second.indent(1) // save space for +/- // This also ensures the layout algorithm is optimal
   }
 }
 
@@ -269,18 +292,10 @@ internal fun <A> List<Pair<A, Doc<A>>>.encloseSepVert(l: Doc<A>, r: Doc<A>, sep:
 }
 
 internal infix fun String.diff(str: String): ValueDiff {
-  /*
-  val lhs = outputParser().runParser("", this).fold({
-    KValue.RawString(this)
-  }, ::identity)
-  val rhs = outputParser().runParser("", str).fold({
-    KValue.RawString(str)
-  }, ::identity)
+  val lhs = rootParser.parseOrNull(this.toCharArray()) ?: KValue.RawString(this)
+  val rhs = rootParser.parseOrNull(str.toCharArray()) ?: KValue.RawString(str)
 
   return lhs.toDiff(rhs)
-
-   */
-  TODO()
 }
 
 internal fun ValueDiff.toDoc(): Doc<Markup> =
