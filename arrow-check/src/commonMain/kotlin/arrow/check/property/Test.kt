@@ -1,5 +1,6 @@
 package arrow.check.property
 
+import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
@@ -86,9 +87,7 @@ interface Test {
 
     if (EQ(this@roundtrip, decoded)) succeeded()
     else failWith(
-      SA.run {
-        val diff = TODO() // this@roundtrip.show().diff(decoded.show())
-
+      SA(this@roundtrip).diff(SA(decoded)).let { diff ->
         "━━━ Intermediate ━━━".text() + hardLine() +
           intermediate.showPretty(SB) + hardLine() +
           "━━━ Failed (".text() +
@@ -161,9 +160,7 @@ fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
  */
 fun <A> Test.diff(a: A, other: A, SA: (A) -> String = { it.toString() }, cmp: (A, A) -> Boolean): Unit =
   if (cmp(a, other)) succeeded()
-  else TODO() // a.show().diff(other.show())
-
-    /*
+  else SA(a).diff(SA(other)).let { diff ->
     when (diff.unDiff) {
       is ValueDiffF.Same -> "━━━ Failed (no differences) ━━━".text() +
         hardLine() + diff.toDoc()
@@ -176,7 +173,8 @@ fun <A> Test.diff(a: A, other: A, SA: (A) -> String = { it.toString() }, cmp: (A
           ") ━━━".text() +
           hardLine() + diff.toDoc()
       }
-    }*/
+    }.let(::failWith)
+  }
 
 internal fun Log.coverage(): Coverage<CoverCount> =
   unLog.filterIsInstance<JournalEntry.JournalLabel>().map {
