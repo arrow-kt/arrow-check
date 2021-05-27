@@ -1,47 +1,25 @@
 package arrow.check.pretty
 
-import arrow.Kind
 import arrow.check.property.Markup
-import arrow.core.Tuple2
 import arrow.core.andThen
-import arrow.core.extensions.list.functor.map
-import arrow.core.extensions.list.functor.tupleLeft
-import arrow.core.identity
-import arrow.core.toMap
-import arrow.core.toT
-import arrow.recursion.typeclasses.Birecursive
-import arrow.syntax.collections.tail
-import arrow.typeclasses.Functor
-import kparsec.runParser
+import arrow.core.tail
 import pretty.Doc
 import pretty.align
 import pretty.alterAnnotations
 import pretty.annotate
 import pretty.column
-import pretty.fill
 import pretty.hardLine
-import pretty.indent
-import pretty.lineBreak
-import pretty.nest
 import pretty.plus
 import pretty.spaced
 import pretty.symbols.comma
-import pretty.symbols.equals
 import pretty.symbols.lBracket
 import pretty.symbols.lParen
 import pretty.symbols.rBracket
 import pretty.symbols.rParen
 import pretty.symbols.space
 import pretty.text
-import kotlin.math.min
 
-internal class ForValueDiffF private constructor()
-internal typealias ValueDiffFOf<F> = Kind<ForValueDiffF, F>
-
-@Suppress("UNCHECKED_CAST", "NOTHING_TO_INLINE")
-internal inline fun <F> ValueDiffFOf<F>.fix(): ValueDiffF<F> = this as ValueDiffF<F>
-
-internal sealed class ValueDiffF<out F> : ValueDiffFOf<F> {
+internal sealed class ValueDiffF<out F> {
   // two values that are entirely different
   data class ValueD(val l: KValue, val r: KValue) : ValueDiffF<Nothing>()
 
@@ -58,7 +36,7 @@ internal sealed class ValueDiffF<out F> : ValueDiffFOf<F> {
   data class ListD<F>(val vals: List<F>) : ValueDiffF<F>()
 
   // a record that contains at least one diff value that is not Same
-  data class Record<F>(val conName: String, val props: List<Tuple2<String, F>>) : ValueDiffF<F>()
+  data class Record<F>(val conName: String, val props: List<Pair<String, F>>) : ValueDiffF<F>()
 
   // a cons, name(prop1, ..., propN), that contains at least one diff value that is not Same
   data class Cons<F>(val consName: String, val props: List<F>) : ValueDiffF<F>()
@@ -69,38 +47,13 @@ internal sealed class ValueDiffF<out F> : ValueDiffFOf<F> {
   companion object
 }
 
-// @extension
-internal interface ValueDiffFFunctor : Functor<ForValueDiffF> {
-  override fun <A, B> Kind<ForValueDiffF, A>.map(f: (A) -> B): Kind<ForValueDiffF, B> = when (val d = fix()) {
-    is ValueDiffF.ValueD -> ValueDiffF.ValueD(d.l, d.r)
-    is ValueDiffF.TupleD -> ValueDiffF.TupleD(d.vals.map(f))
-    is ValueDiffF.ListD -> ValueDiffF.ListD(d.vals.map(f))
-    is ValueDiffF.Record -> ValueDiffF.Record(d.conName, d.props.map { (k, v) -> k toT f(v) })
-    is ValueDiffF.Cons -> ValueDiffF.Cons(d.consName, d.props.map(f))
-    is ValueDiffF.Same -> ValueDiffF.Same(d.v)
-    is ValueDiffF.ValueDRemoved -> ValueDiffF.ValueDRemoved(d.v)
-    is ValueDiffF.ValueDAdded -> ValueDiffF.ValueDAdded(d.v)
-  }
-}
-
-internal fun ValueDiffF.Companion.functor(): Functor<ForValueDiffF> = object : ValueDiffFFunctor {}
-
 internal data class ValueDiff(val unDiff: ValueDiffF<ValueDiff>) {
   companion object
 }
 
-// @extension
-internal interface ValueDiffBirecursive : Birecursive<ValueDiff, ForValueDiffF> {
-  override fun FF(): Functor<ForValueDiffF> = ValueDiffF.functor()
-  override fun ValueDiff.projectT(): Kind<ForValueDiffF, ValueDiff> = unDiff
-  override fun Kind<ForValueDiffF, ValueDiff>.embedT(): ValueDiff = ValueDiff(this.fix())
-}
-
-internal fun ValueDiff.Companion.birecursive(): Birecursive<ValueDiff, ForValueDiffF> = object : ValueDiffBirecursive {}
-
-internal infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).let { (a, b) ->
+internal infix fun KValue.toDiff(other: KValue): ValueDiff = (this to other).let { (a, b) ->
   when {
-    KValue.eq().run { a.eqv(b) } -> ValueDiff(ValueDiffF.Same(a))
+    a == b -> ValueDiff(ValueDiffF.Same(a))
     a is KValue.Cons && b is KValue.Cons
       && a.name == b.name ->
       ValueDiff(ValueDiffF.Cons(a.name, a.props.diffOrderedLists(b.props)))
@@ -116,13 +69,13 @@ internal infix fun KValue.toDiff(other: KValue): ValueDiff = (this toT other).le
 }
 
 internal fun diffMaps(
-  a: List<Tuple2<String, KValue>>,
-  b: List<Tuple2<String, KValue>>
-): List<Tuple2<String, ValueDiff>> =
+  a: List<Pair<String, KValue>>,
+  b: List<Pair<String, KValue>>
+): List<Pair<String, ValueDiff>> =
   a.toMap().let { aMap ->
     val diffOrAdd = b.map { (k, v) ->
-      if (aMap.containsKey(k)) k toT aMap.getValue(k).toDiff(v)
-      else k toT ValueDiff(ValueDiffF.ValueDAdded(v))
+      if (aMap.containsKey(k)) k to aMap.getValue(k).toDiff(v)
+      else k to ValueDiff(ValueDiffF.ValueDAdded(v))
     }.toMap()
 
     val diffOrRemove = a.mapNotNull { (k, v) ->
@@ -130,7 +83,7 @@ internal fun diffMaps(
       else (k to ValueDiff(ValueDiffF.ValueDRemoved(v)))
     }
 
-    (diffOrAdd.toList() + diffOrRemove).map { (k, v) -> k toT v }
+    (diffOrAdd.toList() + diffOrRemove).map { (k, v) -> k to v }
   }
 
 // Myer's algorithm
@@ -145,8 +98,8 @@ internal sealed class Edit {
 internal data class Endpoint(val x: Int, val y: Int, val script: List<Edit>)
 
 internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
-  val (lArr, rArr) = this.toTypedArray() toT ls.toTypedArray()
-  val (m, n) = size toT ls.size
+  val (lArr, rArr) = this.toTypedArray() to ls.toTypedArray()
+  val (m, n) = size to ls.size
 
   fun moveDownFrom(e: Endpoint): Endpoint = Endpoint(
     e.x,
@@ -165,7 +118,7 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
   fun slideFrom(e: Endpoint): Endpoint {
     val (l, r) = zipNullable(lArr.safeGet(e.x), rArr.safeGet(e.y)) ?: return e
     // call shallow diff here (only top level: type and conName)
-    return if (KValue.eq().run { l.eqv(r) })
+    return if (l == r)
       slideFrom(Endpoint(e.x + 1, e.y + 1, listOf(Edit.Compare(l, r)) + e.script))
     else e
   }
@@ -191,7 +144,7 @@ internal fun List<KValue>.diffOrderedLists(ls: List<KValue>): List<ValueDiff> {
         endpoints.firstOrNull(::isComplete)?.let { (_, _, script) -> script }
           ?: searchToD(
             d + 1,
-            endpoints.map { it.x - it.y + d + 1 toT it }.toMap().let { m ->
+            endpoints.map { it.x - it.y + d + 1 to it }.toMap().let { m ->
               Array(d * 2 + 2) { ind -> m[ind] } as Array<Endpoint>
             }
           )
@@ -241,8 +194,8 @@ internal sealed class DiffType {
  *  itself we must also add a Markup.Diff annotation that has the current column offset around the entire diff.
  *  In the end this all allows diffs to be rendered properly anywhere.
  */
-internal fun ValueDiff.toLineDiff(): Doc<DiffType> = ValueDiff.birecursive().run {
-  when (val diff = this@toLineDiff.unDiff) {
+internal fun ValueDiff.toLineDiff(): Doc<DiffType> {
+  return when (val diff = this@toLineDiff.unDiff) {
     // Treat top level value diffs special because the nested diff implementation assumes newlines that this does not have
     is ValueDiffF.ValueD ->
       // This is the only place where we need to manually add a prefix because this cannot
@@ -250,8 +203,8 @@ internal fun ValueDiff.toLineDiff(): Doc<DiffType> = ValueDiff.birecursive().run
       ("-".text() spaced diff.l.doc()).annotate(DiffType.Removed) +
         (hardLine() spaced diff.r.doc()).annotate(DiffType.Added)
     is ValueDiffF.Same -> diff.v.doc()
-    else ->
-      cata<Tuple2<DiffType, Doc<DiffType>>> {
+    else -> TODO()
+      /*cata<Pair<DiffType, Doc<DiffType>>> {
         when (val vd = it.fix()) {
           is ValueDiffF.ValueD ->
             DiffType.Removed toT (vd.l.doc() + (hardLine() + vd.r.doc()).annotate(DiffType.Added))
@@ -284,28 +237,29 @@ internal fun ValueDiff.toLineDiff(): Doc<DiffType> = ValueDiff.birecursive().run
           }
         }
       }.b.indent(1) // save space for +/- // This also ensures the layout algorithm is optimal
+       */
   }
 }
 
-internal fun <A> List<Tuple2<A, Doc<A>>>.listNested(): Doc<A> =
+internal fun <A> List<Pair<A, Doc<A>>>.listNested(): Doc<A> =
   encloseSepVert(
     lBracket(),
     hardLine() + rBracket(),
     comma() + space()
   )
 
-internal fun <A> List<Tuple2<A, Doc<A>>>.tupledNested(): Doc<A> =
+internal fun <A> List<Pair<A, Doc<A>>>.tupledNested(): Doc<A> =
   encloseSepVert(
     lParen(),
     hardLine() + rParen(),
     comma() + space()
   )
 
-internal fun <A> List<Tuple2<A, Doc<A>>>.encloseSepVert(l: Doc<A>, r: Doc<A>, sep: Doc<A>): Doc<A> = when {
+internal fun <A> List<Pair<A, Doc<A>>>.encloseSepVert(l: Doc<A>, r: Doc<A>, sep: Doc<A>): Doc<A> = when {
   isEmpty() -> l + r
   size == 1 -> l + first().let { (t, doc) -> (hardLine() + doc).annotate(t) }.align() + r
-  else -> l + ((listOf((hardLine() + space() + space()) toT this.first()) + this.tail().tupleLeft(sep))
-    .map { (a, b) -> b.a toT (a + b.b.align()) }
+  else -> l + ((listOf((hardLine() + space() + space()) to this.first()) + this.tail().map { sep to it })
+    .map { (a, b) -> b.first to (a + b.second.align()) }
     .let { xs ->
       if (xs.size == 1) xs.first().let { (ann, d) -> d.annotate(ann) }
       else xs.tail().fold(xs.first().let { (ann, d) -> d.annotate(ann) }) { acc, (ann, d) ->
@@ -315,6 +269,7 @@ internal fun <A> List<Tuple2<A, Doc<A>>>.encloseSepVert(l: Doc<A>, r: Doc<A>, se
 }
 
 internal infix fun String.diff(str: String): ValueDiff {
+  /*
   val lhs = outputParser().runParser("", this).fold({
     KValue.RawString(this)
   }, ::identity)
@@ -323,6 +278,9 @@ internal infix fun String.diff(str: String): ValueDiff {
   }, ::identity)
 
   return lhs.toDiff(rhs)
+
+   */
+  TODO()
 }
 
 internal fun ValueDiff.toDoc(): Doc<Markup> =

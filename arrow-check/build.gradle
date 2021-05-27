@@ -1,25 +1,31 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm"
-    id "org.jetbrains.kotlin.kapt"
+    id "org.jetbrains.kotlin.multiplatform"
     id "org.jlleitschuh.gradle.ktlint"
 }
 
 apply plugin: 'kotlinx-atomicfu'
 
-apply from: "$SUB_PROJECT"
+apply from: "$SUB_PROJECT_MPP"
 
-dependencies {
-    kapt "io.arrow-kt:arrow-meta:$ARROW_VERSION" // auto generation for @optics
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation 'org.jetbrains.kotlin:kotlin-stdlib-common'
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3"
 
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$KOTLINX_COROUTINES_VERSION"
-
-    implementation "io.arrow-kt:arrow-core:$ARROW_VERSION" // lenses and @optics
-    implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
-    implementation "io.arrow-kt:arrow-syntax:$ARROW_VERSION" // helper functions like curried...
-    implementation "io.arrow-kt:arrow-recursion:$ARROW_VERSION" // Recursion schemes
-    api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-jvm:0.6.0" // Pretty printing diffs
-    api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-ansi-jvm:0.6.0" // Ansi terminal support with colors
-    implementation("com.github.1Jajen1:Kparsec:79b78eb6d9") // Parser combinators to create toString-output parser
-
-    testImplementation project(":arrow-check-kotest")
+                implementation "io.arrow-kt:arrow-core:$ARROW_VERSION" // lenses and @optics
+                implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
+                api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty:0.6.0" // Pretty printing diffs
+                api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-ansi:0.6.0" // Ansi terminal support with colors
+                // Parser combinators to create toString-output parser
+                implementation("com.github.1Jajen1.parsley4k:char:bff1d08247")
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation project(":arrow-check-kotest")
+            }
+        }
+    }
 }

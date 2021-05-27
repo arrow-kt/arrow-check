@@ -1,12 +1,9 @@
 package arrow.check.property
 
-import arrow.check.pretty.ValueDiffF
 import arrow.check.pretty.diff
 import arrow.check.pretty.showPretty
 import arrow.check.pretty.toDoc
-import arrow.core.extensions.list.foldable.combineAll
-import arrow.typeclasses.Eq
-import arrow.typeclasses.Show
+import arrow.core.combineAll
 import pretty.Doc
 import pretty.annotate
 import pretty.doc
@@ -48,8 +45,8 @@ interface Test {
    * @see neqv To test for inequality
    * @see diff As a more lower level operator
    */
-  fun <A> A.eqv(other: A, EQA: Eq<A> = Eq.any(), SA: Show<A> = Show.any()): Unit =
-    diff(this, other, SA) { a, b -> EQA.run { a.eqv(b) } }
+  fun <A> A.eqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
+    diff(this, other, SA) { a, b -> EQA(a, b) }
 
   /**
    * Test two values for inequality and should they be equal provide a pretty-printed diff.
@@ -65,8 +62,8 @@ interface Test {
    * @see eqv To test for equality
    * @see diff As a more lower level operator
    */
-  fun <A> A.neqv(other: A, EQA: Eq<A> = Eq.any(), SA: Show<A> = Show.any()): Unit =
-    diff(this, other, SA) { a, b -> EQA.run { a.neqv(b) } }
+  fun <A> A.neqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
+    diff(this, other, SA) { a, b -> EQA(a, b).not() }
 
   /**
    * Test if a pair of [encode]/[decode] end up at the same value again.
@@ -80,17 +77,17 @@ interface Test {
   suspend fun <A, B> A.roundtrip(
     encode: suspend (A) -> B,
     decode: suspend (B) -> A,
-    EQ: Eq<A> = Eq.any(),
-    SA: Show<A> = Show.any(),
-    SB: Show<B> = Show.any()
+    EQ: (A, A) -> Boolean = { a, b -> a == b },
+    SA: (A) -> String = { it.toString() },
+    SB: (B) -> String = { it.toString() }
   ): Unit {
     val intermediate = encode(this@roundtrip)
     val decoded = decode(intermediate)
 
-    if (EQ.run { this@roundtrip.eqv(decoded) }) succeeded()
+    if (EQ(this@roundtrip, decoded)) succeeded()
     else failWith(
       SA.run {
-        val diff = this@roundtrip.show().diff(decoded.show())
+        val diff = TODO() // this@roundtrip.show().diff(decoded.show())
 
         "━━━ Intermediate ━━━".text() + hardLine() +
           intermediate.showPretty(SB) + hardLine() +
@@ -162,11 +159,11 @@ fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
  * @param SA Optional show instance, default uses [Any.toString]
  * @param cmp Comparison function to which [a] and [other] will be passed.
  */
-fun <A> Test.diff(a: A, other: A, SA: Show<A> = Show.any(), cmp: (A, A) -> Boolean): Unit =
+fun <A> Test.diff(a: A, other: A, SA: (A) -> String = { it.toString() }, cmp: (A, A) -> Boolean): Unit =
   if (cmp(a, other)) succeeded()
-  else failWith(SA.run {
-    val diff = a.show().diff(other.show())
+  else TODO() // a.show().diff(other.show())
 
+    /*
     when (diff.unDiff) {
       is ValueDiffF.Same -> "━━━ Failed (no differences) ━━━".text() +
         hardLine() + diff.toDoc()
@@ -179,8 +176,7 @@ fun <A> Test.diff(a: A, other: A, SA: Show<A> = Show.any(), cmp: (A, A) -> Boole
           ") ━━━".text() +
           hardLine() + diff.toDoc()
       }
-    }
-  })
+    }*/
 
 internal fun Log.coverage(): Coverage<CoverCount> =
   unLog.filterIsInstance<JournalEntry.JournalLabel>().map {

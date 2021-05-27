@@ -9,7 +9,6 @@ import arrow.check.gen.RandSeed
 import arrow.check.gen.Rose
 import arrow.check.gen.flatMap
 import arrow.check.testCount
-import arrow.core.Tuple3
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
 import pretty.Doc
@@ -82,7 +81,7 @@ internal suspend inline fun <A> execPropertyTest(
       }
     }
   }
-  return gen.runGen(Tuple3(seed, size, Unit))
+  return gen.runGen(Triple(seed, size, Unit))
 }
 
 // TODO also clean this up... split it apart etc
@@ -301,37 +300,3 @@ internal class Promise<A> {
   object EMPTY
   class Waiting<A>(val cont: Continuation<A>)
 }
-
-private val coroutineImplClass by lazy { Class.forName("kotlin.coroutines.jvm.internal.BaseContinuationImpl") }
-
-private val completionField by lazy { coroutineImplClass.getDeclaredField("completion").apply { isAccessible = true } }
-
-private val coroutineImplClass2 by lazy { Class.forName("kotlin.coroutines.jvm.internal.ContinuationImpl") }
-
-internal val intercepted by lazy { coroutineImplClass2.getDeclaredField("intercepted").apply { isAccessible = true } }
-
-private var <T> Continuation<T>.completion: Continuation<*>?
-  get() = completionField.get(this) as Continuation<*>
-  set(value) = completionField.set(this@completion, value)
-
-internal var <T> Continuation<T>.stateStack: List<Map<String, *>>
-  get() {
-    if (!coroutineImplClass.isInstance(this)) return emptyList()
-    val resultForThis = (this.javaClass.declaredFields)
-      .associate { it.isAccessible = true; it.name to it.get(this@stateStack) }
-      .let(::listOf)
-    val resultForCompletion = completion?.stateStack
-    return resultForCompletion?.let { resultForThis + it } ?: resultForThis
-  }
-  set(value) {
-    if (!coroutineImplClass.isInstance(this)) return
-    val mapForThis = value.first()
-    (this.javaClass.declaredFields).forEach {
-      if (it.name in mapForThis) {
-        it.isAccessible = true
-        val fieldValue = mapForThis[it.name]
-        it.set(this@stateStack, fieldValue)
-      }
-    }
-    completion?.stateStack = value.subList(1, value.size)
-  }

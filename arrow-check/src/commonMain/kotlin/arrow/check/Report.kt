@@ -1,6 +1,7 @@
 package arrow.check
 
 import arrow.check.gen.RandSeed
+import arrow.check.internal.AndThen
 import arrow.check.property.CoverCount
 import arrow.check.property.CoverPercentage
 import arrow.check.property.Coverage
@@ -14,11 +15,9 @@ import arrow.check.property.Size
 import arrow.check.property.TestCount
 import arrow.check.property.coverPercentage
 import arrow.check.property.labelCovered
-import arrow.core.AndThen
-import arrow.core.extensions.list.foldable.foldMap
+import arrow.core.foldMap
 import arrow.core.identity
-import arrow.core.toT
-import arrow.syntax.collections.tail
+import arrow.core.tail
 import arrow.typeclasses.Monoid
 import pretty.AnsiStyle
 import pretty.Color
@@ -207,7 +206,7 @@ internal fun <A> Coverage<A>.ifNotEmpty(f: Coverage<A>.() -> Doc<Markup>): Doc<M
 
 fun Coverage<CoverCount>.prettyPrint(tests: TestCount): Doc<Markup> =
     unCoverage.toList().let {
-        if (it.size == 1 && it.first().first === null) it.first().second.let { v ->
+        if (it.size == 1 && it.first().first == null) it.first().second.let { v ->
             v.values.map { l ->
                 l.pretty(tests, v.values.toList().width(tests))
             }.vSep()
@@ -301,14 +300,14 @@ fun List<FailureAnnotation>.prettyAnnotations(): List<Doc<Markup>> =
         }.let { listOf(it) }
     } else {
         val szLen = "$size".length
-        fold(0 toT emptyList<Doc<Markup>>()) { (i, acc), v ->
+        fold(0 to emptyList<Doc<Markup>>()) { (i, acc), v ->
             when (v) {
-                is FailureAnnotation.Annotation -> i toT acc + v.text().group().annotate(Markup.Annotation)
+                is FailureAnnotation.Annotation -> i to acc + v.text().group().annotate(Markup.Annotation)
                 is FailureAnnotation.Input ->
-                    (i + 1) toT acc + ("forAll".text() + (i + 1).doc().fill(szLen) spaced pretty.symbols.equals() +
+                    (i + 1) to acc + ("forAll".text() + (i + 1).doc().fill(szLen) spaced pretty.symbols.equals() +
                             (line() + v.text().annotate(Markup.Annotation)).nest(2)).group()
             }
-        }.b
+        }.second
     }
 
 fun TestCount.testCount(): Doc<Nothing> = unTestCount.plural("test".text(), "tests".text())
@@ -375,11 +374,11 @@ private fun spaces(nr: Int): String = generateSequence { " " }.take(nr).joinToSt
 fun SimpleDoc<Style>.renderMarkup(): String {
     tailrec fun SimpleDoc<Style>.go(
       xs: List<Style>,
-      cont: (String) -> String
+      cont: AndThen<String, String>
     ): String = when (val dF = unDoc(Unit)) {
         is SimpleDocF.Fail -> throw IllegalStateException("Encountered Fail in doc render. Please report this!")
         is SimpleDocF.Nil -> cont("")
-        is SimpleDocF.Line -> dF.doc.go(xs, AndThen(cont).compose { str ->
+        is SimpleDocF.Line -> dF.doc.go(xs, cont.compose { str ->
             // This is quite the hack, but it works ^^
             // Maybe implement it as filter and get all Style.Prefix if in the future there can be more than one
             xs.firstOrNull { it is Style.Prefix }?.let {
@@ -387,19 +386,19 @@ fun SimpleDoc<Style>.renderMarkup(): String {
                 "\n${spaces(it.col)}${it.pre}${spaces(dF.i - it.col - 1)}$str"
             } ?: "\n${spaces(dF.i)}$str"
         })
-        is SimpleDocF.Text -> dF.doc.go(xs, AndThen(cont).compose { dF.str + it })
+        is SimpleDocF.Text -> dF.doc.go(xs, cont.compose { dF.str + it })
         is SimpleDocF.AddAnnotation -> when (val a = dF.ann) {
             is Style.Prefix -> dF.doc.go(listOf(dF.ann) + xs, cont)
             is Style.Ansi -> {
                 val currStyle = xs.firstOrNull { it is Style.Ansi }
                 val newS = a.st + (currStyle as Style.Ansi).st
-                dF.doc.go(listOf(Style.Ansi(newS)) + xs, AndThen(cont).compose {
+                dF.doc.go(listOf(Style.Ansi(newS)) + xs, cont.compose {
                     newS.toRawString() + it
                 })
             }
             else -> dF.doc.go(listOf(dF.ann) + xs, cont)
         }
-        is SimpleDocF.RemoveAnnotation -> dF.doc.go(xs.tail(), AndThen(cont).compose { str ->
+        is SimpleDocF.RemoveAnnotation -> dF.doc.go(xs.tail(), cont.compose { str ->
             if (xs.first() is Style.Ansi)
                 xs.tail().firstOrNull { it is Style.Ansi }!!.let {
                     (it as Style.Ansi)
@@ -408,5 +407,5 @@ fun SimpleDoc<Style>.renderMarkup(): String {
             else str
         })
     }
-    return go(listOf(Style.Ansi(AnsiStyle.empty())), ::identity)
+    return go(listOf(Style.Ansi(AnsiStyle.empty())), AndThen(::identity))
 }

@@ -1,7 +1,5 @@
 package arrow.check.gen
 
-import arrow.core.toT
-
 /**
  * Shrink the number towards a destination.
  */
@@ -42,7 +40,7 @@ fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())
 internal fun <A> List<A>.removes(n: Int): Sequence<List<A>> = loopRemove(n, size)
 
 private fun <A> List<A>.loopRemove(k: Int, n: Int): Sequence<List<A>> =
-    (take(k) toT drop(k)).let { (head, tail) ->
+    (take(k) to drop(k)).let { (head, tail) ->
         when {
             k > n -> emptySequence()
             tail.isEmpty() -> sequenceOf(emptyList())

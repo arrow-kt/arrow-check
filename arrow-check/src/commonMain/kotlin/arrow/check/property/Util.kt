@@ -1,9 +1,5 @@
 package arrow.check.property
 
-import arrow.core.ListK
-import arrow.core.Tuple2
-import arrow.core.extensions.listk.monoid.monoid
-import arrow.core.toT
 import arrow.optics.optics
 import arrow.typeclasses.Monoid
 import arrow.typeclasses.Semigroup
@@ -121,10 +117,10 @@ inline class Failure(val unFailure: Doc<Markup>)
 // @extension
 interface LogMonoid : Monoid<Log> {
   override fun Log.combine(b: Log): Log = Log(
-    ListK.monoid<JournalEntry>().run { unLog + b.unLog }
+    Monoid.list<JournalEntry>().run { unLog + b.unLog }
   )
 
-  override fun empty(): Log = Log(ListK.empty())
+  override fun empty(): Log = Log(emptyList())
 }
 
 fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
@@ -308,10 +304,10 @@ inline class GroupName(val unGroupName: String)
 
 /* inline */class Size(val unSize: Int)
 
-internal fun Coverage<CoverCount>.labelsToTotals(): List<Tuple2<Int, Label<CoverCount>>> =
+internal fun Coverage<CoverCount>.labelsToTotals(): List<Pair<Int, Label<CoverCount>>> =
   unCoverage.values.flatMap {
     val total = it.values.sumBy { it.annotation.unCoverCount }
-    it.values.map { total toT it }
+    it.values.map { total to it }
   }
 
 fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
@@ -344,7 +340,7 @@ internal fun wilsonHigh(k: Int, n: Int, a: Double): Double = wilson(k, n, invnor
 
 internal fun wilson(k: Int, n: Int, z: Double): Double {
   val p = k / n.toDouble()
-  return (p + z * z / (2 * n) + z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
+  return (p + z * z / (2 * n) + z * sqrt(p * (1 - p) / n + z * z / (4 * n * n))) / (1 + z * z / n)
 }
 
 // Quickcheck added this without erfc, so I'll use that. Credits to them:

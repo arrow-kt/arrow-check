@@ -1,29 +1,5 @@
 package arrow.check.pretty
 
-import arrow.core.Eval
-import arrow.core.ForEval
-import arrow.core.ListK
-import arrow.core.Tuple2
-import arrow.core.extensions.eval.monad.monad
-import arrow.core.extensions.listk.foldable.foldable
-import arrow.core.identity
-import arrow.core.k
-import arrow.core.some
-import arrow.core.toT
-import arrow.typeclasses.Eq
-import arrow.typeclasses.Show
-import arrow.typeclasses.altSum
-import kparsec.KParsecT
-import kparsec.fix
-import kparsec.runParser
-import kparsec.stream
-import kparsec.string.char
-import kparsec.string.decimal
-import kparsec.string.double
-import kparsec.string.signedDouble
-import kparsec.string.signedLong
-import kparsec.string.space
-import kparsec.takeRemaining
 import pretty.Doc
 import pretty.align
 import pretty.doc
@@ -51,7 +27,7 @@ internal sealed class KValue {
     data class Rational(val r: Double) : KValue()
     data class KList(val vals: List<KValue>) : KValue()
     data class KTuple(val vals: List<KValue>) : KValue()
-    data class Record(val name: String, val kv: List<Tuple2<String, KValue>>) : KValue()
+    data class Record(val name: String, val kv: List<Pair<String, KValue>>) : KValue()
     data class Cons(val name: String, val props: List<KValue>) : KValue()
 
     fun doc(): Doc<Nothing> = when (this) {
@@ -61,7 +37,7 @@ internal sealed class KValue {
         is KList -> vals.map { it.doc() }.newLineList().align()
         is KTuple -> vals.map { it.doc() }.newLineTupled().align()
         is Record -> {
-            val max = min(10, kv.maxByOrNull { it.a.length }?.a?.length ?: 0)
+            val max = min(10, kv.maxBy { it.first.length }?.first?.length ?: 0)
             name.text() +
                     (kv.map { (k, v) ->
                         (k.text().fillBreak(max).flatAlt(k.text()) spaced pretty.symbols.equals() spaced v.doc().align()).align()
@@ -101,20 +77,18 @@ internal sealed class KValue {
  *
  * @param SA Optional [Show] instance, default uses [Any.toString].
  */
-fun <A> A.showPretty(SA: Show<A> = Show.any()): Doc<Nothing> = SA.run {
-    val str = show()
-    outputParser().runParser("", str).fold({
-        KValue.RawString(str)
-    }, ::identity)
-}.doc().group()
-
-// @extension
-internal interface KValueEq : Eq<KValue> {
-    override fun KValue.eqv(b: KValue): Boolean = this == b
+fun <A> A.showPretty(SA: (A) -> String = { it.toString() }): Doc<Nothing> {
+  val str = SA(this)
+  /*
+  return outputParser().runParser("", str).fold({
+    KValue.RawString(str)
+  }, ::identity).doc().group()
+   */
+  TODO()
 }
 
-internal fun KValue.Companion.eq(): Eq<KValue> = object : KValueEq {}
-
+// @extension
+/*
 internal typealias Parser<A> = KParsecT<Nothing, String, Char, ForEval, A>
 
 internal fun parser() = KParsecT.monadParsec<Nothing, String, Char, String, ForEval>(String.stream(), Eval.monad())
@@ -203,3 +177,4 @@ internal fun tupleParser(): Parser<KValue> = parser().run {
 internal fun rawStringParser(): Parser<KValue> = parser().run {
     takeRemaining().map { KValue.RawString(it) }.fix()
 }
+ */

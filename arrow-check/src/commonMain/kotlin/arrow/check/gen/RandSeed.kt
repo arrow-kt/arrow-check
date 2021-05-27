@@ -1,8 +1,5 @@
 package arrow.check.gen
 
-import arrow.core.Tuple2
-import arrow.core.toT
-
 /**
  * TODO run a random number testsuite like dieharder over this!
  * This whole thing is copypasta simply to make SplittableRandom more accessible
@@ -24,8 +21,8 @@ class RandSeed private constructor(
      * Modify the random seed in a way that even small variations in [i] brings larger variants.
      */
     fun variant(i: Long): RandSeed = when {
-        i >= 1 -> gammaF(i)(this.split().a)
-        else -> gammaF(1 - i)(this.split().b)
+        i >= 1 -> gammaF(i)(this.split().first)
+        else -> gammaF(1 - i)(this.split().second)
     }
 
     private fun gammaF(i: Long): (RandSeed) -> RandSeed = {
@@ -37,14 +34,14 @@ class RandSeed private constructor(
     private tailrec fun encode(n: Long, k: Int, r: RandSeed): RandSeed = when (k) {
         -1 -> r
         else -> when {
-            n and (1L shl k) == 0L -> encode(n, k - 1, r.split().a)
-            else -> encode(n, k - 1, r.split().b)
+            n and (1L shl k) == 0L -> encode(n, k - 1, r.split().first)
+            else -> encode(n, k - 1, r.split().second)
         }
     }
 
     private tailrec fun zeroes(n: Int, r: RandSeed): RandSeed = when (n) {
         0 -> r
-        else -> zeroes(n - 1, r.split().a)
+        else -> zeroes(n - 1, r.split().first)
     }
 
     private fun ilog2(i: Long): Int {
@@ -58,12 +55,12 @@ class RandSeed private constructor(
     /**
      * Generate a random long.
      */
-    fun nextLong(): Tuple2<Long, RandSeed> = nextSeed(seed, gamma).let { mix64(it) toT RandSeed(it, gamma) }
+    fun nextLong(): Pair<Long, RandSeed> = nextSeed(seed, gamma).let { mix64(it) to RandSeed(it, gamma) }
 
     /**
      * Generate a random long within bounds (inclusive, exclusive).
      */
-    fun nextLong(origin: Long, bound: Long): Tuple2<Long, RandSeed> = when {
+    fun nextLong(origin: Long, bound: Long): Pair<Long, RandSeed> = when {
         origin >= bound -> throw IllegalArgumentException("Invalid bounds $origin $bound")
         else -> {
             nextSeed(seed, gamma).let {
@@ -88,7 +85,7 @@ class RandSeed private constructor(
                         r = mix64(latestSeed)
                     }
                 }
-                r toT RandSeed(latestSeed, gamma)
+                r to RandSeed(latestSeed, gamma)
             }
         }
     }
@@ -96,12 +93,12 @@ class RandSeed private constructor(
     /**
      * Generate a random integer
      */
-    fun nextInt(): Tuple2<Int, RandSeed> = nextSeed(seed, gamma).let { mix32(it) toT RandSeed(it, gamma) }
+    fun nextInt(): Pair<Int, RandSeed> = nextSeed(seed, gamma).let { mix32(it) to RandSeed(it, gamma) }
 
     /**
      * Generate a random integer within bounds (inclusive, exclusive)
      */
-    fun nextInt(origin: Int, bound: Int): Tuple2<Int, RandSeed> = when {
+    fun nextInt(origin: Int, bound: Int): Pair<Int, RandSeed> = when {
         origin >= bound -> throw IllegalArgumentException("Invalid bounds $origin $bound")
         else -> {
             nextSeed(seed, gamma).let {
@@ -126,7 +123,7 @@ class RandSeed private constructor(
                         r = mix32(latestSeed)
                     }
                 }
-                r toT RandSeed(latestSeed, gamma)
+                r to RandSeed(latestSeed, gamma)
             }
         }
     }
@@ -134,14 +131,14 @@ class RandSeed private constructor(
     /**
      * Generate a random double
      */
-    fun nextDouble(): Tuple2<Double, RandSeed> = nextSeed(seed, gamma).let {
-        mix64(it).ushr(11) * DOUBLE_UNIT toT RandSeed(it, gamma)
+    fun nextDouble(): Pair<Double, RandSeed> = nextSeed(seed, gamma).let {
+        mix64(it).ushr(11) * DOUBLE_UNIT to RandSeed(it, gamma)
     }
 
     /**
      * Generate a random double within bounds (inclusive, exclusive)
      */
-    fun nextDouble(origin: Double, bound: Double): Tuple2<Double, RandSeed> {
+    fun nextDouble(origin: Double, bound: Double): Pair<Double, RandSeed> {
         val (l, s) = nextLong()
         var r = l.ushr(11) * DOUBLE_UNIT
         if (origin < bound) {
@@ -152,24 +149,22 @@ class RandSeed private constructor(
             // Not sure if the above is equal to this java code
             // r = java.lang.Double.longBitsToDouble(java.lang.Double.doubleToLongBits(bound) - 1)
         }
-        return r toT s
+        return r to s
     }
 
     /**
      * Split the seed into two new seeds
      */
-    fun split(): Tuple2<RandSeed, RandSeed> {
+    fun split(): Pair<RandSeed, RandSeed> {
         val (l, seed) = nextLong()
         val nl = nextSeed(seed.seed, gamma)
         val nextGamma = mixGamma(nl)
-        return RandSeed(nl, seed.gamma) toT RandSeed(l, nextGamma)
+        return RandSeed(nl, seed.gamma) to RandSeed(l, nextGamma)
     }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as RandSeed
+        if (other !is RandSeed) return false
 
         if (seed != other.seed) return false
         if (gamma != other.gamma) return false
