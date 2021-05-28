@@ -29,7 +29,7 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
   /**
    * Extract the lower bound using the given [Size]
    */
-  fun upperBound(s: Size): A = bounds(s).first
+  fun upperBound(s: Size): A = bounds(s).second
 
   companion object {
 
