@@ -31,7 +31,7 @@ fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destinat
  * This is only used to add shrinking to collections, it does not shrink individual elements.
  *
  * > To have elements itself also shrink you have to either manually write the shrinker
- *  (like [Gen.shrink]) or have shrinking already be present before.
+ *  (use [Gen.shrink]) or have shrinking already be present before.
  *  Or use [Gen.list] to generate the list, which already implements nested recursive shrinking.
  */
 fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())

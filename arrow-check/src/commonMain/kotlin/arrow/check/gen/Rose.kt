@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.onCompletion
 
 typealias Shrinks<A> = Flow<Rose<A>?>
 
-internal fun <A, B> Shrinks<A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Shrinks<B> =
+internal inline fun <A, B> Shrinks<A>.mapRose(crossinline f: suspend (Rose<A>) -> Rose<B>?): Shrinks<B> =
     map { it?.let { f(it) } }
 
 /**

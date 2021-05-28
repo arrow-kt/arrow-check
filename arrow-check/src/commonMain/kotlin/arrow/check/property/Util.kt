@@ -199,7 +199,7 @@ interface CoverageMonoid<A> : Monoid<Coverage<A>> {
     Coverage(
       b.unCoverage.toList().fold(unCoverage) { acc, (k, v) ->
         if (acc.containsKey(k))
-          acc + mapOf(k to v.toList().fold(acc.getValue(k)) { acc, (k2, v2) ->
+          acc + mapOf(k to v.entries.fold(acc.getValue(k)) { acc, (k2, v2) ->
             if (acc.containsKey(k2))
               acc + mapOf(
                 k2 to (Label(

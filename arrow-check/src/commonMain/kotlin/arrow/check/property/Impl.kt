@@ -9,17 +9,12 @@ import arrow.check.gen.RandSeed
 import arrow.check.gen.Rose
 import arrow.check.gen.flatMap
 import arrow.check.testCount
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.collect
 import pretty.Doc
 import pretty.hardLine
 import pretty.plus
 import pretty.spaced
 import pretty.text
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
-import kotlin.coroutines.intrinsics.suspendCoroutineUninterceptedOrReturn
-import kotlin.coroutines.resume
 
 internal data class State(
   val numTests: TestCount,
@@ -32,7 +27,7 @@ internal data class State(
 // ---------------- Running a single property
 internal class PropertyTestImpl : Test {
 
-  internal var logs: MutableList<JournalEntry> = mutableListOf()
+  private var logs: MutableList<JournalEntry> = mutableListOf()
 
   fun getAndClearLogs(): List<JournalEntry> = logs.also { logs = mutableListOf() }
 
@@ -272,31 +267,3 @@ internal suspend fun shrinkResult(
 }
 
 internal object AbortFlowException : Throwable()
-
-// Not really a fully fledged promise, but enough for this use case
-internal class Promise<A> {
-
-  val state = atomic<Any?>(EMPTY)
-
-  suspend fun await(): A =
-    when (val curr = state.value) {
-      EMPTY -> suspendCoroutineUninterceptedOrReturn { c ->
-        state.compareAndSet(EMPTY, Waiting(c))
-        COROUTINE_SUSPENDED
-      }
-      else -> curr as A
-    }
-
-  inline fun complete(a: A, f: (A, A) -> A): Unit =
-    when (val curr = state.value) {
-      EMPTY -> state.compareAndSet(EMPTY, a).let { }
-      is Waiting<*> -> {
-        state.compareAndSet(curr, a)
-        (curr.cont as Continuation<A>).resume(a)
-      }
-      else -> state.compareAndSet(curr, f(a, curr as A)).let {}
-    }
-
-  object EMPTY
-  class Waiting<A>(val cont: Continuation<A>)
-}

@@ -67,7 +67,7 @@ internal sealed class ValueDiffF<out F> {
 internal data class ValueDiff(val unDiff: ValueDiffF<ValueDiff>) {
 
   @OptIn(ExperimentalStdlibApi::class)
-  fun <B> cata(f: (ValueDiffF<B>) -> B): B =
+  inline fun <B> cata(crossinline f: (ValueDiffF<B>) -> B): B =
     DeepRecursiveFunction<ValueDiff, B> { v ->
       f(v.unDiff.map { callRecursive(it) })
     }(this)
@@ -225,7 +225,7 @@ internal fun ValueDiff.toLineDiff(): Doc<DiffType> {
       // This is the only place where we need to manually add a prefix because this cannot
       //  elevate the annotation to the previous newline
       ("-".text() spaced diff.l.doc()).annotate(DiffType.Removed) +
-        (hardLine() spaced diff.r.doc()).annotate(DiffType.Added)
+        (hardLine() + "+".text() spaced diff.r.doc()).annotate(DiffType.Added)
     is ValueDiffF.Same -> diff.v.doc()
     else ->
       cata<Pair<DiffType, Doc<DiffType>>> {
