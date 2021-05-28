@@ -85,8 +85,8 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
 
     // This needs extra work to prevent overflows, the above just convert to long to avoid those
     fun linearFrom(origin: Long, start: Long, end: Long): Range<Long> = Range(origin) { s ->
-      val xSized = scaleLinear(s, origin, start).clamp(start, end)
-      val ySized = scaleLinear(s, origin, end).clamp(start, end)
+      val xSized = scaleLinear(s, origin, start).also(::println).clamp(start, end)
+      val ySized = scaleLinear(s, origin, end).also(::println).clamp(start, end)
       xSized to ySized
     }
 
@@ -119,9 +119,11 @@ fun scaleLinear(size: Size, origin: Long, target: Long): Long {
   val sz = max(size.unSize, min(99, size.unSize))
   val frac = sz.toDouble() / 99
 
-  // special case for frac = 1 to avoid inaccurate rounding towards range edges
-  val z = if (frac == 1.0) origin else (origin * frac).toLong()
-  val n = if (frac == 1.0) target else (target * frac).toLong()
+  if (frac == 1.0) return target
+  if (frac == 0.0) return origin
+
+  val z = (origin * frac).toLong()
+  val n = (target * frac).toLong()
 
   if (n >= 0) {
     if (z >= 0) {
@@ -131,8 +133,8 @@ fun scaleLinear(size: Size, origin: Long, target: Long): Long {
     } else {
       // may overflow
       val diff = n - z
-      if (diff < n) origin + Long.MAX_VALUE + n.also { println("overflow") }
-      return origin + diff
+      return if (diff < n) (origin + Long.MAX_VALUE) + (n - Long.MAX_VALUE - z)
+      else origin + diff
     }
   } else {
     if (z <= 0) {
@@ -142,8 +144,8 @@ fun scaleLinear(size: Size, origin: Long, target: Long): Long {
     } else {
       // may overflow
       val diff = n - z
-      if (diff > n) origin + Long.MIN_VALUE + n.also { println("underflow") }
-      return origin + diff
+      return if (diff > n) (origin + Long.MIN_VALUE) + (n - Long.MIN_VALUE - z)
+      else origin + diff
     }
   }
 }
@@ -152,9 +154,11 @@ internal fun scaleLinear(size: Size, origin: Double, target: Double): Double {
   val sz = max(size.unSize, min(99, size.unSize))
   val frac = sz.toDouble() / 99
 
-  // special case for frac = 1 to avoid inaccurate rounding towards range edges
-  val z = if (frac == 1.0) origin else origin * frac
-  val n = if (frac == 1.0) target else target * frac
+  if (frac == 1.0) return target
+  if (frac == 0.0) return origin
+
+  val z = origin * frac
+  val n = target * frac
 
   // TODO Handle precision errors towards the edges better...
   return origin + (n - z)
