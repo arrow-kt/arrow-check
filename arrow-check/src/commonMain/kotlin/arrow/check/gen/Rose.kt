@@ -1,7 +1,5 @@
 package arrow.check.gen
 
-import arrow.core.Tuple2
-import arrow.core.toT
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
@@ -10,7 +8,7 @@ import kotlinx.coroutines.flow.onCompletion
 
 typealias Shrinks<A> = Flow<Rose<A>?>
 
-internal fun <A, B> Shrinks<A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Shrinks<B> =
+internal inline fun <A, B> Shrinks<A>.mapRose(crossinline f: suspend (Rose<A>) -> Rose<B>?): Shrinks<B> =
     map { it?.let { f(it) } }
 
 /**
@@ -66,4 +64,4 @@ data class Rose<out A>(val res: A, val shrinks: Shrinks<A> = emptyFlow()) {
 fun <A> Rose<A>.expand(f: (A) -> Flow<A>): Rose<A> =
     Rose(res, shrinks.onCompletion { emitAll(f(res).map { Rose(it).expand(f) } as Shrinks<A>) })
 
-internal fun <A> List<A>.uncons(): Tuple2<A, List<A>> = this[0] toT drop(1)
+internal fun <A> List<A>.uncons(): Pair<A, List<A>> = this[0] to drop(1)

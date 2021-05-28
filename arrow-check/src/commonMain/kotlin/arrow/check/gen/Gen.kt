@@ -9,17 +9,12 @@ import arrow.core.Either
 import arrow.core.Ior
 import arrow.core.NonEmptyList
 import arrow.core.Predicate
-import arrow.core.Tuple2
-import arrow.core.Tuple3
 import arrow.core.Validated
 import arrow.core.andThen
 import arrow.core.identity
 import arrow.core.left
 import arrow.core.right
-import arrow.core.toMap
-import arrow.core.toT
-import arrow.syntax.collections.tail
-import arrow.typeclasses.Show
+import arrow.core.tail
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.collect
@@ -46,9 +41,9 @@ import kotlin.random.Random
  * The environment [R] is local state which can be passed down through generators. By using [local] it is possible
  *  to make generators stateful. This is similar to how a split [RandSeed] is passed down through [flatMap].
  */
-class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Tuple3<RandSeed, Size, R>, Rose<A>?>) {
+class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Triple<RandSeed, Size, R>, Rose<A>?>) {
   companion object {
-    internal operator fun <R, A> invoke(f: suspend (Tuple3<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
+    internal operator fun <R, A> invoke(f: suspend (Triple<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
       Gen(AndThenS.Single(f))
 
     fun <A> just(a: A): Gen<Any?, A> = Gen { Rose(a) }
@@ -58,7 +53,7 @@ class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Tuple3
 /**
  * Run the generator with an environment [r], effectively removing the need to supply this environment later on.
  */
-fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen(runGen.compose { (seed, size, _) -> Tuple3(seed, size, r) })
+fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen(runGen.compose { (seed, size, _) -> Triple(seed, size, r) })
 
 /**
  * Retrieve the current environment from the generator.
@@ -68,10 +63,10 @@ fun <R> Gen.Companion.ask(): Gen<R, R> = Gen { (_, _, env) -> Rose(env) }
 /**
  * Modify the current environment.
  *
- * This is, as the name suggests, a local change only. Only the generator this is performed on will get the new state.
+ * This is, as the name suggests, a local change. Only the generator this is performed on will get the new state.
  */
 fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> =
-  Gen(runGen.compose { (seed, size, env) -> Tuple3(seed, size, f(env)) })
+  Gen(runGen.compose { (seed, size, env) -> Triple(seed, size, f(env)) })
 
 /**
  * Map the generated values.
@@ -94,21 +89,20 @@ fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = G
  *  In comparison sequential shrinking would first shrink one generator and then move onto the shrinks of the other one, but
  *  it does not come back to the first one if the second one successfully shrinks. Parallel shrinking on the other
  *  hand does come back and attempts to shrink both.
- *  This is in direct comparison to [flatMap] which cannot shrink in parallel, so if possible avoid [flatMap] as much
- *  as possible.
+ *  This is in direct comparison to [flatMap] which cannot shrink in parallel, so if possible avoid [flatMap] as much.
  *
  * @see Gen.Companion.mapN for a n-ary version of this function.
  */
 fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
   Gen(
-    AndThenS<Tuple3<RandSeed, Size, R>, Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (seed, size, env) ->
-      Tuple3(seed.split(), size, env)
+    AndThenS<Triple<RandSeed, Size, R>, Triple<Pair<RandSeed, RandSeed>, Size, R>> { (seed, size, env) ->
+      Triple(seed.split(), size, env)
     }.andThenF(
-      this@map2.runGen.compose<Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (lr, sz, env) ->
-        Tuple3(lr.a, sz, env)
+      this@map2.runGen.compose<Triple<Pair<RandSeed, RandSeed>, Size, R>> { (lr, sz, env) ->
+        Triple(lr.first, sz, env)
       }.flatMap { roseA ->
-        other.runGen.compose<Tuple3<Tuple2<RandSeed, RandSeed>, Size, R>> { (lr, size, env) ->
-          Tuple3(lr.b, size, env)
+        other.runGen.compose<Triple<Pair<RandSeed, RandSeed>, Size, R>> { (lr, size, env) ->
+          Triple(lr.second, size, env)
         }.andThen { roseB ->
           if (roseA == null || roseB == null) null
           else roseA.zip(roseB, f)
@@ -122,7 +116,7 @@ fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
  *
  * Using this function has two major downsides:
  * - It is necessarily sequential, especially regarding shrinking. This means during shrinking it will attempt to
- *  shrink the [this] first and then proceed with the shrinks from the result of [f]. It cannot go back to
+ *  shrink the [this]-generator first and then proceed with the shrinks from the result of [f]. It cannot go back to
  *  the initial generator and thus may lead to sub-par shrinking.
  * - Very long [flatMap] chains are not stacksafe. This may be worked around by suspending and thus
  *  rescheduling inside [flatMap], but that depends on the coroutine runner.
@@ -132,15 +126,15 @@ fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
 fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
   Gen { (seed, size, env) ->
     val (l, r) = seed.split()
-    runGen(Tuple3(l, size, env))?.flatMap { a ->
-      f(a).runGen(Tuple3(r, size, env))
+    runGen(Triple(l, size, env))?.flatMap { a ->
+      f(a).runGen(Triple(r, size, env))
     }
   }
 
 /**
  * Low level constructor for [Gen]. It provides access to [RandSeed] and [Size].
  *
- * The generated values are not shrunk, shrinking can be added again by using [shrink].
+ * The generated values are not shrunk, shrinking can be added by using [shrink].
  */
 fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
   Gen { (seed, size) -> Rose(f(seed, size)) }
@@ -156,7 +150,7 @@ fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> =
 /**
  * Throw away layers of the shrink tree.
  *
- * @param n refers to how many layers of shrinking are kept. So if it is zero, the entire tree is thrown away.
+ * @param n refers to how many layers of shrinking are kept. If zero, the entire shrink-tree is thrown away.
  */
 fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.prune(n) })
 
@@ -178,7 +172,7 @@ fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
   Gen(runGen.compose { (seed, size, env) ->
     val newSz = f(size)
     if (newSz.unSize < 0) throw IllegalArgumentException("Gen.scale Negative size")
-    else Tuple3(seed, newSz, env)
+    else Triple(seed, newSz, env)
   })
 
 /**
@@ -191,7 +185,7 @@ fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
 fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
 
 /**
- * Modify the [Size] using [golden].
+ * Modify the [Size] using the [golden] ratio.
  *
  * Very useful in recursive generators to create progressively smaller values and act as a recursion breaker once the
  *  [Size] goes low enough.
@@ -228,9 +222,9 @@ fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
   generate { randSeed, size ->
     val (min, max) = range.bounds(size)
     if (min == max) min
-    else if (max == Long.MAX_VALUE && min == Long.MIN_VALUE) randSeed.nextLong().a
-    else if (max == Long.MAX_VALUE) randSeed.nextLong(min, max).a // Better solution?
-    else randSeed.nextLong(min, max + 1).a
+    else if (max == Long.MAX_VALUE && min == Long.MIN_VALUE) randSeed.nextLong().first
+    else if (max == Long.MAX_VALUE) randSeed.nextLong(min, max).first // Better solution?
+    else randSeed.nextLong(min, max + 1).first
   }
 
 /**
@@ -343,7 +337,7 @@ fun Gen.Companion.double_(range: Range<Double>): Gen<Any?, Double> =
   generate { randSeed, size ->
     val (min, max) = range.bounds(size)
     if (min == max) min
-    else randSeed.nextDouble(min, max).a
+    else randSeed.nextDouble(min, max).first
   }
 
 /**
@@ -381,7 +375,7 @@ fun Gen.Companion.bool(): Gen<Any?, Boolean> =
  * @see bool For a version that does shrink.
  */
 fun Gen.Companion.bool_(): Gen<Any?, Boolean> =
-  generate { randSeed, _ -> randSeed.nextInt(0, 2).a == 0 }
+  generate { randSeed, _ -> randSeed.nextInt(0, 2).first == 0 }
 
 // chars
 /**
@@ -509,7 +503,7 @@ fun <R> Gen<R, Char>.string(range: IntRange): Gen<R, String> = string(Range.cons
 
 // combinators
 /**
- * Generate which always produces [a].
+ * Generator which always produces [a].
  *
  * This generator does not shrink.
  */
@@ -529,7 +523,7 @@ fun <A> Gen.Companion.element(vararg els: A): Gen<Any?, A> =
 /**
  * Generate a value by running one of the [gens].
  *
- * This generator shrinks towards the first element.
+ * This generator shrinks towards the first generator and further uses the chosen generators shrinking.
  *
  * The argument [gens] needs to be non-empty.
  */
@@ -542,7 +536,7 @@ fun <R, A> Gen.Companion.choice(vararg gens: Gen<R, A>): Gen<R, A> =
  *
  * This combinator choose weighted based on the first part of the pair.
  *
- * This generator shrinks towards the first element.
+ * This generator shrinks towards the first pair and further uses the chosen generators shrinking.
  *
  * The argument [gens] needs to be non-empty.
  */
@@ -555,9 +549,10 @@ fun <R, A> Gen.Companion.frequency(vararg gens: Pair<Int, Gen<R, A>>): Gen<R, A>
     }
   }
 
-private fun <A> List<Pair<Int, A>>.pick(n: Int): A =
+private tailrec fun <A> List<Pair<Int, A>>.pick(n: Int): A =
   if (isEmpty()) throw IllegalArgumentException("Gen.Frequency.Pick used with no arguments")
-  else first().let { (k, el) ->
+  else {
+    val (k, el) = first()
     if (n <= k) el
     else tail().pick(n - k)
   }
@@ -686,13 +681,15 @@ internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
     acc.map2(this@replicate) { a, b -> a + b }
   }
 
-internal fun <A> Sequence<A>.splits(): Sequence<Tuple3<Sequence<A>, A, Sequence<A>>> =
+// TODO This is all sub-par. It uses direct recursion through Sequence.flatMap and thus is prone to stackoverflows
+//  also its likely slow since it uses lots of sequence.drop(1) which is just terrible for this use case.
+internal fun <A> Sequence<A>.splits(): Sequence<Triple<Sequence<A>, A, Sequence<A>>> =
   firstOrNull()?.let { x ->
-    sequenceOf(Tuple3(emptySequence<A>(), x, drop(1)))
+    sequenceOf(Triple(emptySequence<A>(), x, drop(1)))
       // flatMap for added laziness
       .flatMap {
         sequenceOf(it) + drop(1).splits().map { (a, b, c) ->
-          Tuple3(sequenceOf(x) + a, b, c)
+          Triple(sequenceOf(x) + a, b, c)
         }
       }
   } ?: emptySequence()
@@ -742,7 +739,7 @@ internal fun <R, K, A> Gen<R, Pair<K, A>>.uniqueByKey(n: Int): Gen<R, List<Gen<R
   fun go(k: Int, map: Map<K, Gen<R, Pair<K, A>>>): Gen<R, List<Gen<R, Pair<K, A>>>> =
     if (k > 100) Gen.discard()
     else freeze().replicate(n).flatMap {
-      val xs = it.map { it.bimap({ it.first }, ::identity) }.toMap()
+      val xs = it.map { (fst, sec) -> Pair(fst.first, sec) }.toMap()
         .toList().take(n - map.size).toMap()
       val res = map + xs
       if (res.size >= n) Gen.just(res.values.toList())
@@ -839,12 +836,12 @@ fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
  *
  * The frozen generator preserves shrinking.
  */
-fun <R, A> Gen<R, A>.freeze(): Gen<R, Tuple2<A, Gen<R, A>>> =
-  Gen(runGen.andThen { it?.let { mx -> Rose(mx.res toT Gen { mx }) } })
+fun <R, A> Gen<R, A>.freeze(): Gen<R, Pair<A, Gen<R, A>>> =
+  Gen(runGen.andThen { it?.let { mx -> Rose(mx.res to Gen { mx }) } })
 
 // Invariant: List size does not change
 internal fun <R, A> List<Gen<R, A>>.genSubterms(): Gen<R, Subterms<A>> =
-  map { it.freeze().map { it.b } }
+  map { it.freeze().map { it.second } }
     .sequence()
     .map { Subterms.All(it) as Subterms<Gen<R, A>> }
     .shrink { it.shrinkSubterms() }
@@ -1029,7 +1026,7 @@ suspend fun <R, A> Gen<R, A>.sample(size: Size = Size(30), r: R): A {
     if (n <= 0) throw IllegalStateException("Gen.Sample too many discards")
     else {
       val seed = RandSeed(Random.nextLong())
-      when (val res = this.runGen(Tuple3(seed, size, r))?.res) {
+      when (val res = this.runGen(Triple(seed, size, r))?.res) {
         null -> loop(n - 1)
         else -> res
       }
@@ -1045,10 +1042,10 @@ suspend fun <A> Gen<Any?, A>.sample(size: Size = Size(30)): A = sample(size, Uni
 suspend fun <R, A> Gen<R, A>.print(
   seed: RandSeed = RandSeed(Random.nextLong()),
   size: Size = Size(30),
-  SA: Show<A> = Show.any(),
+  SA: (A) -> String = { it.toString() },
   env: R
 ): Unit {
-  when (val rose = runGen(Tuple3(seed, size, env))) {
+  when (val rose = runGen(Triple(seed, size, env))) {
     null -> {
       println("=== Outcome ===")
       println("<discard>")
