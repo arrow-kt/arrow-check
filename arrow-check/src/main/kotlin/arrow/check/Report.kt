@@ -316,6 +316,7 @@ fun Doc<Markup>.render(useColor: UseColor): String = alterAnnotations {
         is Markup.DiffRemoved -> listOf(
             Style.Prefix("-", it.offset), Style.Ansi(colorDull(Color.Red))
         )
+        is Markup.DiffSame -> listOf(Style.Prefix(" ", it.offset))
         is Markup.Result.Failed -> listOf(Style.Ansi(color(Color.Red)))
         is Markup.Result.GaveUp -> listOf(Style.Ansi(colorDull(Color.Yellow)))
         is Markup.Result.Success -> listOf(Style.Ansi(colorDull(Color.Green)))
@@ -335,6 +336,7 @@ fun Doc<Markup>.render(useColor: UseColor): String = alterAnnotations {
     } else when (it) {
         is Markup.DiffAdded -> listOf(Style.Prefix("+", it.offset))
         is Markup.DiffRemoved -> listOf(Style.Prefix("-", it.offset))
+        is Markup.DiffSame -> listOf(Style.Prefix(" ", it.offset))
         else -> emptyList()
     }
 }
