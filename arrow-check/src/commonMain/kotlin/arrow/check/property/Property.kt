@@ -1,18 +1,14 @@
 package arrow.check.property
 
-// -------------- Property
-/**
- * Constructor function to create [Property]'s.
- */
-fun <A> property(config: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Property<A> =
-  Property(config, prop)
+import arrow.check.gen.Gen
 
+// -------------- Property
 /**
  * A [Property] represents a config together with a property test.
  *
  * The [PropertyConfig] holds information about how the property [prop] will be run.
  */
-data class Property<A>(val config: PropertyConfig, val prop: suspend Test.(A) -> Unit) {
+data class Property<A>(val config: PropertyConfig = PropertyConfig(), val gen: Gen<Any?, A>, val prop: suspend Test.(A) -> Unit) {
 
   /**
    * Change the config of a [Property]

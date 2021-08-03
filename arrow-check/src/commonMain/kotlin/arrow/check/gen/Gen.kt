@@ -124,12 +124,19 @@ fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
  * If possible use [map2], [mapN] or [map] instead.
  */
 fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
-  Gen { (seed, size, env) ->
-    val (l, r) = seed.split()
-    runGen(Triple(l, size, env))?.flatMap { a ->
-      f(a).runGen(Triple(r, size, env))
+  runGen.compose { (lr, size, env): Triple<Pair<RandSeed, RandSeed>, Size, R1> -> Triple(lr.first, size, env) }
+    // Calling fa.invoke (fa : AndThenS) one layer after a flatMap is safe because the resulting
+    //  AndThenS is invoked in a new loop iteration and thus with a fresh stack. This sort of relies on internals
+    //  but that's fine because the internals are still within this package^^ TODO Test this some more
+    .flatMap {
+      it?.let { roseA ->
+        AndThenS { (lr, size, env) ->
+          roseA.flatMap { a -> f(a).runGen(Triple(lr.second, size, env)) }
+        }
+      } ?: AndThenS { null }
     }
-  }
+    .compose { (seed, size, env): Triple<RandSeed, Size, R1> -> Triple(seed.split(), size, env) }
+    .let(::Gen)
 
 /**
  * Low level constructor for [Gen]. It provides access to [RandSeed] and [Size].
@@ -540,6 +547,7 @@ fun <R, A> Gen.Companion.choice(vararg gens: Gen<R, A>): Gen<R, A> =
  *
  * The argument [gens] needs to be non-empty.
  */
+// TODO https://github.com/hedgehogqa/haskell-hedgehog/pull/406/files
 fun <R, A> Gen.Companion.frequency(vararg gens: Pair<Int, Gen<R, A>>): Gen<R, A> =
   if (gens.isEmpty()) throw IllegalArgumentException("Gens.Frequency used with no arguments")
   else {

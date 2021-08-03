@@ -1,19 +1,17 @@
 package arrow.check.gen
 
-import arrow.check.PropertySpec
+import arrow.check.checkProp
 import arrow.check.property.PropertyConfig
-import arrow.check.property.annotate
-import arrow.check.property.assert
-import arrow.check.property.cover
-import arrow.check.property.coverTable
-import arrow.check.property.property
-import arrow.core.Either
-import arrow.core.Ior
-import arrow.core.Nel
-import arrow.core.Validated
-import pretty.text
 
-class GenTest : PropertySpec({
+class GenTest {
+
+  suspend fun t() {
+    checkProp(Gen.long(0L..100L), PropertyConfig()) { l ->
+      TODO()
+    }
+  }
+}
+  /*
 
   // Functor laws
 
@@ -261,4 +259,6 @@ class GenTest : PropertySpec({
     annotate { "Sorted lists need to be the same".text() }
     xs.sorted().eqv(ys.sorted())
   }
-})
+}
+
+   */

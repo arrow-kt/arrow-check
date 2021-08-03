@@ -107,6 +107,7 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
   }
 }
 
+// TODO https://github.com/hedgehogqa/haskell-hedgehog/pull/405
 internal fun scaleLinear(size: Size, origin: Int, target: Int): Long {
   val sz = max(size.unSize, min(99, size.unSize))
   val z = origin.toLong()

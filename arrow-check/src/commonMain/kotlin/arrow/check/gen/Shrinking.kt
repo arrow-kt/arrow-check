@@ -3,6 +3,8 @@ package arrow.check.gen
 /**
  * Shrink the number towards a destination.
  */
+// TODO Use binary search algorithm instead of halves to reduce duplication
+//  https://github.com/hedgehogqa/haskell-hedgehog/pull/413/
 fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
     this -> emptySequence()
     else -> {
