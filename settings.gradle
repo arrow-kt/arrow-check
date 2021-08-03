@@ -1,4 +1,4 @@
 rootProject.name = 'arrow-check-lib'
 
-include 'arrow-check', 'arrow-check-kotlintest'
+include 'arrow-check', 'arrow-check-kotest'
 include 'arrow-docs'

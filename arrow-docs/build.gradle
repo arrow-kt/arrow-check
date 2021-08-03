@@ -3,7 +3,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath "io.arrow-kt:arrow-ank-gradle:$ARROW_VERSION"
+        classpath "io.arrow-kt:arrow-ank-gradle:0.13.2" // TODO Check version
     }
 }
 
@@ -16,7 +16,7 @@ apply from: "$SUB_PROJECT"
 
 dependencies {
     compile project(":arrow-check")
-    compile project(":arrow-check-kotlintest")
+    compile project(":arrow-check-kotest")
 }
 
 apply plugin: 'ank-gradle-plugin'

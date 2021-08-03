@@ -1,37 +1,31 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm"
-    id "org.jetbrains.kotlin.kapt"
+    id "org.jetbrains.kotlin.multiplatform"
     id "org.jlleitschuh.gradle.ktlint"
 }
 
-apply from: "$SUB_PROJECT"
+apply plugin: 'kotlinx-atomicfu'
 
-dependencies {
-    kapt "io.arrow-kt:arrow-meta:$ARROW_VERSION" // auto generation for @extension and @higherkind
+apply from: "$SUB_PROJECT_MPP"
 
-    // TODO do a pass on what is still needed and what not!
-    // TODO also should some of those be api? Because the types and methods are exposed, not sure
-    //  how exactly that works
-    implementation "io.arrow-kt:arrow-fx:$ARROW_VERSION" // IO and arrow fx
-    implementation "io.arrow-kt:arrow-fx-mtl:$ARROW_VERSION" // IO and arrow fx
-    implementation "io.arrow-kt:arrow-free:$ARROW_VERSION" // Trampoline for stacksafety tests
-    implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
-    implementation "io.arrow-kt:arrow-syntax:$ARROW_VERSION" // helper functions like curried...
-    implementation "io.arrow-kt:arrow-mtl:$ARROW_VERSION" // StateT, Reader, Writer...
-    implementation "io.arrow-kt:arrow-recursion:$ARROW_VERSION" // Recursion schemes
-    api "kotlin-pretty:kotlin-pretty:0.5.2" // Pretty printing diffs
-    api "kotlin-pretty:kotlin-pretty-ansi:0.5.2" // Ansi terminal support with colors
-    api "kparsec:kparsec:0.2.2" // Parser combinators to create toString-output parser
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                implementation kotlin('stdlib-common')
+                implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.3"
 
-    testImplementation project(":arrow-check-kotlintest")
-    testImplementation("io.arrow-kt:arrow-core-test:$ARROW_VERSION") { // test helpers and laws
-        exclude group: "io.kotlintest"
+                implementation "io.arrow-kt:arrow-core:$ARROW_VERSION" // lenses and @optics
+                implementation "io.arrow-kt:arrow-optics:$ARROW_VERSION" // lenses and @optics
+                api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty:0.6.0" // Pretty printing diffs
+                api "com.github.1Jajen1.kotlin-pretty:kotlin-pretty-ansi:0.6.0" // Ansi terminal support with colors
+                // Parser combinators to create toString-output parser
+                implementation("com.github.1Jajen1.parsley4k:char:45e3b640e4")
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation project(":arrow-check-kotest")
+            }
+        }
     }
-    testImplementation("io.arrow-kt:arrow-fx-test:$ARROW_VERSION") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation("io.arrow-kt:arrow-incubator-test:$ARROW_VERSION") { // test helpers and laws
-        exclude group: "io.kotlintest"
-    }
-    testImplementation "org.jetbrains.kotlin:kotlin-reflect:$KOTLIN_VERSION"
 }
