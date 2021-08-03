@@ -1,17 +1,19 @@
 package arrow.check.gen
 
-import arrow.check.checkProp
+import arrow.check.PropertySpec
+import arrow.check.property.Property
 import arrow.check.property.PropertyConfig
+import arrow.check.property.annotate
+import arrow.check.property.assert
+import arrow.check.property.cover
+import arrow.check.property.coverTable
+import arrow.core.Either
+import arrow.core.Ior
+import arrow.core.Nel
+import arrow.core.Validated
+import pretty.text
 
-class GenTest {
-
-  suspend fun t() {
-    checkProp(Gen.long(0L..100L), PropertyConfig()) { l ->
-      TODO()
-    }
-  }
-}
-  /*
+class GenTest : PropertySpec({
 
   // Functor laws
 
@@ -46,7 +48,7 @@ class GenTest {
     assert(l < max) { "long_: Generated long was larger than max".text() }
   }
 
-  "Gen.long_ with small range"(Gen.long_(-100L..100), property { l: Long ->
+  "Gen.long_ with small range"(Property(Gen.long_(-100L..100)) { l: Long ->
     cover(0.1, "Min", l == -100L)
     cover(0.1, "Max", l == 100L)
 
@@ -76,19 +78,19 @@ class GenTest {
     assert(d < 100.0) { "double_: Generated double was larger than max".text() }
   }
 
-  "Gen.bool_"(Gen.bool_(), property { b: Boolean ->
+  "Gen.bool_"(Property(Gen.bool_()) { b: Boolean ->
     cover(45.0, "true", b)
     cover(45.0, "false", b.not())
   }.verifiedTermination())
 
-  "Gen.binit"(Gen.binit(), property { c: Char ->
+  "Gen.binit"(Property(Gen.binit()) { c: Char ->
     cover(45.0, "0", '0' == c)
     cover(45.0, "1", '1' == c)
 
     assert(c == '0' || c == '1') { "Char $c was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.octit"(Gen.octit(), property { c: Char ->
+  "Gen.octit"(Property(Gen.octit()) { c: Char ->
     for (c1 in '0'..'7') {
       cover(10.0, "$c1", c1 == c)
     }
@@ -96,7 +98,7 @@ class GenTest {
     assert(c in '0'..'7') { "Char $c was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.digit"(Gen.digit(), property { c: Char ->
+  "Gen.digit"(Property(Gen.digit()) { c: Char ->
     for (c1 in '0'..'9') {
       cover(8.0, "$c1", c1 == c)
     }
@@ -104,7 +106,7 @@ class GenTest {
     assert(c in '0'..'9') { "Char $c was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.hexit"(Gen.hexit(), property { c: Char ->
+  "Gen.hexit"(Property(Gen.hexit()) { c: Char ->
     for (c1 in '0'..'9') {
       cover(3.0, "$c1", c1 == c)
     }
@@ -118,7 +120,7 @@ class GenTest {
     assert(c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F') { "Char $c was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.lower"(Gen.lower(), property { c: Char ->
+  "Gen.lower"(Property(Gen.lower()) { c: Char ->
     for (c1 in 'a'..'z') {
       cover(2.0, "$c1", c1 == c)
     }
@@ -126,7 +128,7 @@ class GenTest {
     assert(c in 'a'..'z') { "Char $c was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.upper"(Gen.upper(), property { c: Char ->
+  "Gen.upper"(Property(Gen.upper()) { c: Char ->
     for (c1 in 'A'..'Z') {
       cover(2.0, "$c1", c1 == c)
     }
@@ -150,7 +152,7 @@ class GenTest {
     assert(c.toInt() in 0..255) { "Char $c was not in range".text() }
   }
 
-  "Gen.string"(Gen.digit().string(0..20), property { str: String ->
+  "Gen.string"(Property(Gen.digit().string(0..20)) { str: String ->
     for (i in 0..20) {
       coverTable("Size", 3.0, "$i", i == str.length)
     }
@@ -163,14 +165,14 @@ class GenTest {
     l.eqv(res)
   }
 
-  "Gen.element"(Gen.element(*(0..10).toList().toTypedArray()), property { res: Int ->
+  "Gen.element"(Property(Gen.element(*(0..10).toList().toTypedArray())) { res: Int ->
 
     for (i in 0..10) cover(8.0, "$i", i == res)
 
     assert(res in 0..10) { "Element $res was not in range".text() }
   }.verifiedTermination())
 
-  "Gen.choice"(Gen.choice(*(0..10).map { Gen.constant(it) }.toTypedArray()), property { res: Int ->
+  "Gen.choice"(Property(Gen.choice(*(0..10).map { Gen.constant(it) }.toTypedArray())) { res: Int ->
 
     for (i in 0..10) cover(8.0, "$i", i == res)
 
@@ -183,25 +185,25 @@ class GenTest {
 
   // TODO Gen.discard, filter and such
 
-  "Gen.orNull"(Gen.int(0..100).orNull(), property { a: Int? ->
+  "Gen.orNull"(Property(Gen.int(0..100).orNull()) { a: Int? ->
 
     cover(8.0, "null", a == null)
     cover(85.0, "not null", a != null)
   }.verifiedTermination())
 
-  "Gen.either"(Gen.either(Gen.int(0..100), Gen.int(0..100)), property { a: Either<Int, Int> ->
+  "Gen.either"(Property(Gen.either(Gen.int(0..100), Gen.int(0..100))) { a: Either<Int, Int> ->
 
     cover(8.0, "left", a.isLeft())
     cover(85.0, "right", a.isRight())
   }.verifiedTermination())
 
-  "Gen.either_"(Gen.either_(Gen.int(0..100), Gen.int(0..100)), property { a: Either<Int, Int> ->
+  "Gen.either_"(Property(Gen.either_(Gen.int(0..100), Gen.int(0..100))) { a: Either<Int, Int> ->
 
     cover(45.0, "left", a.isLeft())
     cover(45.0, "right", a.isRight())
   }.verifiedTermination())
 
-  "Gen.list"(Gen.int(0..100).list(0..20), property { a: List<Int> ->
+  "Gen.list"(Property(Gen.int(0..100).list(0..20)) { a: List<Int> ->
 
     for (i in 0..20) cover(3.0, "$i", a.size == i)
 
@@ -209,7 +211,7 @@ class GenTest {
     assert(a.isEmpty() || a.all { it in 0..100 }) { "Generated list contained elements outside of the inner gens range".text() }
   }.verifiedTermination())
 
-  "Gen.hashMap"(Gen.int(0..100).tupled(Gen.alphaNum()).hashMap(Range.constant(0..20)), property { ma: Map<Int, Char> ->
+  "Gen.hashMap"(Property(Gen.int(0..100).tupled(Gen.alphaNum()).hashMap(Range.constant(0..20))) { ma: Map<Int, Char> ->
 
     for (i in 0..20) cover(3.0, "$i", ma.size == i)
 
@@ -221,26 +223,26 @@ class GenTest {
     ) { "Generated HashMap contained keys or values outside of range".text() }
   }.verifiedTermination())
 
-  "Gen.set"(Gen.int(0..100).set(Range.constant(0..20)), property { a: Set<Int> ->
+  "Gen.set"(Property(Gen.int(0..100).set(Range.constant(0..20))) { a: Set<Int> ->
     for (i in 0..20) cover(3.0, "$i", a.size == i)
 
     assert(a.size in 0..20) { "Generated set is outside of allowed size. ${a.size}".text() }
     assert(a.isEmpty() || a.all { it in 0..100 }) { "Generated set contained elements outside of the inner gens range".text() }
   }.verifiedTermination())
 
-  "Gen.validation"(Gen.validated(Gen.int(0..100), Gen.int(0..100)), property { a: Validated<Int, Int> ->
+  "Gen.validation"(Property(Gen.validated(Gen.int(0..100), Gen.int(0..100))) { a: Validated<Int, Int> ->
 
     cover(8.0, "invalid", a.isInvalid)
     cover(85.0, "valid", a.isValid)
   }.verifiedTermination())
 
-  "Gen.ior"(Gen.ior(Gen.int(0..100), Gen.int(0..100)), property { a: Ior<Int, Int> ->
+  "Gen.ior"(Property(Gen.ior(Gen.int(0..100), Gen.int(0..100))) { a: Ior<Int, Int> ->
     cover(5.0, "Left", a.isLeft)
     cover(25.0, "Both", a.isBoth)
     cover(55.0, "Right", a.isRight)
   }.verifiedTermination())
 
-  "Gen.nonEmptyList"(Gen.int(0..100).nonEmptyList(Range.constant(1..21)), property { a: Nel<Int> ->
+  "Gen.nonEmptyList"(Property(Gen.int(0..100).nonEmptyList(Range.constant(1..21))) { a: Nel<Int> ->
     for (i in 1..21) cover(3.0, "$i", a.size == i)
 
     assert(a.size in 1..21) { "Generated list is outside of range".text() }
@@ -259,6 +261,4 @@ class GenTest {
     annotate { "Sorted lists need to be the same".text() }
     xs.sorted().eqv(ys.sorted())
   }
-}
-
-   */
+})

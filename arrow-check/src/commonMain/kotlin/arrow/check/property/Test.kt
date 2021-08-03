@@ -22,16 +22,16 @@ import pretty.text
  * Upon this all other relevant combinators can be built and the [PropertyTest] interface merely expands
  *  the functionality by adding [PropertyTest.forAll] to the primitives.
  */
-interface Test {
+public interface Test {
   /**
    * Append a [JournalEntry] to this tests log.
    */
-  fun writeLog(log: JournalEntry): Unit
+  public fun writeLog(log: JournalEntry): Unit
 
   /**
    * Fail a test with a prettified [Doc].
    */
-  fun failWith(msg: Doc<Markup>): Nothing
+  public fun failWith(msg: Doc<Markup>): Nothing
 
   // TODO Move when we can have multiple receivers...
   /**
@@ -46,7 +46,7 @@ interface Test {
    * @see neqv To test for inequality
    * @see diff As a more lower level operator
    */
-  fun <A> A.eqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
+  public fun <A> A.eqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
     diff(this, other, SA) { a, b -> EQA(a, b) }
 
   /**
@@ -63,7 +63,7 @@ interface Test {
    * @see eqv To test for equality
    * @see diff As a more lower level operator
    */
-  fun <A> A.neqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
+  public fun <A> A.neqv(other: A, EQA: (A, A) -> Boolean = { a, b -> a == b }, SA: (A) -> String = { it.toString() }): Unit =
     diff(this, other, SA) { a, b -> EQA(a, b).not() }
 
   /**
@@ -75,7 +75,7 @@ interface Test {
    * @param SA Optional show instance for the initial value, default uses [Any.toString].
    * @param SB Optional show instance for the encoded value, default uses [Any.toString].
    */
-  suspend fun <A, B> A.roundtrip(
+  public suspend fun <A, B> A.roundtrip(
     encode: suspend (A) -> B,
     decode: suspend (B) -> A,
     EQ: (A, A) -> Boolean = { a, b -> a == b },
@@ -104,14 +104,14 @@ interface Test {
 /**
  * Fail a test with a [String] rather than a [Doc]. Offered only for convenience.
  */
-fun Test.failWith(msg: String): Nothing = failWith(msg.doc())
+public fun Test.failWith(msg: String): Nothing = failWith(msg.doc())
 
 /**
  * Append an annotation to the test.
  *
  * This is lazy to only incur the sometimes larger cost of rendering data when a failed test is rendered.
  */
-fun Test.annotate(msg: () -> Doc<Markup>): Unit =
+public fun Test.annotate(msg: () -> Doc<Markup>): Unit =
   writeLog(JournalEntry.Annotate(msg))
 
 /**
@@ -119,13 +119,13 @@ fun Test.annotate(msg: () -> Doc<Markup>): Unit =
  *
  * This is lazy to only incur the sometimes larger cost of rendering data when a failed test is rendered.
  */
-fun Test.footnote(msg: () -> Doc<Markup>): Unit =
+public fun Test.footnote(msg: () -> Doc<Markup>): Unit =
   writeLog(JournalEntry.Footnote(msg))
 
 /**
  * Fail a test with an exception and display that exception.
  */
-fun Test.failException(e: Throwable): Nothing =
+public fun Test.failException(e: Throwable): Nothing =
   failWith(
     ("━━━ Failed: (Exception) ━━━".text() + hardLine() + e.toString().doc())
   )
@@ -133,14 +133,14 @@ fun Test.failException(e: Throwable): Nothing =
 /**
  * Fail a test without an explicit failure message.
  */
-fun Test.failure(): Nothing = failWith(nil())
+public fun Test.failure(): Nothing = failWith(nil())
 
 /**
  * Constant function which returns [Unit]
  *
  * Sometimes useful in combinators to explicitly show success like in assert
  */
-fun Test.succeeded(): Unit = Unit
+public fun Test.succeeded(): Unit = Unit
 
 /**
  * Assert that a specific condition holds, otherwise fail the test.
@@ -148,7 +148,7 @@ fun Test.succeeded(): Unit = Unit
  * @param b Condition
  * @param msg Lazy message to use should [b] be false.
  */
-fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
+public fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
   if (b) succeeded() else failWith(msg())
 
 /**
@@ -158,7 +158,7 @@ fun Test.assert(b: Boolean, msg: () -> Doc<Markup> = { nil() }): Unit =
  * @param SA Optional show instance, default uses [Any.toString]
  * @param cmp Comparison function to which [a] and [other] will be passed.
  */
-fun <A> Test.diff(a: A, other: A, SA: (A) -> String = { it.toString() }, cmp: (A, A) -> Boolean): Unit =
+public fun <A> Test.diff(a: A, other: A, SA: (A) -> String = { it.toString() }, cmp: (A, A) -> Boolean): Unit =
   if (cmp(a, other)) succeeded()
   else SA(a).diff(SA(other)).let { diff ->
     when (diff.unDiff) {

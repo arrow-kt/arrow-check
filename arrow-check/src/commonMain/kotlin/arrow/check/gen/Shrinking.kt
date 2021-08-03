@@ -5,7 +5,7 @@ package arrow.check.gen
  */
 // TODO Use binary search algorithm instead of halves to reduce duplication
 //  https://github.com/hedgehogqa/haskell-hedgehog/pull/413/
-fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
+public fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
     this -> emptySequence()
     else -> {
         val diff = (this / 2) - (destination / 2)
@@ -16,7 +16,7 @@ fun Long.shrinkTowards(destination: Long): Sequence<Long> = when (destination) {
 /**
  * Shrink the number towards a destination.
  */
-fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destination) {
+public fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destination) {
     this -> emptySequence()
     else -> {
         val diff = this - destination
@@ -36,7 +36,7 @@ fun Double.shrinkTowards(destination: Double): Sequence<Double> = when (destinat
  *  (use [Gen.shrink]) or have shrinking already be present before.
  *  Or use [Gen.list] to generate the list, which already implements nested recursive shrinking.
  */
-fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())
+public fun <A> List<A>.shrink(): Sequence<List<A>> = halves(size.toLong())
     .flatMap { removes(it.toInt()) }
 
 internal fun <A> List<A>.removes(n: Int): Sequence<List<A>> = loopRemove(n, size)

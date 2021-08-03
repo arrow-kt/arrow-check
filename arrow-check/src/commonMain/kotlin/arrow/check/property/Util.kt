@@ -12,63 +12,63 @@ import kotlin.math.sqrt
 /**
  * Sealed class with all annotations that arrow-check supports
  */
-sealed class Markup {
+public sealed class Markup {
   /**
    * Renders text inside the annotation as red and also prefixes with -
    *
    * @param offset Refers to the offset where the prefix is inserted
    */
-  data class DiffRemoved(val offset: Int) : Markup()
+  public data class DiffRemoved(val offset: Int) : Markup()
 
   /**
    * Renders text inside the annotation as red and also prefixes with +
    *
    * @param offset Refers to the offset where the prefix is inserted
    */
-  data class DiffAdded(val offset: Int) : Markup()
+  public data class DiffAdded(val offset: Int) : Markup()
 
   /**
    * Annotation which wraps the Diff.
    *
    * Not used much atm, however may be useful for special rendering methods later.
    */
-  object Diff : Markup()
+  public object Diff : Markup()
 
   /**
    * Wraps a tests annotation output
    */
-  object Annotation : Markup()
+  public object Annotation : Markup()
 
   /**
    * Wraps a tests footnote output
    */
-  object Footnote : Markup()
+  public object Footnote : Markup()
 
   /**
    * Wraps a tests coverage output
    */
-  object Coverage : Markup()
+  public object Coverage : Markup()
 
   /**
    * Wraps a test coverages coverage bar
    */
-  object CoverageFill : Markup()
+  public object CoverageFill : Markup()
 
   /**
    * Wraps a tests status
    */
-  sealed class Progress : Markup() {
-    object Running : Progress()
-    object Shrinking : Progress()
+  public sealed class Progress : Markup() {
+    public object Running : Progress()
+    public object Shrinking : Progress()
   }
 
   /**
    * Wraps a tests result text
    */
-  sealed class Result : Markup() {
-    object Failed : Result()
-    object GaveUp : Result()
-    object Success : Result()
+  public sealed class Result : Markup() {
+    public object Failed : Result()
+    public object GaveUp : Result()
+    public object Success : Result()
   }
 
   /**
@@ -76,27 +76,27 @@ sealed class Markup {
    *
    * Useful for future settings that go lower on the unicode count
    */
-  data class Icon(val name: IconType) : Markup()
+  public data class Icon(val name: IconType) : Markup()
 
   /**
    * Annotate coverage output to indicate failure or success
    */
-  sealed class Style : Markup() {
-    object Failure : Style()
-    object Success : Style()
+  public sealed class Style : Markup() {
+    public object Failure : Style()
+    public object Success : Style()
   }
 }
 
 /**
  * All icons currenty in use.
  */
-sealed class IconType {
-  object GaveUp : IconType()
-  object Failure : IconType()
-  object Success : IconType()
-  object Running : IconType()
-  object Shrinking : IconType()
-  object Coverage : IconType()
+public sealed class IconType {
+  public object GaveUp : IconType()
+  public object Failure : IconType()
+  public object Success : IconType()
+  public object Running : IconType()
+  public object Shrinking : IconType()
+  public object Coverage : IconType()
 }
 
 // TODO if possible (might be hard within the jvm, but maybe gradle has options) later on we can extend this with source pos info to print text at specific points in test source
@@ -105,17 +105,17 @@ sealed class IconType {
  *
  * Contains rich doc describing it.
  */
-inline class Failure(val unFailure: Doc<Markup>)
+public inline class Failure(public val unFailure: Doc<Markup>)
 
 /**
  * Test Log
  */
-/* inline */ class Log(val unLog: List<JournalEntry>) {
-  companion object
+public /* inline */ class Log(public val unLog: List<JournalEntry>) {
+  public companion object
 }
 
 // @extension
-interface LogMonoid : Monoid<Log> {
+private interface LogMonoid : Monoid<Log> {
   override fun Log.combine(b: Log): Log = Log(
     Monoid.list<JournalEntry>().run { unLog + b.unLog }
   )
@@ -123,58 +123,58 @@ interface LogMonoid : Monoid<Log> {
   override fun empty(): Log = Log(emptyList())
 }
 
-fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
+public fun Log.Companion.monoid(): Monoid<Log> = object : LogMonoid {}
 
 /**
  * Test annotations
  */
-sealed class JournalEntry {
+public sealed class JournalEntry {
 
   /**
    * Inputs refer to values returned by forAll, usually not added manually.
    */
-  data class Input(val text: () -> Doc<Markup>) : JournalEntry()
+  public data class Input(val text: () -> Doc<Markup>) : JournalEntry()
 
   /**
    * Annotations, added by [Test.annotate] by users.
    */
-  data class Annotate(val text: () -> Doc<Markup>) : JournalEntry()
+  public data class Annotate(val text: () -> Doc<Markup>) : JournalEntry()
 
   /**
    * Footnotes, added by [Test.footnote] by users.
    */
-  data class Footnote(val text: () -> Doc<Markup>) : JournalEntry()
+  public data class Footnote(val text: () -> Doc<Markup>) : JournalEntry()
 
   /**
    * Coverage labels. Used to track classified and covered input.
    *
    * Usually not added manually, but by the coverage methods themselves.
    */
-  data class JournalLabel(val label: Label<Boolean>) : JournalEntry()
+  public data class JournalLabel(val label: Label<Boolean>) : JournalEntry()
 }
 
 /**
  * Coverage label
  */
-data class Label<A>(
+public data class Label<A>(
   val table: LabelTable?,
   val name: LabelName,
   val min: CoverPercentage,
   val annotation: A
 )
 
-inline class CoverPercentage(val unCoverPercentage: Double)
+public inline class CoverPercentage(public val unCoverPercentage: Double)
 
-inline class LabelTable(val unLabelTable: String)
+public inline class LabelTable(public val unLabelTable: String)
 
-inline class LabelName(val unLabelName: String)
+public inline class LabelName(public val unLabelName: String)
 
 /**
  * Coverage with a special monoid instance to combine several runs.
  */
-data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>>) {
-  companion object {
-    fun <A> monoid(SA: Semigroup<A>) = object : CoverageMonoid<A> {
+public data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>>) {
+  public companion object {
+    public fun <A> monoid(SA: Semigroup<A>): Monoid<Coverage<A>> = object : CoverageMonoid<A> {
       override fun SA(): Semigroup<A> = SA
     }
   }
@@ -183,16 +183,16 @@ data class Coverage<A>(val unCoverage: Map<LabelTable?, Map<LabelName, Label<A>>
 /**
  * Check if a coverage report contains only covered labels
  */
-fun Coverage<CoverCount>.coverageSuccess(test: TestCount): Boolean =
+public fun Coverage<CoverCount>.coverageSuccess(test: TestCount): Boolean =
   coverageFailures(test).isEmpty()
 
 /**
  * Check if a coverage report contains any uncovered labels
  */
-fun Coverage<CoverCount>.coverageFailures(testCount: TestCount): List<Label<CoverCount>> =
+public fun Coverage<CoverCount>.coverageFailures(testCount: TestCount): List<Label<CoverCount>> =
   unCoverage.values.flatMap { it.values }.filter { it.labelCovered(testCount).not() }
 
-interface CoverageMonoid<A> : Monoid<Coverage<A>> {
+private interface CoverageMonoid<A> : Monoid<Coverage<A>> {
   fun SA(): Semigroup<A>
   override fun empty(): Coverage<A> = Coverage(emptyMap())
   override fun Coverage<A>.combine(b: Coverage<A>): Coverage<A> =
@@ -215,24 +215,24 @@ interface CoverageMonoid<A> : Monoid<Coverage<A>> {
     )
 }
 
-data class CoverCount(val unCoverCount: Int) {
-  companion object {
-    fun semigroup() = object : CoverCountSemigroup {}
+public data class CoverCount(public val unCoverCount: Int) {
+  public companion object {
+    public fun semigroup(): Semigroup<CoverCount> = object : CoverCountSemigroup {}
   }
 }
 
-interface CoverCountSemigroup : Semigroup<CoverCount> {
+private interface CoverCountSemigroup : Semigroup<CoverCount> {
   override fun CoverCount.combine(b: CoverCount): CoverCount =
     CoverCount(unCoverCount + b.unCoverCount)
 }
 
-fun CoverCount.coverPercentage(test: TestCount): CoverPercentage =
+public fun CoverCount.coverPercentage(test: TestCount): CoverPercentage =
   CoverPercentage(((unCoverCount.toDouble() / test.unTestCount.toDouble() * 100.0) * 10).roundToInt().toDouble() / 10.0)
 
 /**
  * Check if a label is covered
  */
-fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
+public fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
   annotation.coverPercentage(test).unCoverPercentage >= min.unCoverPercentage
 
 /**
@@ -249,60 +249,60 @@ fun Label<CoverCount>.labelCovered(test: TestCount): Boolean =
  * @param shrinkLimit Maximum shrinking depth. Note this does not refer to shrinking runs, only depth!
  */
 @optics
-data class PropertyConfig(
-  val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
-  val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
-  val shrinkLimit: ShrinkLimit = ShrinkLimit(1000)
+public data class PropertyConfig(
+  public val terminationCriteria: TerminationCriteria = NoConfidenceTermination(),
+  public val maxDiscardRatio: DiscardRatio = DiscardRatio(10.0),
+  public val shrinkLimit: ShrinkLimit = ShrinkLimit(1000)
 ) {
 
-  operator fun plus(other: TerminationCriteria): PropertyConfig = this.copy(terminationCriteria = other)
-  operator fun plus(other: ShrinkLimit): PropertyConfig = this.copy(shrinkLimit = other)
-  operator fun plus(other: DiscardRatio): PropertyConfig = this.copy(maxDiscardRatio = other)
+  public operator fun plus(other: TerminationCriteria): PropertyConfig = this.copy(terminationCriteria = other)
+  public operator fun plus(other: ShrinkLimit): PropertyConfig = this.copy(shrinkLimit = other)
+  public operator fun plus(other: DiscardRatio): PropertyConfig = this.copy(maxDiscardRatio = other)
 
-  companion object {
-    fun default(): PropertyConfig = PropertyConfig()
-    fun verifiedTermination(): TerminationCriteria = NoEarlyTermination(Confidence())
-    fun earlyTermination(confidence: Confidence): TerminationCriteria = EarlyTermination(confidence)
-    fun noEarlyTermination(confidence: Confidence): TerminationCriteria = NoEarlyTermination(confidence)
-    fun testLimit(n: Int): TerminationCriteria = NoConfidenceTermination(TestLimit(n))
-    fun shrinkLimit(l: Int): ShrinkLimit = ShrinkLimit(l)
-    fun maxDiscardRatio(ratio: Double): DiscardRatio = DiscardRatio(ratio)
-    fun once(): TerminationCriteria = testLimit(1)
+  public companion object {
+    public fun default(): PropertyConfig = PropertyConfig()
+    public fun verifiedTermination(): TerminationCriteria = NoEarlyTermination(Confidence())
+    public fun earlyTermination(confidence: Confidence): TerminationCriteria = EarlyTermination(confidence)
+    public fun noEarlyTermination(confidence: Confidence): TerminationCriteria = NoEarlyTermination(confidence)
+    public fun testLimit(n: Int): TerminationCriteria = NoConfidenceTermination(TestLimit(n))
+    public fun shrinkLimit(l: Int): ShrinkLimit = ShrinkLimit(l)
+    public fun maxDiscardRatio(ratio: Double): DiscardRatio = DiscardRatio(ratio)
+    public fun once(): TerminationCriteria = testLimit(1)
   }
 }
 
 /**
  * Default minimum amount of tests that need to be run
  */
-val defaultMinTests = TestLimit(100)
+internal val defaultMinTests: TestLimit = TestLimit(100)
 
 /**
  * Confidence refers to how much leeway a test is given before it decides that reaching a certain coverage
  *  percentage is not possible.
  */
-data class Confidence(val certainty: Long = 10.0.pow(9.0).toLong(), val tolerance: Double = 0.9)
+public data class Confidence(val certainty: Long = 10.0.pow(9.0).toLong(), val tolerance: Double = 0.9)
 
-sealed class TerminationCriteria
-data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
+public sealed class TerminationCriteria
+public data class EarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
   TerminationCriteria()
 
-data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
+public data class NoEarlyTermination(val confidence: Confidence = Confidence(), val limit: TestLimit = TestLimit(100)) :
   TerminationCriteria()
 
-data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)) : TerminationCriteria()
+public data class NoConfidenceTermination(val limit: TestLimit = TestLimit(100)) : TerminationCriteria()
 
-inline class TestLimit(val unTestLimit: Int)
-inline class DiscardRatio(val unDiscardRatio: Double)
-inline class ShrinkLimit(val unShrinkLimit: Int)
+public inline class TestLimit(public val unTestLimit: Int)
+public inline class DiscardRatio(public val unDiscardRatio: Double)
+public inline class ShrinkLimit(public val unShrinkLimit: Int)
 
-inline class TestCount(val unTestCount: Int)
-inline class ShrinkCount(val unShrinkCount: Int)
-inline class DiscardCount(val unDiscardCount: Int)
+public inline class TestCount(public val unTestCount: Int)
+public inline class ShrinkCount(public val unShrinkCount: Int)
+public inline class DiscardCount(public val unDiscardCount: Int)
 
-inline class PropertyName(val unPropertyName: String)
-inline class GroupName(val unGroupName: String)
+public inline class PropertyName(public val unPropertyName: String)
+public inline class GroupName(public val unGroupName: String)
 
-/* inline */class Size(val unSize: Int)
+public /* inline */ class Size(public val unSize: Int)
 
 internal fun Coverage<CoverCount>.labelsToTotals(): List<Pair<Int, Label<CoverCount>>> =
   unCoverage.values.flatMap {
@@ -310,7 +310,7 @@ internal fun Coverage<CoverCount>.labelsToTotals(): List<Pair<Int, Label<CoverCo
     it.values.map { total to it }
   }
 
-fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
+public fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
   coverage.labelsToTotals().map { (total, l) ->
     sufficientlyCovered(
       l.table?.let { test.unTestCount } ?: total,
@@ -319,7 +319,7 @@ fun Confidence.success(test: TestCount, coverage: Coverage<CoverCount>): Boolean
     )
   }.fold(true) { acc, v -> acc && v }
 
-fun Confidence.failure(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
+public fun Confidence.failure(test: TestCount, coverage: Coverage<CoverCount>): Boolean =
   coverage.labelsToTotals().map { (total, l) ->
     insufficientlyCovered(
       l.table?.let { test.unTestCount } ?: total,
@@ -328,10 +328,10 @@ fun Confidence.failure(test: TestCount, coverage: Coverage<CoverCount>): Boolean
     )
   }.fold(false) { acc, v -> acc || v }
 
-fun Confidence.sufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
+public fun Confidence.sufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
   wilsonLow(k, n, 1.toDouble() / certainty) >= tolerance * p
 
-fun Confidence.insufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
+public fun Confidence.insufficientlyCovered(n: Int, k: Int, p: Double): Boolean =
   wilsonHigh(k, n, 1.toDouble() / certainty) < p
 
 internal fun wilsonLow(k: Int, n: Int, a: Double): Double = wilson(k, n, invnormcdf(a / 2))

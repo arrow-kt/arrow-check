@@ -1,17 +1,24 @@
 plugins {
-    id "org.jetbrains.kotlin.jvm"
+    id "org.jetbrains.kotlin.multiplatform"
     id "org.jlleitschuh.gradle.ktlint"
 }
 
-apply from: "$SUB_PROJECT"
+apply from: "$SUB_PROJECT_MPP"
 
-dependencies {
-    api project(":arrow-check")
+kotlin {
+    sourceSets {
+        commonMain {
+            dependencies {
+                api project(":arrow-check")
 
-    api("io.kotest:kotest-runner-junit5-jvm:$KOTEST_VERSION") { // for kotest framework
-        exclude group: "io.arrow-kt"
-    }
-    api("io.kotest:kotest-assertions-core-jvm:$KOTEST_VERSION") { // for kotest core jvm assertions
-        exclude group: "io.arrow-kt"
+                api("io.kotest:kotest-assertions-core:$KOTEST_VERSION") { // for kotest core jvm assertions
+                    exclude group: "io.arrow-kt"
+                }
+                api("io.kotest:kotest-framework-api:$KOTEST_VERSION") { // for kotest core jvm assertions
+                    exclude group: "io.arrow-kt"
+                }
+                implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.1'
+            }
+        }
     }
 }

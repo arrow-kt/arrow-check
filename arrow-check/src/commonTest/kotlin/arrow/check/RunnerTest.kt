@@ -4,18 +4,18 @@ import arrow.check.gen.Gen
 import arrow.check.gen.int
 import arrow.check.gen.list
 import arrow.check.gen.tupledN
+import arrow.check.property.Property
 import arrow.check.property.PropertyConfig
 import arrow.check.property.assert
 import arrow.check.property.classify
 import arrow.check.property.failWith
 import arrow.check.property.failure
-import arrow.check.property.property
 import kotlinx.coroutines.delay
 import pretty.text
 
 class RunnerTest : PropertySpec({
     "empty property"(Gen.just(Unit), PropertyConfig.default() + PropertyConfig.once()) {
-        checkReport(null, Gen.just(Unit), property<Unit> {}.once())
+        checkReport(null, Property<Unit>(Gen.just(Unit)) {}.once())
             .let {
                 if (it.coverage.unCoverage.isNotEmpty()) failWith("Coverage was not empty")
                 if (it.numDiscarded.unDiscardCount != 0) failWith("Tests were discarded")
@@ -25,7 +25,7 @@ class RunnerTest : PropertySpec({
     }
 
     "fail property"(Gen.just(Unit), PropertyConfig.default() + PropertyConfig.once()) {
-        checkReport(null, Gen.just(Unit), property<Unit> { failure() }.once())
+        checkReport(null, Property(Gen.just(Unit)) { failure() }.once())
             .let {
                 if (it.coverage.unCoverage.isNotEmpty()) failWith("Coverage was not empty")
                 if (it.numDiscarded.unDiscardCount != 0) failWith("Tests were discarded")
@@ -58,9 +58,9 @@ class RunnerTest : PropertySpec({
     }
 
     // test interleaved suspension
-    "Interleaved delay on a failed test"(Gen.just(Unit), property { _: Unit ->
+    "Interleaved delay on a failed test"(Property(Gen.unit()) { _: Unit ->
         // This validates interleaved suspension even on multishot uses during shrinking
-        val res = checkReport(Gen.int(0..100), property { xs ->
+        val res = checkReport(null, Property(Gen.int(0..100)) { xs ->
             delay(10)
             assert(xs <= 10)
         }).let { it.status !is Result.Success }

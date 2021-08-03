@@ -41,31 +41,33 @@ import kotlin.random.Random
  * The environment [R] is local state which can be passed down through generators. By using [local] it is possible
  *  to make generators stateful. This is similar to how a split [RandSeed] is passed down through [flatMap].
  */
-class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Triple<RandSeed, Size, R>, Rose<A>?>) {
-  companion object {
+public class Gen<in R, out A> internal constructor(internal val runGen: AndThenS<Triple<RandSeed, Size, R>, Rose<A>?>) {
+  public companion object {
     internal operator fun <R, A> invoke(f: suspend (Triple<RandSeed, Size, R>) -> Rose<A>?): Gen<R, A> =
       Gen(AndThenS.Single(f))
 
-    fun <A> just(a: A): Gen<Any?, A> = Gen { Rose(a) }
+    public fun <A> just(a: A): Gen<Any?, A> = Gen { Rose(a) }
+
+    public fun unit(): Gen<Any?, Unit> = Gen.just(Unit)
   }
 }
 
 /**
  * Run the generator with an environment [r], effectively removing the need to supply this environment later on.
  */
-fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen(runGen.compose { (seed, size, _) -> Triple(seed, size, r) })
+public fun <R, A> Gen<R, A>.runEnv(r: R): Gen<Any?, A> = Gen(runGen.compose { (seed, size, _) -> Triple(seed, size, r) })
 
 /**
  * Retrieve the current environment from the generator.
  */
-fun <R> Gen.Companion.ask(): Gen<R, R> = Gen { (_, _, env) -> Rose(env) }
+public fun <R> Gen.Companion.ask(): Gen<R, R> = Gen { (_, _, env) -> Rose(env) }
 
 /**
  * Modify the current environment.
  *
  * This is, as the name suggests, a local change. Only the generator this is performed on will get the new state.
  */
-fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> =
+public fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> =
   Gen(runGen.compose { (seed, size, env) -> Triple(seed, size, f(env)) })
 
 /**
@@ -73,14 +75,14 @@ fun <R, A> Gen<R, A>.local(f: (R) -> R): Gen<R, A> =
  *
  * This operation preserves shrinking.
  */
-fun <R, A, B> Gen<R, A>.map(f: (A) -> B): Gen<R, B> = Gen(runGen.andThen { it?.map(f) })
+public fun <R, A, B> Gen<R, A>.map(f: (A) -> B): Gen<R, B> = Gen(runGen.andThen { it?.map(f) })
 
 /**
  * Map the entire [Rose] tree if the value is not discarded.
  *
  * Since this operation may change the entire [Rose] tree, it is up to [f] whether or not it preserves shrinking.
  */
-fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = Gen(runGen.andThen { it?.let { f(it) } })
+public fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = Gen(runGen.andThen { it?.let { f(it) } })
 
 /**
  * Run two generators and combine their results.
@@ -93,7 +95,7 @@ fun <R, A, B> Gen<R, A>.mapRose(f: suspend (Rose<A>) -> Rose<B>?): Gen<R, B> = G
  *
  * @see Gen.Companion.mapN for a n-ary version of this function.
  */
-fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
+public fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
   Gen(
     AndThenS<Triple<RandSeed, Size, R>, Triple<Pair<RandSeed, RandSeed>, Size, R>> { (seed, size, env) ->
       Triple(seed.split(), size, env)
@@ -123,7 +125,7 @@ fun <R, A, B, C> Gen<R, A>.map2(other: Gen<R, B>, f: (A, B) -> C): Gen<R, C> =
  *
  * If possible use [map2], [mapN] or [map] instead.
  */
-fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
+public fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 : R =
   runGen.compose { (lr, size, env): Triple<Pair<RandSeed, RandSeed>, Size, R1> -> Triple(lr.first, size, env) }
     // Calling fa.invoke (fa : AndThenS) one layer after a flatMap is safe because the resulting
     //  AndThenS is invoked in a new loop iteration and thus with a fresh stack. This sort of relies on internals
@@ -143,7 +145,7 @@ fun <R, R1, A, B> Gen<R, A>.flatMap(f: (A) -> Gen<R1, B>): Gen<R1, B> where R1 :
  *
  * The generated values are not shrunk, shrinking can be added by using [shrink].
  */
-fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
+public fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
   Gen { (seed, size) -> Rose(f(seed, size)) }
 
 /**
@@ -151,7 +153,7 @@ fun <A> Gen.Companion.generate(f: suspend (RandSeed, Size) -> A): Gen<Any?, A> =
  *
  * If there are already existing shrinks, the new ones will be added after the existing shrinks.
  */
-fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> =
+public fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> =
   Gen(runGen.andThen { it?.expand(f.andThen { it.asFlow() }) })
 
 /**
@@ -159,13 +161,13 @@ fun <R, A> Gen<R, A>.shrink(f: (A) -> Sequence<A>): Gen<R, A> =
  *
  * @param n refers to how many layers of shrinking are kept. If zero, the entire shrink-tree is thrown away.
  */
-fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.prune(n) })
+public fun <R, A> Gen<R, A>.prune(n: Int = 0): Gen<R, A> = Gen(runGen.andThen { it?.prune(n) })
 
 // size
 /**
  * Create a generator with access to the [Size] parameter.
  */
-fun <R, A> Gen.Companion.sized(f: (Size) -> Gen<R, A>): Gen<R, A> =
+public fun <R, A> Gen.Companion.sized(f: (Size) -> Gen<R, A>): Gen<R, A> =
   generate { _, size -> f(size) }.flatMap { it }
 
 /**
@@ -175,7 +177,7 @@ fun <R, A> Gen.Companion.sized(f: (Size) -> Gen<R, A>): Gen<R, A> =
  *
  * @param f Modify [Size]. This has to result in a positive number and thus [scale] will throw should it return a negative number.
  */
-fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
+public fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
   Gen(runGen.compose { (seed, size, env) ->
     val newSz = f(size)
     if (newSz.unSize < 0) throw IllegalArgumentException("Gen.scale Negative size")
@@ -189,7 +191,7 @@ fun <R, A> Gen<R, A>.scale(f: (Size) -> Size): Gen<R, A> =
  *
  * @param sz New [Size] parameter. Has to be a positive number, otherwise this function will throw.
  */
-fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
+public fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
 
 /**
  * Modify the [Size] using the [golden] ratio.
@@ -199,14 +201,14 @@ fun <R, A> Gen<R, A>.resize(sz: Size): Gen<R, A> = scale { sz }
  *
  * This operation preserves shrinking.
  */
-fun <R, A> Gen<R, A>.small(): Gen<R, A> = scale { it.golden() }
+public fun <R, A> Gen<R, A>.small(): Gen<R, A> = scale { it.golden() }
 
 /**
  * Modify [Size] using the golden ratio.
  *
  * @see Gen.small A combinator which uses this function.
  */
-fun Size.golden(): Size = Size((unSize * 0.61803398875).toInt())
+public fun Size.golden(): Size = Size((unSize * 0.61803398875).toInt())
 
 // Generators
 // Integral numbers
@@ -217,7 +219,7 @@ fun Size.golden(): Size = Size((unSize * 0.61803398875).toInt())
  *
  * @see long_ For a version that does not shrink.
  */
-fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
+public fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
   long_(range).shrink { it.shrinkTowards(range.origin) }
 
 /**
@@ -225,7 +227,7 @@ fun Gen.Companion.long(range: Range<Long>): Gen<Any?, Long> =
  *
  * @see long For a version that does shrink.
  */
-fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
+public fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
   generate { randSeed, size ->
     val (min, max) = range.bounds(size)
     if (min == max) min
@@ -241,7 +243,7 @@ fun Gen.Companion.long_(range: Range<Long>): Gen<Any?, Long> =
  *
  * @see long_ For a version that does not shrink.
  */
-fun Gen.Companion.long(range: LongRange): Gen<Any?, Long> =
+public fun Gen.Companion.long(range: LongRange): Gen<Any?, Long> =
   long(Range.constant(range))
 
 /**
@@ -249,7 +251,7 @@ fun Gen.Companion.long(range: LongRange): Gen<Any?, Long> =
  *
  * @see long For a version that does shrink
  */
-fun Gen.Companion.long_(range: LongRange): Gen<Any?, Long> =
+public fun Gen.Companion.long_(range: LongRange): Gen<Any?, Long> =
   long_(Range.constant(range))
 
 /**
@@ -259,7 +261,7 @@ fun Gen.Companion.long_(range: LongRange): Gen<Any?, Long> =
  *
  * @see int_ For a version that does not shrink
  */
-fun Gen.Companion.int(range: Range<Int>): Gen<Any?, Int> =
+public fun Gen.Companion.int(range: Range<Int>): Gen<Any?, Int> =
   long(range.map { it.toLong() }).map { it.toInt() }
 
 /**
@@ -267,7 +269,7 @@ fun Gen.Companion.int(range: Range<Int>): Gen<Any?, Int> =
  *
  * @see int For a version that does shrink
  */
-fun Gen.Companion.int_(range: Range<Int>): Gen<Any?, Int> =
+public fun Gen.Companion.int_(range: Range<Int>): Gen<Any?, Int> =
   long_(range.map { it.toLong() }).map { it.toInt() }
 
 /**
@@ -277,7 +279,7 @@ fun Gen.Companion.int_(range: Range<Int>): Gen<Any?, Int> =
  *
  * @see int_ For a version that does not shrink
  */
-fun Gen.Companion.int(range: IntRange): Gen<Any?, Int> =
+public fun Gen.Companion.int(range: IntRange): Gen<Any?, Int> =
   int(Range.constant(range))
 
 /**
@@ -285,7 +287,7 @@ fun Gen.Companion.int(range: IntRange): Gen<Any?, Int> =
  *
  * @see int For a version that does shrink
  */
-fun Gen.Companion.int_(range: IntRange): Gen<Any?, Int> =
+public fun Gen.Companion.int_(range: IntRange): Gen<Any?, Int> =
   int_(Range.constant(range))
 
 /**
@@ -295,7 +297,7 @@ fun Gen.Companion.int_(range: IntRange): Gen<Any?, Int> =
  *
  * @see short_ For a version that does not shrink
  */
-fun Gen.Companion.short(range: Range<Short>): Gen<Any?, Short> =
+public fun Gen.Companion.short(range: Range<Short>): Gen<Any?, Short> =
   long(range.map { it.toLong() }).map { it.toShort() }
 
 /**
@@ -303,7 +305,7 @@ fun Gen.Companion.short(range: Range<Short>): Gen<Any?, Short> =
  *
  * @see short For a version that does shrink
  */
-fun Gen.Companion.short_(range: Range<Short>): Gen<Any?, Short> =
+public fun Gen.Companion.short_(range: Range<Short>): Gen<Any?, Short> =
   long_(range.map { it.toLong() }).map { it.toShort() }
 
 /**
@@ -313,7 +315,7 @@ fun Gen.Companion.short_(range: Range<Short>): Gen<Any?, Short> =
  *
  * @see byte For a version that does shrink
  */
-fun Gen.Companion.byte(range: Range<Byte>): Gen<Any?, Byte> =
+public fun Gen.Companion.byte(range: Range<Byte>): Gen<Any?, Byte> =
   long(range.map { it.toLong() }).map { it.toByte() }
 
 /**
@@ -321,7 +323,7 @@ fun Gen.Companion.byte(range: Range<Byte>): Gen<Any?, Byte> =
  *
  * @see byte For a version that does shrink
  */
-fun Gen.Companion.byte_(range: Range<Byte>): Gen<Any?, Byte> =
+public fun Gen.Companion.byte_(range: Range<Byte>): Gen<Any?, Byte> =
   long_(range.map { it.toLong() }).map { it.toByte() }
 
 // floating point numbers
@@ -332,7 +334,7 @@ fun Gen.Companion.byte_(range: Range<Byte>): Gen<Any?, Byte> =
  *
  * @see double_ For a version that does not shrink.
  */
-fun Gen.Companion.double(range: Range<Double>): Gen<Any?, Double> =
+public fun Gen.Companion.double(range: Range<Double>): Gen<Any?, Double> =
   double_(range).shrink { it.shrinkTowards(range.origin) }
 
 /**
@@ -340,7 +342,7 @@ fun Gen.Companion.double(range: Range<Double>): Gen<Any?, Double> =
  *
  * @see double For a version that does shrink.
  */
-fun Gen.Companion.double_(range: Range<Double>): Gen<Any?, Double> =
+public fun Gen.Companion.double_(range: Range<Double>): Gen<Any?, Double> =
   generate { randSeed, size ->
     val (min, max) = range.bounds(size)
     if (min == max) min
@@ -354,7 +356,7 @@ fun Gen.Companion.double_(range: Range<Double>): Gen<Any?, Double> =
  *
  * @see float_ For a version that does not shrink.
  */
-fun Gen.Companion.float(range: Range<Float>): Gen<Any?, Float> =
+public fun Gen.Companion.float(range: Range<Float>): Gen<Any?, Float> =
   double(range.map { it.toDouble() }).map { it.toFloat() }
 
 /**
@@ -362,7 +364,7 @@ fun Gen.Companion.float(range: Range<Float>): Gen<Any?, Float> =
  *
  * @see float For a version that does shrink.
  */
-fun Gen.Companion.float_(range: Range<Float>): Gen<Any?, Float> =
+public fun Gen.Companion.float_(range: Range<Float>): Gen<Any?, Float> =
   double_(range.map { it.toDouble() }).map { it.toFloat() }
 
 // boolean
@@ -373,7 +375,7 @@ fun Gen.Companion.float_(range: Range<Float>): Gen<Any?, Float> =
  *
  * @see bool_ For a version that does not shrink.
  */
-fun Gen.Companion.bool(): Gen<Any?, Boolean> =
+public fun Gen.Companion.bool(): Gen<Any?, Boolean> =
   bool_().shrink { if (it) sequenceOf(false) else emptySequence() }
 
 /**
@@ -381,7 +383,7 @@ fun Gen.Companion.bool(): Gen<Any?, Boolean> =
  *
  * @see bool For a version that does shrink.
  */
-fun Gen.Companion.bool_(): Gen<Any?, Boolean> =
+public fun Gen.Companion.bool_(): Gen<Any?, Boolean> =
   generate { randSeed, _ -> randSeed.nextInt(0, 2).first == 0 }
 
 // chars
@@ -392,7 +394,7 @@ fun Gen.Companion.bool_(): Gen<Any?, Boolean> =
  *
  * @see char_ For a version that does not shrink
  */
-fun Gen.Companion.char(range: Range<Char>): Gen<Any?, Char> =
+public fun Gen.Companion.char(range: Range<Char>): Gen<Any?, Char> =
   long(range.map { it.toLong() }).map { it.toChar() }
 
 /**
@@ -400,7 +402,7 @@ fun Gen.Companion.char(range: Range<Char>): Gen<Any?, Char> =
  *
  * @see char For a version that does shrink
  */
-fun Gen.Companion.char_(range: Range<Char>): Gen<Any?, Char> =
+public fun Gen.Companion.char_(range: Range<Char>): Gen<Any?, Char> =
   long_(range.map { it.toLong() }).map { it.toChar() }
 
 /**
@@ -410,7 +412,7 @@ fun Gen.Companion.char_(range: Range<Char>): Gen<Any?, Char> =
  *
  * @see char_ For a version that does not shrink
  */
-fun Gen.Companion.char(range: CharRange): Gen<Any?, Char> =
+public fun Gen.Companion.char(range: CharRange): Gen<Any?, Char> =
   char(Range.constant(range))
 
 /**
@@ -418,38 +420,38 @@ fun Gen.Companion.char(range: CharRange): Gen<Any?, Char> =
  *
  * @see char For a version that does shrink
  */
-fun Gen.Companion.char_(range: CharRange): Gen<Any?, Char> =
+public fun Gen.Companion.char_(range: CharRange): Gen<Any?, Char> =
   char_(Range.constant(range))
 
 /**
  * Generates a value within `'0'..'1'`
  */
-fun Gen.Companion.binit(): Gen<Any?, Char> = char('0'..'1')
+public fun Gen.Companion.binit(): Gen<Any?, Char> = char('0'..'1')
 
 /**
  * Generates a value within `'0'..'7'`
  */
-fun Gen.Companion.octit(): Gen<Any?, Char> = char('0'..'7')
+public fun Gen.Companion.octit(): Gen<Any?, Char> = char('0'..'7')
 
 /**
  * Generates a value within `'0'..'9'`
  */
-fun Gen.Companion.digit(): Gen<Any?, Char> = char('0'..'9')
+public fun Gen.Companion.digit(): Gen<Any?, Char> = char('0'..'9')
 
 /**
  * Generates a hexadecimal value within `'0'..'1' or 'a'..'f' or 'A'..'F'`
  */
-fun Gen.Companion.hexit(): Gen<Any?, Char> = choice(digit(), char('a'..'f'), char('A'..'F'))
+public fun Gen.Companion.hexit(): Gen<Any?, Char> = choice(digit(), char('a'..'f'), char('A'..'F'))
 
 /**
  * Generate a lowercase char within `'a'..'z'`
  */
-fun Gen.Companion.lower(): Gen<Any?, Char> = char('a'..'z')
+public fun Gen.Companion.lower(): Gen<Any?, Char> = char('a'..'z')
 
 /**
  * Generate a uppercase char within `'A'..'Z'`
  */
-fun Gen.Companion.upper(): Gen<Any?, Char> = char('A'..'Z')
+public fun Gen.Companion.upper(): Gen<Any?, Char> = char('A'..'Z')
 
 /**
  * Generate a alphabetical char: `choice(lower(), upper())`
@@ -457,27 +459,27 @@ fun Gen.Companion.upper(): Gen<Any?, Char> = char('A'..'Z')
  * @see upper
  * @see lower
  */
-fun Gen.Companion.alpha(): Gen<Any?, Char> = choice(lower(), upper())
+public fun Gen.Companion.alpha(): Gen<Any?, Char> = choice(lower(), upper())
 
 /**
  * Generate a alphanumerical char: `choice(alpha(), digit())`
  */
-fun Gen.Companion.alphaNum(): Gen<Any?, Char> = choice(alpha(), digit())
+public fun Gen.Companion.alphaNum(): Gen<Any?, Char> = choice(alpha(), digit())
 
 /**
  * Generate any ascii char: `int(0..127).map { it.toChar() }`
  */
-fun Gen.Companion.ascii(): Gen<Any?, Char> = int(0..127).map { it.toChar() }
+public fun Gen.Companion.ascii(): Gen<Any?, Char> = int(0..127).map { it.toChar() }
 
 /**
  * Generate any latin1 char: `int(0..255).map { it.toChar() }`
  */
-fun Gen.Companion.latin1(): Gen<Any?, Char> = int(0..255).map { it.toChar() }
+public fun Gen.Companion.latin1(): Gen<Any?, Char> = int(0..255).map { it.toChar() }
 
 /**
  * Generate unicode chars excluding non-chars and invalid surrogates.
  */
-fun Gen.Companion.unicode(): Gen<Any?, Char> {
+public fun Gen.Companion.unicode(): Gen<Any?, Char> {
   val s1 = (55296 to int(0..55295).map { it.toChar() })
   val s2 = (8190 to int(57344..65533).map { it.toChar() })
   val s3 = (1048576 to int(65536..1114111).map { it.toChar() })
@@ -487,7 +489,7 @@ fun Gen.Companion.unicode(): Gen<Any?, Char> {
 /**
  * Generate any unicode char: `char(Char.MIN_VALUE..Char.MAX_VALUE)`
  */
-fun Gen.Companion.unicodeAll(): Gen<Any?, Char> = char(Char.MIN_VALUE..Char.MAX_VALUE)
+public fun Gen.Companion.unicodeAll(): Gen<Any?, Char> = char(Char.MIN_VALUE..Char.MAX_VALUE)
 
 /**
  * Create a string from a char generator.
@@ -496,7 +498,7 @@ fun Gen.Companion.unicodeAll(): Gen<Any?, Char> = char(Char.MIN_VALUE..Char.MAX_
  *
  * This generator shrinks towards empty strings.
  */
-fun <R> Gen<R, Char>.string(range: Range<Int>): Gen<R, String> =
+public fun <R> Gen<R, Char>.string(range: Range<Int>): Gen<R, String> =
   list(range).map { it.joinToString("") }
 
 /**
@@ -506,7 +508,7 @@ fun <R> Gen<R, Char>.string(range: Range<Int>): Gen<R, String> =
  *
  * This generator shrinks towards empty strings.
  */
-fun <R> Gen<R, Char>.string(range: IntRange): Gen<R, String> = string(Range.constant(range))
+public fun <R> Gen<R, Char>.string(range: IntRange): Gen<R, String> = string(Range.constant(range))
 
 // combinators
 /**
@@ -514,7 +516,7 @@ fun <R> Gen<R, Char>.string(range: IntRange): Gen<R, String> = string(Range.cons
  *
  * This generator does not shrink.
  */
-fun <A> Gen.Companion.constant(a: A): Gen<Any?, A> = just(a)
+public fun <A> Gen.Companion.constant(a: A): Gen<Any?, A> = just(a)
 
 /**
  * Generate a value by choosing from [els].
@@ -523,7 +525,7 @@ fun <A> Gen.Companion.constant(a: A): Gen<Any?, A> = just(a)
  *
  * The argument [els] needs to be non-empty.
  */
-fun <A> Gen.Companion.element(vararg els: A): Gen<Any?, A> =
+public fun <A> Gen.Companion.element(vararg els: A): Gen<Any?, A> =
   if (els.isEmpty()) throw IllegalArgumentException("Gen.element used with no arguments")
   else int(Range.constant(0, els.size - 1)).map { els[it] }
 
@@ -534,7 +536,7 @@ fun <A> Gen.Companion.element(vararg els: A): Gen<Any?, A> =
  *
  * The argument [gens] needs to be non-empty.
  */
-fun <R, A> Gen.Companion.choice(vararg gens: Gen<R, A>): Gen<R, A> =
+public fun <R, A> Gen.Companion.choice(vararg gens: Gen<R, A>): Gen<R, A> =
   if (gens.isEmpty()) throw IllegalArgumentException("Gen.Choice used with no arguments")
   else int(Range.constant(0, gens.size - 1)).flatMap { gens[it] }
 
@@ -548,7 +550,7 @@ fun <R, A> Gen.Companion.choice(vararg gens: Gen<R, A>): Gen<R, A> =
  * The argument [gens] needs to be non-empty.
  */
 // TODO https://github.com/hedgehogqa/haskell-hedgehog/pull/406/files
-fun <R, A> Gen.Companion.frequency(vararg gens: Pair<Int, Gen<R, A>>): Gen<R, A> =
+public fun <R, A> Gen.Companion.frequency(vararg gens: Pair<Int, Gen<R, A>>): Gen<R, A> =
   if (gens.isEmpty()) throw IllegalArgumentException("Gens.Frequency used with no arguments")
   else {
     val total = gens.map { it.first }.sum()
@@ -593,7 +595,7 @@ private tailrec fun <A> List<Pair<Int, A>>.pick(n: Int): A =
  *   }
  * ```
  */
-fun <R, A> Gen.Companion.recursive(
+public fun <R, A> Gen.Companion.recursive(
   nonRec: List<Gen<R, A>>,
   rec: () -> List<Gen<R, A>>
 ): Gen<R, A> = sized { sz ->
@@ -604,7 +606,7 @@ fun <R, A> Gen.Companion.recursive(
 /**
  * Create a generator that always discards its values.
  */
-fun Gen.Companion.discard(): Gen<Any?, Nothing> = Gen { null }
+public fun Gen.Companion.discard(): Gen<Any?, Nothing> = Gen { null }
 
 /**
  * Ensure that a predicate holds for all values that this generate creates.
@@ -613,7 +615,7 @@ fun Gen.Companion.discard(): Gen<Any?, Nothing> = Gen { null }
  *
  * This combinator preserves shrinking.
  */
-fun <R, A> Gen<R, A>.ensure(predicate: Predicate<A>): Gen<R, A> =
+public fun <R, A> Gen<R, A>.ensure(predicate: Predicate<A>): Gen<R, A> =
   flatMap { (if (predicate(it)) Gen.just(it) else Gen.discard()) }
 
 /**
@@ -624,7 +626,7 @@ fun <R, A> Gen<R, A>.ensure(predicate: Predicate<A>): Gen<R, A> =
  *
  * This combinator preserves shrinking.
  */
-fun <R, A, B> Gen<R, A>.filterMap(f: (A) -> B?): Gen<R, B> {
+public fun <R, A, B> Gen<R, A>.filterMap(f: (A) -> B?): Gen<R, B> {
   fun t(k: Int): Gen<R, B> =
     if (k > 100) Gen.discard()
     else scale { Size(2 * k + it.unSize) }.freeze().flatMap { (fst, gen) ->
@@ -642,7 +644,7 @@ fun <R, A, B> Gen<R, A>.filterMap(f: (A) -> B?): Gen<R, B> {
  *
  * @see filterMap
  */
-fun <R, A> Gen<R, A>.filter(f: (A) -> Boolean): Gen<R, A> = filterMap {
+public fun <R, A> Gen<R, A>.filter(f: (A) -> Boolean): Gen<R, A> = filterMap {
   if (f(it)) it else null
 }
 
@@ -651,7 +653,7 @@ fun <R, A> Gen<R, A>.filter(f: (A) -> Boolean): Gen<R, A> = filterMap {
  *
  * This combinator produces more values of type [A] with increasing [Size].
  */
-fun <R, A> Gen<R, A>.orNull(): Gen<R, A?> = Gen.sized { sz ->
+public fun <R, A> Gen<R, A>.orNull(): Gen<R, A?> = Gen.sized { sz ->
   Gen.frequency(
     2 to Gen.just(null) as Gen<R, A?>,
     1 + sz.unSize to this@orNull as Gen<R, A?>
@@ -665,7 +667,7 @@ fun <R, A> Gen<R, A>.orNull(): Gen<R, A?> = Gen.sized { sz ->
  *
  * This generator will shrink towards an empty list and also shrink individual elements of the list.
  */
-fun <R, A> Gen<R, A>.list(range: Range<Int>): Gen<R, List<A>> = Gen.sized { s ->
+public fun <R, A> Gen<R, A>.list(range: Range<Int>): Gen<R, List<A>> = Gen.sized { s ->
   Gen.int_(range).flatMap { n ->
     this@list.mapRose { Rose(it) }.replicate(n)
   }.mapRose { r ->
@@ -680,7 +682,7 @@ fun <R, A> Gen<R, A>.list(range: Range<Int>): Gen<R, List<A>> = Gen.sized { s ->
 /**
  * Generate a [List] of [A]'s but uses an [IntRange] for convenience.
  */
-fun <R, A> Gen<R, A>.list(range: IntRange): Gen<R, List<A>> =
+public fun <R, A> Gen<R, A>.list(range: IntRange): Gen<R, List<A>> =
   list(Range.constant(range))
 
 internal fun <R, A> Gen<R, A>.replicate(n: Int): Gen<R, List<A>> =
@@ -726,7 +728,7 @@ internal fun <A> Sequence<Rose<A>>.interleave(): Rose<Sequence<A>> =
  *
  * This generator will shrink to an empty map and also shrink both keys and values.
  */
-fun <R, K, A> Gen<R, Pair<K, A>>.hashMap(range: Range<Int>): Gen<R, Map<K, A>> = Gen.sized { s ->
+public fun <R, K, A> Gen<R, Pair<K, A>>.hashMap(range: Range<Int>): Gen<R, Map<K, A>> = Gen.sized { s ->
   Gen.int_(range).flatMap { k ->
     this@hashMap.uniqueByKey(k)
   }
@@ -763,7 +765,7 @@ internal fun <R, K, A> Gen<R, Pair<K, A>>.uniqueByKey(n: Int): Gen<R, List<Gen<R
  *
  * This generator will shrink to an empty set and also shrinks individual elements.
  */
-fun <R, A> Gen<R, A>.set(range: Range<Int>): Gen<R, Set<A>> =
+public fun <R, A> Gen<R, A>.set(range: Range<Int>): Gen<R, Set<A>> =
   map { it to Unit }.hashMap(range).map { it.keys }
 
 // arrow combinators
@@ -774,7 +776,7 @@ fun <R, A> Gen<R, A>.set(range: Range<Int>): Gen<R, Set<A>> =
  *
  * @see either_ For a non weighted generator
  */
-fun <R, L, A> Gen.Companion.either(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Either<L, A>> =
+public fun <R, L, A> Gen.Companion.either(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Either<L, A>> =
   sized { s ->
     frequency(
       2 to lgen.map { it.left() },
@@ -789,7 +791,7 @@ fun <R, L, A> Gen.Companion.either(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Eit
  *
  * @see either For a weighted generator
  */
-fun <R, L, A> Gen.Companion.either_(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Either<L, A>> =
+public fun <R, L, A> Gen.Companion.either_(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Either<L, A>> =
   choice(
     lgen.map { it.left() },
     rgen.map { it.right() }
@@ -800,7 +802,7 @@ fun <R, L, A> Gen.Companion.either_(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Ei
  *
  * This generator will preserve shrinking.
  */
-fun <R, E, A> Gen.Companion.validated(errGen: Gen<R, E>, succGen: Gen<R, A>): Gen<R, Validated<E, A>> =
+public fun <R, E, A> Gen.Companion.validated(errGen: Gen<R, E>, succGen: Gen<R, A>): Gen<R, Validated<E, A>> =
   either(errGen, succGen).map { Validated.fromEither(it) }
 
 /**
@@ -808,7 +810,7 @@ fun <R, E, A> Gen.Companion.validated(errGen: Gen<R, E>, succGen: Gen<R, A>): Ge
  *
  * This generator will preserve shrinking.
  */
-fun <R, L, A> Gen.Companion.ior(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Ior<L, A>> =
+public fun <R, L, A> Gen.Companion.ior(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Ior<L, A>> =
   sized { s ->
     frequency(
       2 to lgen.map { Ior.Left(it) },
@@ -822,7 +824,7 @@ fun <R, L, A> Gen.Companion.ior(lgen: Gen<R, L>, rgen: Gen<R, A>): Gen<R, Ior<L,
  *
  * This generator will preserve shrinking.
  */
-fun <R, A, T> Gen<R, A>.const(): Gen<R, Const<A, T>> = map(::Const)
+public fun <R, A, T> Gen<R, A>.const(): Gen<R, Const<A, T>> = map(::Const)
 
 /**
  * Generate [NonEmptyList]'s within the [Range].
@@ -832,7 +834,7 @@ fun <R, A, T> Gen<R, A>.const(): Gen<R, Const<A, T>> = map(::Const)
  *
  * This generator shrinks to a one element list and also shrinks the individual elements.
  */
-fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
+public fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
   list(range).filterMap { NonEmptyList.fromList(it).orNull() }
 
 // Subterms
@@ -844,7 +846,7 @@ fun <R, A> Gen<R, A>.nonEmptyList(range: Range<Int>): Gen<R, NonEmptyList<A>> =
  *
  * The frozen generator preserves shrinking.
  */
-fun <R, A> Gen<R, A>.freeze(): Gen<R, Pair<A, Gen<R, A>>> =
+public fun <R, A> Gen<R, A>.freeze(): Gen<R, Pair<A, Gen<R, A>>> =
   Gen(runGen.andThen { it?.let { mx -> Rose(mx.res to Gen { mx }) } })
 
 // Invariant: List size does not change
@@ -869,7 +871,7 @@ internal fun <R, A> List<Gen<R, A>>.subtermList(f: (List<A>) -> Gen<R, A>): Gen<
  *
  * This allows shrinking not only the generator itself but also shrinking to one of its subterms.
  */
-fun <R, A> Gen<R, A>.subtermN(f: suspend (A) -> A): Gen<R, A> =
+public fun <R, A> Gen<R, A>.subtermN(f: suspend (A) -> A): Gen<R, A> =
   listOf(this).subtermList { Gen { _ -> Rose(f(it[0])) } }
 
 /**
@@ -877,7 +879,7 @@ fun <R, A> Gen<R, A>.subtermN(f: suspend (A) -> A): Gen<R, A> =
  *
  * This allows shrinking not only the generator itself but also shrinking to one of its subterms.
  */
-fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A) -> A): Gen<R, A> =
+public fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A) -> A): Gen<R, A> =
   listOf(this, this).subtermList { Gen { _ -> Rose(f(it[0], it[1])) } }
 
 /**
@@ -885,7 +887,7 @@ fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A) -> A): Gen<R, A> =
  *
  * This allows shrinking not only the generator itself but also shrinking to one of its subterms.
  */
-fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A, A) -> A): Gen<R, A> =
+public fun <R, A> Gen<R, A>.subtermN(f: suspend (A, A, A) -> A): Gen<R, A> =
   listOf(this, this, this).subtermList { Gen { _ -> Rose(f(it[0], it[1], it[2])) } }
 
 internal sealed class Subterms<A> {
@@ -909,7 +911,7 @@ internal fun <A> Subterms<A>.shrinkSubterms(): Sequence<Subterms<A>> = when (thi
  *
  * This will shrink towards an empty list.
  */
-fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
+public fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
   map { a -> Gen.bool_().map { if (it) a else null } }
     .sequence()
     .map { it.mapNotNull(::identity) }
@@ -920,7 +922,7 @@ fun <A> List<A>.subsequence(): Gen<Any?, List<A>> =
  *
  * This will shrink towards the original list.
  */
-fun <A> List<A>.shuffle(): Gen<Any?, List<A>> =
+public fun <A> List<A>.shuffle(): Gen<Any?, List<A>> =
   if (isEmpty()) Gen.just(emptyList())
   else {
     Gen.int(Range.constant(0, size - 1)).flatMap { n ->
@@ -936,12 +938,12 @@ fun <A> List<A>.shuffle(): Gen<Any?, List<A>> =
  *
  * Since this is composition of [map2] it preserves parallel shrinking and should be preferred over [flatMap]!
  */
-fun <R, A, B, C> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, f: (A, B) -> C): Gen<R, C> = g1.map2(g2, f)
+public fun <R, A, B, C> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, f: (A, B) -> C): Gen<R, C> = g1.map2(g2, f)
 
-fun <R, A, B, C, D> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, g3: Gen<R, C>, f: (A, B, C) -> D): Gen<R, D> =
+public fun <R, A, B, C, D> Gen.Companion.mapN(g1: Gen<R, A>, g2: Gen<R, B>, g3: Gen<R, C>, f: (A, B, C) -> D): Gen<R, D> =
   g1.map2(g2.map2(g3) { b, c -> b to c }) { a, (b, c) -> f(a, b, c) }
 
-fun <R, A, B, C, D, E> Gen.Companion.mapN(
+public fun <R, A, B, C, D, E> Gen.Companion.mapN(
   g1: Gen<R, A>,
   g2: Gen<R, B>,
   g3: Gen<R, C>,
@@ -950,7 +952,7 @@ fun <R, A, B, C, D, E> Gen.Companion.mapN(
 ): Gen<R, E> =
   g1.map2(g2.map2(g3.map2(g4) { c, d -> c to d }) { b, cd -> b to cd }) { a, (b, cd) -> f(a, b, cd.first, cd.second) }
 
-fun <R, A, B, C, D, E, F> Gen.Companion.mapN(
+public fun <R, A, B, C, D, E, F> Gen.Companion.mapN(
   g1: Gen<R, A>,
   g2: Gen<R, B>,
   g3: Gen<R, C>,
@@ -962,7 +964,7 @@ fun <R, A, B, C, D, E, F> Gen.Companion.mapN(
     f(a, b, cde.first, cde.second.first, cde.second.second)
   }
 
-fun <R, A, B, C, D, E, F, G> Gen.Companion.mapN(
+public fun <R, A, B, C, D, E, F, G> Gen.Companion.mapN(
   g1: Gen<R, A>,
   g2: Gen<R, B>,
   g3: Gen<R, C>,
@@ -978,7 +980,7 @@ fun <R, A, B, C, D, E, F, G> Gen.Companion.mapN(
     f(a, b, c, d, e, f2)
   }
 
-fun <R, A, B, C, D, E, F, G, H> Gen.Companion.mapN(
+public fun <R, A, B, C, D, E, F, G, H> Gen.Companion.mapN(
   g1: Gen<R, A>,
   g2: Gen<R, B>,
   g3: Gen<R, C>,
@@ -996,7 +998,7 @@ fun <R, A, B, C, D, E, F, G, H> Gen.Companion.mapN(
     f(a, b, c, d, e, f2, g)
   }
 
-fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
+public fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
   g1: Gen<R, A>,
   g2: Gen<R, B>,
   g3: Gen<R, C>,
@@ -1016,20 +1018,20 @@ fun <R, A, B, C, D, E, F, G, H, I> Gen.Companion.mapN(
     f(a, b, c, d, e, f2, g, h)
   }
 
-fun <R, A, B> Gen<R, A>.tupled(other: Gen<R, B>): Gen<R, Pair<A, B>> =
+public fun <R, A, B> Gen<R, A>.tupled(other: Gen<R, B>): Gen<R, Pair<A, B>> =
   map2(other, ::Pair)
 
-fun <R, A, B> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>): Gen<R, Pair<A, B>> =
+public fun <R, A, B> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>): Gen<R, Pair<A, B>> =
   first.map2(second, ::Pair)
 
-fun <R, A, B, C> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>, third: Gen<R, C>): Gen<R, Triple<A, B, C>> =
+public fun <R, A, B, C> Gen.Companion.tupledN(first: Gen<R, A>, second: Gen<R, B>, third: Gen<R, C>): Gen<R, Triple<A, B, C>> =
   Gen.mapN(first, second, third) { a, b, c -> Triple(a, b, c) }
 
 // Debugging generators
 /**
  * Run a generator and return the first non discarded result
  */
-suspend fun <R, A> Gen<R, A>.sample(size: Size = Size(30), r: R): A {
+public suspend fun <R, A> Gen<R, A>.sample(size: Size = Size(30), r: R): A {
   tailrec suspend fun loop(n: Int): A =
     if (n <= 0) throw IllegalStateException("Gen.Sample too many discards")
     else {
@@ -1042,12 +1044,12 @@ suspend fun <R, A> Gen<R, A>.sample(size: Size = Size(30), r: R): A {
   return loop(100)
 }
 
-suspend fun <A> Gen<Any?, A>.sample(size: Size = Size(30)): A = sample(size, Unit)
+public suspend fun <A> Gen<Any?, A>.sample(size: Size = Size(30)): A = sample(size, Unit)
 
 /**
  * Run a generator and print the first result together with its first layer of shrinks.
  */
-suspend fun <R, A> Gen<R, A>.print(
+public suspend fun <R, A> Gen<R, A>.print(
   seed: RandSeed = RandSeed(Random.nextLong()),
   size: Size = Size(30),
   SA: (A) -> String = { it.toString() },

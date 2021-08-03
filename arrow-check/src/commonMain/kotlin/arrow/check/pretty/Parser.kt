@@ -96,7 +96,7 @@ internal sealed class KValue {
  *
  * @param SA Optional [Show] instance, default uses [Any.toString].
  */
-fun <A> A.showPretty(SA: (A) -> String = { it.toString() }): Doc<Nothing> {
+public fun <A> A.showPretty(SA: (A) -> String = { it.toString() }): Doc<Nothing> {
   val str = SA(this)
   return (rootParser.parseOrNull(str.toCharArray()) ?: KValue.RawString(str))
     .doc().group()

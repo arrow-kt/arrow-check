@@ -5,13 +5,12 @@ import arrow.check.property.Property
 import arrow.check.property.PropertyConfig
 import arrow.check.property.PropertyName
 import arrow.check.property.Test
-import arrow.check.property.property
 import io.kotest.core.spec.DslDrivenSpec
 import io.kotest.core.test.DescriptionName
 import io.kotest.core.test.TestCaseConfig
 import io.kotest.core.test.TestType
 
-abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : DslDrivenSpec() {
+public abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : DslDrivenSpec() {
   init {
     f()
   }
@@ -20,7 +19,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
     return super.defaultTestCaseConfig() ?: TestCaseConfig()
   }
 
-  operator fun <A> String.invoke(
+  public operator fun <A> String.invoke(
     gen: Gen<Any?, A>,
     propertyConfig: PropertyConfig = PropertyConfig.default(),
     c: suspend Test.(A) -> Unit
@@ -28,14 +27,14 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
     addTest(
       DescriptionName.TestName(this, this, false, false),
       {
-        checkReport(PropertyName(this@invoke), gen, property(propertyConfig, c))
+        checkReport(PropertyName(this@invoke), Property(gen, propertyConfig, c))
           .toException()
       },
       defaultTestCaseConfig(),
       TestType.Test
     )
 
-  operator fun <A> String.invoke(
+  public operator fun <A> String.invoke(
     args: Config,
     gen: Gen<Any?, A>,
     propertyConfig: PropertyConfig = PropertyConfig.default(),
@@ -47,8 +46,7 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
         checkReport(
           args,
           PropertyName(this@invoke),
-          gen,
-          property(propertyConfig, c)
+          Property(gen, propertyConfig, c)
         )
           .toException()
       },
@@ -56,22 +54,22 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
       TestType.Test
     )
 
-  operator fun <A> String.invoke(gen: Gen<Any?, A>, f: Property<A>): Unit =
+  public operator fun <A> String.invoke(f: Property<A>): Unit =
     addTest(
       DescriptionName.TestName(this, this, false, false),
       {
-        checkReport(PropertyName(this@invoke), gen, f)
+        checkReport(PropertyName(this@invoke), f)
           .toException()
       },
       defaultTestCaseConfig(),
       TestType.Test
     )
 
-  operator fun <A> String.invoke(args: Config, gen: Gen<Any?, A>, f: Property<A>): Unit =
+  public operator fun <A> String.invoke(args: Config, f: Property<A>): Unit =
     addTest(
       DescriptionName.TestName(this, this, false, false),
       {
-        checkReport(args, PropertyName(this@invoke), gen, f)
+        checkReport(args, PropertyName(this@invoke), f)
           .toException()
       },
       defaultTestCaseConfig(),
@@ -80,10 +78,10 @@ abstract class AbstractPropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : D
 }
 
 // TODO add summary here
-fun Report<Result>.toException(): Unit = when (status) {
+internal fun Report<Result>.toException(): Unit = when (status) {
   is Result.Success -> Unit
   is Result.GivenUp -> throw AssertionError("GaveUp!")
   is Result.Failure -> throw AssertionError("Failed!")
 }
 
-abstract class PropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : AbstractPropertySpec(f)
+public abstract class PropertySpec(f: AbstractPropertySpec.() -> Unit = {}) : AbstractPropertySpec(f)

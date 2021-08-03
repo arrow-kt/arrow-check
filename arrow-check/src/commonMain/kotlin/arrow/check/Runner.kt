@@ -10,28 +10,28 @@ import arrow.check.property.Test
 import arrow.check.property.runProperty
 import kotlin.random.Random
 
-suspend fun <A> checkProp(gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
-  checkProp(Property(propConfig, gen, prop))
+public suspend fun <A> checkProp(gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
+  checkProp(Property(gen, propConfig, prop))
 
-suspend fun <A> checkProp(config: Config, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
-  checkProp(config, null, Property(propConfig, gen, prop))
+public suspend fun <A> checkProp(config: Config, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
+  checkProp(config, null, Property(gen, propConfig, prop))
 
-suspend fun <A> checkProp(name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
-  checkProp(detectConfig(), name, Property(propConfig, gen, prop))
+public suspend fun <A> checkProp(name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
+  checkProp(detectConfig(), name, Property(gen, propConfig, prop))
 
-suspend fun <A> checkProp(config: Config, name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
-  checkProp(config, name, Property(propConfig, gen, prop))
+public suspend fun <A> checkProp(config: Config, name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Boolean =
+  checkProp(config, name, Property(gen, propConfig, prop))
 
-suspend fun <A> checkProp(prop: Property<A>): Boolean =
+public suspend fun <A> checkProp(prop: Property<A>): Boolean =
   checkProp(detectConfig(), null, prop)
 
-suspend fun <A> checkProp(name: PropertyName?, prop: Property<A>): Boolean =
+public suspend fun <A> checkProp(name: PropertyName?, prop: Property<A>): Boolean =
   checkProp(detectConfig(), name, prop)
 
-suspend fun <A> checkProp(config: Config, prop: Property<A>): Boolean =
+public suspend fun <A> checkProp(config: Config, prop: Property<A>): Boolean =
   checkProp(config, null, prop)
 
-suspend fun <A> checkProp(config: Config, name: PropertyName?, prop: Property<A>): Boolean =
+public suspend fun <A> checkProp(config: Config, name: PropertyName?, prop: Property<A>): Boolean =
   checkReport(config, name, prop).status != Result.Success
 
 /**
@@ -41,27 +41,27 @@ suspend fun <A> checkProp(config: Config, name: PropertyName?, prop: Property<A>
  *
  * @see check for a function that performs the test with random inputs
  */
-suspend fun <A> recheck(size: Size, seed: RandSeed, prop: Property<A>): Unit =
+public suspend fun <A> recheck(size: Size, seed: RandSeed, prop: Property<A>): Unit =
   recheck(detectConfig(), size, seed, prop)
 
-suspend fun <A> recheck(
+public suspend fun <A> recheck(
   size: Size,
   seed: RandSeed,
   gen: Gen<Any?, A>,
   propertyConfig: PropertyConfig = PropertyConfig(),
   c: suspend Test.(A) -> Unit
-): Unit = recheck(size, seed, Property(propertyConfig, gen, c))
+): Unit = recheck(size, seed, Property(gen, propertyConfig, c))
 
-suspend fun <A> recheck(
+public suspend fun <A> recheck(
   config: Config,
   size: Size,
   seed: RandSeed,
   gen: Gen<Any?, A>,
   propertyConfig: PropertyConfig = PropertyConfig(),
   c: suspend Test.(A) -> Unit
-): Unit = recheck(config, size, seed, Property(propertyConfig, gen, c))
+): Unit = recheck(config, size, seed, Property(gen, propertyConfig, c))
 
-suspend fun <A> recheck(config: Config, size: Size, seed: RandSeed, prop: Property<A>): Unit {
+public suspend fun <A> recheck(config: Config, size: Size, seed: RandSeed, prop: Property<A>): Unit {
   checkReport(seed, size, config, null, prop)
 }
 
@@ -71,19 +71,19 @@ suspend fun <A> recheck(config: Config, size: Size, seed: RandSeed, prop: Proper
  * @see check if you are only interested in whether or not the test is a successful
  */
 // TODO Should checkReport do console output or just return the report?
-suspend fun <A> checkReport(name: PropertyName? = null, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Report<Result> =
-  checkReport(detectConfig(), name, Property(propConfig, gen, prop))
+public suspend fun <A> checkReport(name: PropertyName? = null, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Report<Result> =
+  checkReport(detectConfig(), name, Property(gen, propConfig, prop))
 
-suspend fun <A> checkReport(config: Config, name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Report<Result> =
-  checkReport(config, name, Property(propConfig, gen, prop))
+public suspend fun <A> checkReport(config: Config, name: PropertyName?, gen: Gen<Any?, A>, propConfig: PropertyConfig = PropertyConfig(), prop: suspend Test.(A) -> Unit): Report<Result> =
+  checkReport(config, name, Property(gen, propConfig, prop))
 
-suspend fun <A> checkReport(name: PropertyName? = null, prop: Property<A>): Report<Result> =
+public suspend fun <A> checkReport(name: PropertyName? = null, prop: Property<A>): Report<Result> =
   checkReport(detectConfig(), name, prop)
 
-suspend fun <A> checkReport(config: Config, name: PropertyName?, prop: Property<A>): Report<Result> =
+public suspend fun <A> checkReport(config: Config, name: PropertyName?, prop: Property<A>): Report<Result> =
   checkReport(RandSeed(Random.nextLong()), Size(0), config, name, prop)
 
-suspend fun <A> checkReport(
+public suspend fun <A> checkReport(
   seed: RandSeed,
   size: Size,
   config: Config,

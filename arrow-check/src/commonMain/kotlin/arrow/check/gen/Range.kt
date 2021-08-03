@@ -11,12 +11,12 @@ import kotlin.math.min
  * @param origin The origin of a range will only be used to shrink towards that origin
  * @param bounds A function that generates an lower and upper bound depending on the [Size].
  */
-data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
+public data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
 
   /**
    * Change the [Range] by mapping over it
    */
-  fun <B> map(f: (A) -> B): Range<B> = Range(
+  public fun <B> map(f: (A) -> B): Range<B> = Range(
     f(origin),
     bounds andThen { (a, b) -> f(a) to f(b) }
   )
@@ -24,80 +24,80 @@ data class Range<A>(val origin: A, val bounds: (Size) -> Pair<A, A>) {
   /**
    * Extract the lower bound using the given [Size]
    */
-  fun lowerBound(s: Size): A = bounds(s).first
+  public fun lowerBound(s: Size): A = bounds(s).first
 
   /**
    * Extract the lower bound using the given [Size]
    */
-  fun upperBound(s: Size): A = bounds(s).second
+  public fun upperBound(s: Size): A = bounds(s).second
 
-  companion object {
+  public companion object {
 
     /**
      * Singleton range which always has [a] as a bound.
      */
-    fun <A> singleton(a: A): Range<A> = Range(a) { a to a }
+    public fun <A> singleton(a: A): Range<A> = Range(a) { a to a }
 
     /**
      * Create a constant range that does not change with [Size].
      *
      * [start] will also be used as [origin].
      */
-    fun <A> constant(start: A, end: A): Range<A> = Range(start) { start to end }
+    public fun <A> constant(start: A, end: A): Range<A> = Range(start) { start to end }
 
     /**
      * Create a constant range with a specific origin.
      */
-    fun <A> constant(origin: A, start: A, end: A): Range<A> = Range(origin) { start to end }
+    public fun <A> constant(origin: A, start: A, end: A): Range<A> = Range(origin) { start to end }
 
-    fun constant(range: IntRange): Range<Int> = constant(range.first, range.last)
-    fun constant(range: CharRange): Range<Char> = constant(range.first, range.last)
-    fun constant(range: LongRange): Range<Long> = constant(range.first, range.last)
-    fun constant(range: IntProgression): Range<Int> = constant(range.first, range.last)
-    fun constant(range: CharProgression): Range<Char> = constant(range.first, range.last)
-    fun constant(range: LongProgression): Range<Long> = constant(range.first, range.last)
+    public fun constant(range: IntRange): Range<Int> = constant(range.first, range.last)
+    public fun constant(range: CharRange): Range<Char> = constant(range.first, range.last)
+    public fun constant(range: LongRange): Range<Long> = constant(range.first, range.last)
+    public fun constant(range: IntProgression): Range<Int> = constant(range.first, range.last)
+    public fun constant(range: CharProgression): Range<Char> = constant(range.first, range.last)
+    public fun constant(range: LongProgression): Range<Long> = constant(range.first, range.last)
 
     /**
      * Create a range that grows linear with the [Size].
      *
      * The [origin] of this range will be the [start].
      */
-    fun linear(start: Int, end: Int): Range<Int> = linearFrom(start, start, end)
+    public fun linear(start: Int, end: Int): Range<Int> = linearFrom(start, start, end)
 
     /**
      * Create a range that grows linear with the [Size] from a specific [origin].
      */
-    fun linearFrom(origin: Int, start: Int, end: Int): Range<Int> = Range(origin) { s ->
+    public fun linearFrom(origin: Int, start: Int, end: Int): Range<Int> = Range(origin) { s ->
       val xSized = scaleLinear(s, origin, start).clamp(start.toLong(), end.toLong()).toInt()
       val ySized = scaleLinear(s, origin, end).clamp(start.toLong(), end.toLong()).toInt()
       xSized to ySized
     }
 
-    fun linear(start: Char, end: Char): Range<Char> = linearFrom(start, start, end)
-    fun linearFrom(origin: Char, start: Char, end: Char): Range<Char> =
+    public fun linear(start: Char, end: Char): Range<Char> = linearFrom(start, start, end)
+    public fun linearFrom(origin: Char, start: Char, end: Char): Range<Char> =
       linearFrom(origin.toInt(), start.toInt(), end.toInt()).map { it.toChar() }
 
-    fun linear(start: Byte, end: Byte): Range<Byte> = linearFrom(start, start, end)
-    fun linearFrom(origin: Byte, start: Byte, end: Byte): Range<Byte> =
+    public fun linear(start: Byte, end: Byte): Range<Byte> = linearFrom(start, start, end)
+    public fun linearFrom(origin: Byte, start: Byte, end: Byte): Range<Byte> =
       linearFrom(origin.toInt(), start.toInt(), end.toInt()).map { it.toByte() }
 
-    fun linear(start: Long, end: Long): Range<Long> = linearFrom(start, start, end)
+    public fun linear(start: Long, end: Long): Range<Long> = linearFrom(start, start, end)
 
     // This needs extra work to prevent overflows, the above just convert to long to avoid those
-    fun linearFrom(origin: Long, start: Long, end: Long): Range<Long> = Range(origin) { s ->
+    public fun linearFrom(origin: Long, start: Long, end: Long): Range<Long> = Range(origin) { s ->
       val xSized = scaleLinear(s, origin, start).also(::println).clamp(start, end)
       val ySized = scaleLinear(s, origin, end).also(::println).clamp(start, end)
       xSized to ySized
     }
 
-    fun linear(start: Float, end: Float): Range<Float> = linearFrom(start, start, end)
-    fun linearFrom(origin: Float, start: Float, end: Float): Range<Float> =
+    public fun linear(start: Float, end: Float): Range<Float> = linearFrom(start, start, end)
+    public fun linearFrom(origin: Float, start: Float, end: Float): Range<Float> =
       linearFrom(origin.toDouble(), start.toDouble(), end.toDouble()).map { it.toFloat() }
 
-    fun linear(start: Double, end: Double): Range<Double> = linearFrom(start, start, end)
+    public fun linear(start: Double, end: Double): Range<Double> = linearFrom(start, start, end)
 
     // This needs extra work to prevent overflows, the above just convert to double to avoid those
-    fun linearFrom(origin: Double, start: Double, end: Double): Range<Double> = Range(origin) { s ->
+    public fun linearFrom(origin: Double, start: Double, end: Double): Range<Double> = Range(origin) { s ->
       val xSized = scaleLinear(s, origin, start).clamp(start, end)
       val ySized = scaleLinear(s, origin, end).clamp(start, end)
       xSized to ySized
@@ -116,7 +116,7 @@ internal fun scaleLinear(size: Size, origin: Int, target: Int): Long {
   return z + diff
 }
 
-fun scaleLinear(size: Size, origin: Long, target: Long): Long {
+internal fun scaleLinear(size: Size, origin: Long, target: Long): Long {
   val sz = max(size.unSize, min(99, size.unSize))
   val frac = sz.toDouble() / 99
 
